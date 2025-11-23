@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuração - Smart Show</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>📱 Smart Show</h1>
+            <div class="user-info">
+                <span id="userName">Usuário</span>
+                <button id="logoutBtn" class="btn btn-secondary">Sair</button>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav">
+            <a href="index.html" class="nav-item">Dashboard</a>
+            <a href="caixa.html" class="nav-item">Caixa</a>
+            <a href="produtos.html" class="nav-item">Produtos</a>
+            <a href="clientes.html" class="nav-item">Clientes</a>
+            <a href="assistencia.html" class="nav-item">Assistência</a>
+            <a href="financeiro.html" class="nav-item">Financeiro</a>
+            <a href="relatorios.html" class="nav-item">Relatórios</a>
+            <a href="configuracao.html" class="nav-item active">Configuração</a>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main">
+            <h2>Configurações</h2>
+
+            <!-- Leitor de Código de Barras -->
+            <div class="card" style="margin-bottom: 2rem;">
+                <h3>📡 Leitor de Código de Barras</h3>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="enableAutoDetect" checked>
+                        Detectar leitor automaticamente (recomendado)
+                    </label>
+                    <small style="color: #718096; display: block; margin-top: 0.25rem;">
+                        O sistema detecta automaticamente quando um código é escaneado (entrada muito rápida)
+                    </small>
+                </div>
+                
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label>
+                        <input type="checkbox" id="enableReaderMode">
+                        Modo Leitor Ativo (sempre processar automaticamente)
+                    </label>
+                    <small style="color: #718096; display: block; margin-top: 0.25rem;">
+                        Quando ativado, qualquer código digitado será processado automaticamente após 200ms
+                    </small>
+                </div>
+
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label for="testBarcodeInput">Campo de Teste:</label>
+                    <input type="text" id="testBarcodeInput" class="form-control" 
+                           placeholder="Escaneie um código aqui para testar">
+                    <small style="color: #718096; display: block; margin-top: 0.25rem;">
+                        💡 Se aparecer texto aqui ao escanear, o leitor está funcionando!
+                    </small>
+                    <div id="testResult" style="display: none; padding: 1rem; border-radius: 4px; margin-top: 1rem;">
+                        <!-- Resultado do teste aparecerá aqui -->
+                    </div>
+                </div>
+
+                <div class="form-actions" style="margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-primary" onclick="saveBarcodeConfig()">Salvar Configuração do Leitor</button>
+                </div>
+            </div>
+
+            <!-- Impressora de Cupom Fiscal -->
+            <div class="card" style="margin-bottom: 2rem;">
+                <h3>🧾 Impressora de Cupom Fiscal</h3>
+                <div class="form-group">
+                    <label for="fiscalPrinterType">Tipo de Impressora:</label>
+                    <select id="fiscalPrinterType" class="form-control">
+                        <option value="none">Nenhuma</option>
+                        <option value="usb">USB</option>
+                        <option value="network">Rede</option>
+                        <option value="serial">Serial</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="fiscalPrinterConfig" style="display: none;">
+                    <label for="fiscalPrinterPath">Caminho/Porta:</label>
+                    <input type="text" id="fiscalPrinterPath" class="form-control" 
+                           placeholder="Ex: /dev/usb/lp0 ou IP:9100">
+                    <small style="color: #718096; display: block; margin-top: 0.25rem;">
+                        Para USB: deixe vazio para auto-detecção. Para rede: use formato IP:PORTA
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="autoPrintFiscal">
+                        Imprimir cupom fiscal automaticamente após venda
+                    </label>
+                </div>
+
+                <div class="form-actions" style="margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-primary" onclick="testFiscalPrinter()">Testar Impressora</button>
+                    <button type="button" class="btn btn-secondary" onclick="saveFiscalPrinterConfig()">Salvar Configuração</button>
+                </div>
+            </div>
+
+            <!-- Impressora Normal (A4) -->
+            <div class="card" style="margin-bottom: 2rem;">
+                <h3>🖨️ Impressora Normal (Papel A4)</h3>
+                <div class="form-group">
+                    <label for="a4PrinterType">Tipo de Impressora:</label>
+                    <select id="a4PrinterType" class="form-control">
+                        <option value="none">Nenhuma</option>
+                        <option value="usb">USB</option>
+                        <option value="network">Rede</option>
+                        <option value="pdf">Salvar como PDF</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="a4PrinterConfig" style="display: none;">
+                    <label for="a4PrinterPath">Caminho/Porta/Nome:</label>
+                    <input type="text" id="a4PrinterPath" class="form-control" 
+                           placeholder="Ex: /dev/usb/lp1, IP:9100 ou nome da impressora">
+                </div>
+
+                <div class="form-actions" style="margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-primary" onclick="testA4Printer()">Testar Impressora</button>
+                    <button type="button" class="btn btn-secondary" onclick="saveA4PrinterConfig()">Salvar Configuração</button>
+                </div>
+            </div>
+
+            <!-- Gerenciamento de Usuários (Apenas Admin) -->
+            <div class="card" id="usersManagementCard" style="display: none;">
+                <h3>👥 Gerenciamento de Usuários</h3>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <button type="button" class="btn btn-primary" onclick="openUserModal()">➕ Novo Usuário</button>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nome</th>
+                                <th>Usuário</th>
+                                <th>Função</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr><td colspan="6">Carregando usuários...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal de Usuário -->
+    <div id="userModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeUserModal()">&times;</span>
+            <h2 id="userModalTitle">Novo Usuário</h2>
+            <form id="userForm">
+                <input type="hidden" id="userId">
+                
+                <div class="form-group">
+                    <label for="userNameInput">Nome Completo *</label>
+                    <input type="text" id="userNameInput" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="userUsernameInput">Nome de Usuário *</label>
+                    <input type="text" id="userUsernameInput" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="userPasswordInput">Senha *</label>
+                    <input type="password" id="userPasswordInput" class="form-control" required>
+                    <small style="color: #718096;">Deixe em branco ao editar para manter a senha atual</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="userRoleInput">Função *</label>
+                    <select id="userRoleInput" class="form-control" required>
+                        <option value="admin">Administrador (acesso total)</option>
+                        <option value="gerente">Gerente (acesso a tudo exceto configuração)</option>
+                        <option value="caixa">Caixa (Caixa, Produtos, Clientes, Assistência)</option>
+                        <option value="vendedor">Vendedor (Caixa, Produtos, Clientes)</option>
+                        <option value="tecnico">Técnico (Assistência, Produtos)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="userIsActive" checked>
+                        Usuário Ativo
+                    </label>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/access-control.js"></script>
+    <script src="js/configuracao.js"></script>
+</body>
+</html>
+

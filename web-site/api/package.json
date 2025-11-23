@@ -1,0 +1,40 @@
+{
+  "name": "smartshow-api",
+  "version": "1.0.0",
+  "description": "API para sistema de gestão de loja de eletrônicos e assistência técnica",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "setup-db": "node scripts/setup-database.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "loja",
+    "eletronicos",
+    "assistencia-tecnica",
+    "pdv",
+    "api",
+    "aws"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "sqlite3": "^5.1.6",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "pdfkit": "^0.14.0",
+    "escpos": "^2.5.2",
+    "escpos-usb": "^3.0.0-alpha.4",
+    "dotenv": "^16.3.1",
+    "moment": "^2.29.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
+
+

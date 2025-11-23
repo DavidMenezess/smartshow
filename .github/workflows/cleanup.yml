@@ -1,0 +1,21 @@
+name: Cleanup
+
+on:
+  schedule:
+    - cron: '0 2 * * 0' # Semanalmente aos domingos às 2h
+  workflow_dispatch:
+
+jobs:
+  cleanup-artifacts:
+    name: Limpar Artifacts Antigos
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deletar artifacts antigos
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: terraform-plan
+          failOnError: false
+
+
+

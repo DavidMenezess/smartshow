@@ -1,0 +1,86 @@
+name: Lint e Formatação
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-terraform:
+    name: Lint Terraform
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./terraform
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Format (auto-fix)
+        if: failure()
+        run: terraform fmt -recursive
+
+      - name: TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: Executar TFLint
+        run: tflint --init && tflint
+
+  lint-javascript:
+    name: Lint JavaScript
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web-site/api
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Instalar ESLint (se necessário)
+        run: |
+          if [ ! -f package.json ] || ! grep -q "eslint" package.json; then
+            npm install --save-dev eslint
+            npx eslint --init --yes || true
+          fi
+
+      - name: Executar ESLint
+        continue-on-error: true
+        run: |
+          if [ -f .eslintrc.js ] || [ -f .eslintrc.json ] || [ -f package.json ]; then
+            npx --yes eslint . --ext .js 2>/dev/null || echo "⚠️ ESLint não disponível ou encontrou problemas (não bloqueante)"
+          else
+            echo "ℹ️ ESLint não configurado, pulando..."
+          fi
+
+  lint-markdown:
+    name: Lint Markdown
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Markdown Lint
+        uses: DavidAnson/markdownlint-cli2-action@v15
+        with:
+          globs: '**/*.md'
+          fix: false
+        continue-on-error: true

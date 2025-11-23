@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financeiro - Smart Show</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>📱 Smart Show</h1>
+            <div class="user-info">
+                <span id="userName">Usuário</span>
+                <button id="logoutBtn" class="btn btn-secondary">Sair</button>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav">
+            <a href="index.html" class="nav-item">Dashboard</a>
+            <a href="caixa.html" class="nav-item">Caixa</a>
+            <a href="produtos.html" class="nav-item">Produtos</a>
+            <a href="clientes.html" class="nav-item">Clientes</a>
+            <a href="assistencia.html" class="nav-item">Assistência</a>
+            <a href="financeiro.html" class="nav-item active">Financeiro</a>
+            <a href="relatorios.html" class="nav-item">Relatórios</a>
+            <a href="configuracao.html" class="nav-item" id="configNavItem" style="display: none;">Configuração</a>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main">
+            <h2>Financeiro</h2>
+
+            <!-- Cards de Resumo -->
+            <div class="dashboard-grid" style="margin-bottom: 2rem;">
+                <div class="card">
+                    <h3>Contas a Receber</h3>
+                    <div class="card-value" id="totalReceivable">R$ 0,00</div>
+                    <div class="card-count" id="receivableCount">0 contas</div>
+                </div>
+                <div class="card">
+                    <h3>Contas a Pagar</h3>
+                    <div class="card-value" id="totalPayable">R$ 0,00</div>
+                    <div class="card-count" id="payableCount">0 contas</div>
+                </div>
+            </div>
+
+            <!-- Abas -->
+            <div style="margin-bottom: 1rem;">
+                <button class="btn btn-secondary" onclick="showTab('receivable')">Contas a Receber</button>
+                <button class="btn btn-secondary" onclick="showTab('payable')">Contas a Pagar</button>
+            </div>
+
+            <!-- Tabela de Contas a Receber -->
+            <div id="receivableTab" class="tab-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3>Contas a Receber</h3>
+                    <button class="btn btn-primary" onclick="addReceivable()">+ Nova Conta</button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Descrição</th>
+                                <th>Cliente</th>
+                                <th>Valor</th>
+                                <th>Vencimento</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="receivableTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 2rem;">Carregando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tabela de Contas a Pagar -->
+            <div id="payableTab" class="tab-content" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3>Contas a Pagar</h3>
+                    <button class="btn btn-primary" onclick="addPayable()">+ Nova Conta</button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Descrição</th>
+                                <th>Fornecedor</th>
+                                <th>Valor</th>
+                                <th>Vencimento</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="payableTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 2rem;">Carregando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/access-control.js"></script>
+    <script>
+        function showTab(tab) {
+            document.getElementById('receivableTab').style.display = tab === 'receivable' ? 'block' : 'none';
+            document.getElementById('payableTab').style.display = tab === 'payable' ? 'block' : 'none';
+        }
+
+        // Carregar dados financeiros
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                const response = await fetch('/api/financial');
+                const data = await response.json();
+                
+                // Atualizar totais
+                document.getElementById('totalReceivable').textContent = 
+                    `R$ ${parseFloat(data.totalReceivable || 0).toFixed(2).replace('.', ',')}`;
+                document.getElementById('receivableCount').textContent = 
+                    `${data.receivableCount || 0} contas`;
+                document.getElementById('totalPayable').textContent = 
+                    `R$ ${parseFloat(data.totalPayable || 0).toFixed(2).replace('.', ',')}`;
+                document.getElementById('payableCount').textContent = 
+                    `${data.payableCount || 0} contas`;
+
+                // Atualizar tabelas
+                // Implementar conforme necessário
+            } catch (error) {
+                console.error('Erro ao carregar dados financeiros:', error);
+            }
+        });
+    </script>
+</body>
+</html>
+
+

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caixa - Smart Show</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>💰 Caixa - Smart Show</h1>
+            <div class="user-info">
+                <span id="userName">Usuário</span>
+                <button id="openCashBtn" class="btn btn-success" style="display: none;">Abrir Caixa</button>
+                <button id="closeCashBtn" class="btn btn-danger" style="display: none;">Fechar Caixa</button>
+                <a href="index.html" class="btn btn-secondary">Voltar</a>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav">
+            <a href="index.html" class="nav-item">Dashboard</a>
+            <a href="caixa.html" class="nav-item active">Caixa</a>
+            <a href="produtos.html" class="nav-item">Produtos</a>
+            <a href="clientes.html" class="nav-item">Clientes</a>
+            <a href="assistencia.html" class="nav-item">Assistência</a>
+            <a href="financeiro.html" class="nav-item">Financeiro</a>
+            <a href="relatorios.html" class="nav-item">Relatórios</a>
+            <a href="configuracao.html" class="nav-item" id="configNavItem" style="display: none;">Configuração</a>
+        </nav>
+
+        <!-- Status do Caixa -->
+        <div id="cashStatus" class="cash-status" style="display: none;">
+            <div class="cash-status-card">
+                <h3>Status do Caixa</h3>
+                <div class="cash-info">
+                    <div class="cash-info-item">
+                        <span>Valor Inicial:</span>
+                        <strong id="initialCash">R$ 0,00</strong>
+                    </div>
+                    <div class="cash-info-item">
+                        <span>Vendas do Dia:</span>
+                        <strong id="todaySales">R$ 0,00</strong>
+                    </div>
+                    <div class="cash-info-item">
+                        <span>Saldo Atual:</span>
+                        <strong id="currentBalance">R$ 0,00</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main pdv-main" id="pdvMain" style="display: none;">
+            <div class="pdv-container">
+                <!-- Painel Esquerdo - Carrinho -->
+                <div class="pdv-left">
+                    <div class="pdv-header">
+                        <h2>Nova Venda</h2>
+                        <div class="sale-info">
+                            <span>Nº: <strong id="saleNumber">-</strong></span>
+                            <span>Data: <strong id="saleDate">-</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Busca de Produto -->
+                    <div class="barcode-input-container">
+                        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center; flex-wrap: wrap;">
+                            <button type="button" id="searchModeBtn" class="btn btn-secondary" onclick="toggleSearchMode()" style="white-space: nowrap;">
+                                🔍 Buscar por Nome
+                            </button>
+                        </div>
+                        <div id="barcodeSearchContainer">
+                            <label for="barcodeInput">Código de Barras (F3)</label>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <input type="text" id="barcodeInput" class="barcode-input" 
+                                       placeholder="Escaneie ou digite o código e pressione Enter" 
+                                       style="flex: 1;" autofocus>
+                                <button type="button" id="searchBarcodeBtn" class="btn btn-primary" 
+                                        onclick="searchBarcodeManually()" title="Buscar código digitado">
+                                    🔍 Buscar
+                                </button>
+                            </div>
+                            <small style="color: #718096; font-size: 0.85rem; margin-top: 0.25rem; display: block;">
+                                💡 Dica: Digite o código completo e pressione Enter, ou use o botão Buscar
+                            </small>
+                        </div>
+                        <div id="nameSearchContainer" style="display: none;">
+                            <label for="productNameInput">Buscar Produto por Nome</label>
+                            <input type="text" id="productNameInput" class="barcode-input" 
+                                   placeholder="Digite o nome do produto">
+                            <div id="productSearchResults" style="display: none; margin-top: 0.5rem; max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 4px; background: white;">
+                                <!-- Resultados da busca aparecerão aqui -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Itens -->
+                    <div class="cart-container">
+                        <table class="cart-table">
+                            <thead>
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Produto</th>
+                                    <th>Qtd</th>
+                                    <th>Preço</th>
+                                    <th>Total</th>
+                                    <th>Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cartItems">
+                                <tr>
+                                    <td colspan="6" class="empty-cart">Carrinho vazio</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Totais -->
+                    <div class="cart-totals">
+                        <div class="total-row">
+                            <span>Subtotal:</span>
+                            <span id="subtotal">R$ 0,00</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Desconto:</span>
+                            <input type="number" id="discount" value="0" step="0.01" min="0">
+                        </div>
+                        <div class="total-row total-final">
+                            <span>TOTAL:</span>
+                            <span id="total">R$ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Painel Direito - Pagamento -->
+                <div class="pdv-right">
+                    <h3>Pagamento</h3>
+
+                    <!-- Cliente -->
+                    <div class="form-group">
+                        <label for="customerSearch">Cliente <small style="color: #718096; font-weight: normal;">(opcional)</small></label>
+                        <div style="position: relative;">
+                            <input type="text" id="customerSearch" class="form-control" 
+                                   placeholder="Digite o nome ou CPF do cliente"
+                                   autocomplete="off">
+                            <div id="customerSearchResults" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1000; max-height: 300px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 4px; margin-top: 2px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                <!-- Resultados aparecerão aqui -->
+                            </div>
+                        </div>
+                        <input type="hidden" id="customerId" value="">
+                        <small style="color: #718096; display: block; margin-top: 0.25rem;">
+                            💡 Digite o nome ou CPF para buscar. Deixe vazio para venda sem cliente.
+                        </small>
+                    </div>
+
+                    <!-- Forma de Pagamento -->
+                    <div class="form-group">
+                        <label for="paymentMethod">Forma de Pagamento</label>
+                        <select id="paymentMethod" class="form-control">
+                            <option value="Dinheiro">Dinheiro</option>
+                            <option value="Cartão de Débito">Cartão de Débito</option>
+                            <option value="Cartão de Crédito">Cartão de Crédito</option>
+                            <option value="PIX">PIX</option>
+                            <option value="Boleto">Boleto</option>
+                            <option value="Crediário">Crediário</option>
+                        </select>
+                    </div>
+
+                    <!-- Valor Pago (para dinheiro) -->
+                    <div class="form-group" id="paidAmountGroup" style="display: none;">
+                        <label for="paidAmount">Valor Pago</label>
+                        <input type="number" id="paidAmount" class="form-control" step="0.01" min="0">
+                        <div class="change-display" id="changeDisplay" style="display: none;">
+                            Troco: <strong id="change">R$ 0,00</strong>
+                        </div>
+                    </div>
+
+                    <!-- Observações -->
+                    <div class="form-group">
+                        <label for="observations">Observações</label>
+                        <textarea id="observations" class="form-control" rows="3"></textarea>
+                    </div>
+
+                    <!-- Botões de Ação -->
+                    <div class="pdv-actions">
+                        <button id="finalizeSaleBtn" class="btn btn-primary btn-large">
+                            Finalizar Venda
+                        </button>
+                        <button id="printReceiptBtn" class="btn btn-secondary">
+                            Imprimir Cupom
+                        </button>
+                        <button id="cancelSaleBtn" class="btn btn-danger">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Mensagem quando caixa está fechado -->
+        <div id="closedCashMessage" class="closed-cash-message">
+            <div class="message-box">
+                <h2>💰 Caixa Fechado</h2>
+                <p>Para iniciar as vendas, é necessário abrir o caixa primeiro.</p>
+                <button id="openCashModalBtn" class="btn btn-primary">Abrir Caixa</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Abertura de Caixa -->
+    <div id="openCashModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" id="closeModal">&times;</span>
+            <h2>Abrir Caixa</h2>
+            <form id="openCashForm">
+                <div class="form-group">
+                    <label for="initialCashValue">Valor Inicial em Caixa</label>
+                    <input type="number" id="initialCashValue" class="form-control" step="0.01" min="0" value="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="cashObservations">Observações</label>
+                    <textarea id="cashObservations" class="form-control" rows="3" placeholder="Observações sobre a abertura do caixa"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Abrir Caixa</button>
+                    <button type="button" class="btn btn-secondary" id="cancelOpenCash">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Fechamento de Caixa -->
+    <div id="closeCashModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" id="closeCloseModal">&times;</span>
+            <h2>Fechar Caixa</h2>
+            <div class="cash-summary">
+                <div class="summary-item">
+                    <span>Valor Inicial:</span>
+                    <strong id="summaryInitialCash">R$ 0,00</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Vendas do Dia:</span>
+                    <strong id="summaryTodaySales">R$ 0,00</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Saldo Esperado:</span>
+                    <strong id="summaryExpectedBalance">R$ 0,00</strong>
+                </div>
+                <div class="form-group">
+                    <label for="finalCashValue">Valor Final em Caixa</label>
+                    <input type="number" id="finalCashValue" class="form-control" step="0.01" min="0" required>
+                </div>
+                <div id="cashDifference" class="cash-difference"></div>
+                <div class="form-group">
+                    <label for="closeObservations">Observações</label>
+                    <textarea id="closeObservations" class="form-control" rows="3" placeholder="Observações sobre o fechamento do caixa"></textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-danger" id="confirmCloseCash">Fechar Caixa</button>
+                <button type="button" class="btn btn-secondary" id="cancelCloseCash">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/access-control.js"></script>
+    <script src="js/barcode-reader.js"></script>
+    <script src="js/pdv.js"></script>
+    <script src="js/caixa.js"></script>
+    <script>
+        // Carregar configuração do leitor ao iniciar
+        document.addEventListener('DOMContentLoaded', function() {
+            const saved = localStorage.getItem('smartshow_reader_config');
+            if (saved) {
+                const readerConfig = JSON.parse(saved);
+                // Aplicar no leitor se existir
+                if (window.pdv && window.pdv.barcodeReader) {
+                    window.pdv.barcodeReader.setConfig(readerConfig);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+

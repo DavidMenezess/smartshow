@@ -1,0 +1,53 @@
+# ========================================
+# EXEMPLO DE CONFIGURAÇÕES DO TERRAFORM
+# ========================================
+# 
+# INSTRUÇÕES:
+# 1. Copie este arquivo: cp terraform.tfvars.example terraform.tfvars
+# 2. Edite terraform.tfvars com suas informações reais
+# 3. NUNCA commite terraform.tfvars no Git (já está no .gitignore)
+# 
+# Para descobrir seu IP: curl ifconfig.me
+# Para ver suas chaves SSH: AWS Console → EC2 → Key Pairs
+# ========================================
+
+# Região da AWS onde os recursos serão criados
+# Opções: "sa-east-1" (São Paulo - RECOMENDADO para Brasil), "us-east-1" (N. Virginia), "us-west-2" (Oregon)
+aws_region = "sa-east-1"
+
+# Perfil AWS CLI a ser usado (deixe vazio para usar default)
+aws_profile = "smartshow"
+
+# Nome do projeto
+project_name = "smartshow"
+
+# Ambiente (prod, staging, dev)
+environment = "prod"
+
+# Tipo da instância EC2 (t3.micro = Free Tier)
+instance_type = "t3.micro"
+
+# Nome da chave SSH criada na AWS (SEM a extensão .pem)
+# Exemplo: Se sua chave é "smartshow.pem", use apenas "smartshow"
+key_name = "smartshow"
+
+# Seu IP público para acesso SSH (formato: x.x.x.x/32)
+# Para descobrir: curl ifconfig.me
+# Use /32 para permitir apenas seu IP (mais seguro)
+your_ip = "0.0.0.0/32"  # ⚠️ ALTERE: Coloque seu IP aqui no formato x.x.x.x/32
+
+# Tamanho do volume EBS em GB (Free Tier: até 30GB)
+ebs_volume_size = 20
+
+# Porta da API Node.js
+api_port = 3000
+
+# Token do GitHub (apenas se o repositório for privado)
+# Para gerar: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+# Permissões necessárias: repo (para repositórios privados)
+# Deixe vazio se o repositório for público
+github_token = ""  # ⚠️ ALTERE: Cole seu token aqui se o repositório for privado
+
+# URL do repositório GitHub
+github_repo = "https://github.com/usuario/smartshow.git"  # ⚠️ ALTERE: Coloque a URL do seu repositório
+

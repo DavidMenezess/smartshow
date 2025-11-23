@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clientes - Smart Show</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>📱 Smart Show</h1>
+            <div class="user-info">
+                <span id="userName">Usuário</span>
+                <button id="logoutBtn" class="btn btn-secondary">Sair</button>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav">
+            <a href="index.html" class="nav-item">Dashboard</a>
+            <a href="caixa.html" class="nav-item">Caixa</a>
+            <a href="produtos.html" class="nav-item">Produtos</a>
+            <a href="clientes.html" class="nav-item active">Clientes</a>
+            <a href="assistencia.html" class="nav-item">Assistência</a>
+            <a href="financeiro.html" class="nav-item">Financeiro</a>
+            <a href="relatorios.html" class="nav-item">Relatórios</a>
+            <a href="configuracao.html" class="nav-item" id="configNavItem" style="display: none;">Configuração</a>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2>Clientes</h2>
+                <button id="addCustomerBtn" class="btn btn-primary">+ Novo Cliente</button>
+            </div>
+
+            <!-- Filtros -->
+            <div class="filters" style="margin-bottom: 2rem;">
+                <input type="text" id="searchCustomer" class="form-control" placeholder="Buscar cliente..." style="max-width: 300px;">
+            </div>
+
+            <!-- Tabela de Clientes -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>CPF/CNPJ</th>
+                            <th>Telefone</th>
+                            <th>E-mail</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="customersTableBody">
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 2rem;">
+                                Carregando clientes...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal de Cliente -->
+    <div id="customerModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeCustomerModal()">&times;</span>
+            <h2 id="customerModalTitle">Novo Cliente</h2>
+            <form id="customerForm">
+                <input type="hidden" id="customerId">
+                <div class="form-group">
+                    <label for="customerName">Nome *</label>
+                    <input type="text" id="customerName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="customerDocument">CPF/CNPJ</label>
+                    <input type="text" id="customerDocument" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="customerPhone">Telefone</label>
+                    <input type="text" id="customerPhone" class="form-control" placeholder="(00) 00000-0000">
+                </div>
+                <div class="form-group">
+                    <label for="customerEmail">E-mail</label>
+                    <input type="email" id="customerEmail" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="customerAddress">Endereço</label>
+                    <input type="text" id="customerAddress" class="form-control">
+                </div>
+                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="customerCity">Cidade</label>
+                        <input type="text" id="customerCity" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="customerState">Estado</label>
+                        <input type="text" id="customerState" class="form-control" maxlength="2" placeholder="UF">
+                    </div>
+                    <div class="form-group">
+                        <label for="customerZipCode">CEP</label>
+                        <input type="text" id="customerZipCode" class="form-control" placeholder="00000-000">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeCustomerModal()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/access-control.js"></script>
+    <script>
+        let customers = [];
+
+        // Carregar clientes
+        async function loadCustomers() {
+            try {
+                const response = await fetch('/api/customers');
+                customers = await response.json();
+                
+                const tbody = document.getElementById('customersTableBody');
+                if (customers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem;">Nenhum cliente cadastrado</td></tr>';
+                } else {
+                    tbody.innerHTML = customers.map(customer => `
+                        <tr>
+                            <td>${customer.name}</td>
+                            <td>${customer.cpf_cnpj || '-'}</td>
+                            <td>${customer.phone || '-'}</td>
+                            <td>${customer.email || '-'}</td>
+                            <td>
+                                <button class="btn btn-sm btn-secondary" onclick="editCustomer(${customer.id})">Editar</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${customer.id})">Excluir</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar clientes:', error);
+                document.getElementById('customersTableBody').innerHTML = 
+                    '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar clientes</td></tr>';
+            }
+        }
+
+        // Abrir modal de cliente
+        function openCustomerModal(customerId = null) {
+            const modal = document.getElementById('customerModal');
+            const form = document.getElementById('customerForm');
+            const title = document.getElementById('customerModalTitle');
+            
+            if (customerId) {
+                const customer = customers.find(c => c.id === customerId);
+                if (customer) {
+                    title.textContent = 'Editar Cliente';
+                    document.getElementById('customerId').value = customer.id;
+                    document.getElementById('customerName').value = customer.name || '';
+                    document.getElementById('customerDocument').value = customer.cpf_cnpj || '';
+                    document.getElementById('customerPhone').value = customer.phone || '';
+                    document.getElementById('customerEmail').value = customer.email || '';
+                    document.getElementById('customerAddress').value = customer.address || '';
+                    document.getElementById('customerCity').value = customer.city || '';
+                    document.getElementById('customerState').value = customer.state || '';
+                    document.getElementById('customerZipCode').value = customer.zip_code || '';
+                }
+            } else {
+                title.textContent = 'Novo Cliente';
+                form.reset();
+                document.getElementById('customerId').value = '';
+            }
+            
+            modal.style.display = 'block';
+        }
+
+        // Fechar modal
+        function closeCustomerModal() {
+            document.getElementById('customerModal').style.display = 'none';
+            document.getElementById('customerForm').reset();
+        }
+
+        // Salvar cliente
+        document.getElementById('customerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const customerId = document.getElementById('customerId').value;
+            const customerData = {
+                name: document.getElementById('customerName').value,
+                cpf_cnpj: document.getElementById('customerDocument').value || null,
+                phone: document.getElementById('customerPhone').value || null,
+                email: document.getElementById('customerEmail').value || null,
+                address: document.getElementById('customerAddress').value || null,
+                city: document.getElementById('customerCity').value || null,
+                state: document.getElementById('customerState').value || null,
+                zip_code: document.getElementById('customerZipCode').value || null
+            };
+
+            try {
+                let response;
+                if (customerId) {
+                    response = await fetch(`/api/customers/${customerId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(customerData)
+                    });
+                } else {
+                    response = await fetch('/api/customers', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(customerData)
+                    });
+                }
+
+                if (response.ok) {
+                    closeCustomerModal();
+                    loadCustomers();
+                    alert(customerId ? 'Cliente atualizado com sucesso!' : 'Cliente criado com sucesso!');
+                } else {
+                    const error = await response.json();
+                    alert('Erro: ' + (error.error || 'Erro ao salvar cliente'));
+                }
+            } catch (error) {
+                console.error('Erro ao salvar cliente:', error);
+                alert('Erro ao salvar cliente');
+            }
+        });
+
+        // Editar cliente
+        function editCustomer(id) {
+            openCustomerModal(id);
+        }
+
+        // Deletar cliente
+        async function deleteCustomer(id) {
+            if (!confirm('Tem certeza que deseja excluir este cliente?')) return;
+            
+            try {
+                const response = await fetch(`/api/customers/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_active: 0 })
+                });
+                
+                if (response.ok) {
+                    loadCustomers();
+                    alert('Cliente excluído com sucesso!');
+                } else {
+                    alert('Erro ao excluir cliente');
+                }
+            } catch (error) {
+                console.error('Erro ao excluir cliente:', error);
+                alert('Erro ao excluir cliente');
+            }
+        }
+
+        // Event listeners
+        document.getElementById('addCustomerBtn').addEventListener('click', () => openCustomerModal());
+        
+        // Fechar modal ao clicar fora
+        window.onclick = function(event) {
+            const modal = document.getElementById('customerModal');
+            if (event.target === modal) {
+                closeCustomerModal();
+            }
+        }
+
+        // Carregar clientes ao iniciar
+        document.addEventListener('DOMContentLoaded', loadCustomers);
+    </script>
+</body>
+</html>
+

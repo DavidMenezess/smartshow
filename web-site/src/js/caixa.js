@@ -1,0 +1,305 @@
+// ========================================
+// SISTEMA DE CAIXA - ABERTURA E FECHAMENTO
+// ========================================
+
+class CaixaSystem {
+    constructor() {
+        this.cashControl = {
+            isOpen: false,
+            initialCash: 0,
+            currentBalance: 0,
+            todaySales: 0,
+            lastOpened: null,
+            lastClosed: null,
+            observations: ''
+        };
+        this.init();
+    }
+
+    init() {
+        this.loadCashControl();
+        this.setupEventListeners();
+        this.updateUI();
+    }
+
+    loadCashControl() {
+        const stored = localStorage.getItem('smartshow_cash_control');
+        if (stored) {
+            this.cashControl = JSON.parse(stored);
+        }
+    }
+
+    saveCashControl() {
+        localStorage.setItem('smartshow_cash_control', JSON.stringify(this.cashControl));
+    }
+
+    setupEventListeners() {
+        // Botão abrir caixa
+        document.getElementById('openCashBtn')?.addEventListener('click', () => {
+            this.showOpenCashModal();
+        });
+
+        document.getElementById('openCashModalBtn')?.addEventListener('click', () => {
+            this.showOpenCashModal();
+        });
+
+        // Botão fechar caixa
+        document.getElementById('closeCashBtn')?.addEventListener('click', () => {
+            this.showCloseCashModal();
+        });
+
+        // Formulário de abertura
+        document.getElementById('openCashForm')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.openCash();
+        });
+
+        // Botão confirmar fechamento
+        document.getElementById('confirmCloseCash')?.addEventListener('click', () => {
+            this.closeCash();
+        });
+
+        // Fechar modais
+        document.getElementById('closeModal')?.addEventListener('click', () => {
+            this.hideOpenCashModal();
+        });
+
+        document.getElementById('closeCloseModal')?.addEventListener('click', () => {
+            this.hideCloseCashModal();
+        });
+
+        document.getElementById('cancelOpenCash')?.addEventListener('click', () => {
+            this.hideOpenCashModal();
+        });
+
+        document.getElementById('cancelCloseCash')?.addEventListener('click', () => {
+            this.hideCloseCashModal();
+        });
+
+        // Calcular diferença no fechamento
+        document.getElementById('finalCashValue')?.addEventListener('input', () => {
+            this.calculateCashDifference();
+        });
+    }
+
+    updateUI() {
+        const isOpen = this.cashControl.isOpen;
+        
+        // Mostrar/esconder botões
+        const openBtn = document.getElementById('openCashBtn');
+        const closeBtn = document.getElementById('closeCashBtn');
+        const pdvMain = document.getElementById('pdvMain');
+        const closedMessage = document.getElementById('closedCashMessage');
+        const cashStatus = document.getElementById('cashStatus');
+
+        if (isOpen) {
+            if (openBtn) openBtn.style.display = 'none';
+            if (closeBtn) closeBtn.style.display = 'inline-block';
+            if (pdvMain) pdvMain.style.display = 'block';
+            if (closedMessage) closedMessage.style.display = 'none';
+            if (cashStatus) cashStatus.style.display = 'block';
+            
+            // Atualizar informações do caixa
+            this.updateCashStatus();
+        } else {
+            if (openBtn) openBtn.style.display = 'inline-block';
+            if (closeBtn) closeBtn.style.display = 'none';
+            if (pdvMain) pdvMain.style.display = 'none';
+            if (closedMessage) closedMessage.style.display = 'block';
+            if (cashStatus) cashStatus.style.display = 'none';
+        }
+    }
+
+    updateCashStatus() {
+        document.getElementById('initialCash').textContent = 
+            this.formatCurrency(this.cashControl.initialCash);
+        document.getElementById('todaySales').textContent = 
+            this.formatCurrency(this.cashControl.todaySales);
+        document.getElementById('currentBalance').textContent = 
+            this.formatCurrency(this.cashControl.currentBalance);
+    }
+
+    showOpenCashModal() {
+        const modal = document.getElementById('openCashModal');
+        if (modal) {
+            modal.style.display = 'block';
+            document.getElementById('initialCashValue').focus();
+        }
+    }
+
+    hideOpenCashModal() {
+        const modal = document.getElementById('openCashModal');
+        if (modal) {
+            modal.style.display = 'none';
+            document.getElementById('openCashForm').reset();
+        }
+    }
+
+    showCloseCashModal() {
+        const modal = document.getElementById('closeCashModal');
+        if (modal) {
+            modal.style.display = 'block';
+            
+            // Atualizar valores no modal
+            document.getElementById('summaryInitialCash').textContent = 
+                this.formatCurrency(this.cashControl.initialCash);
+            document.getElementById('summaryTodaySales').textContent = 
+                this.formatCurrency(this.cashControl.todaySales);
+            document.getElementById('summaryExpectedBalance').textContent = 
+                this.formatCurrency(this.cashControl.currentBalance);
+            
+            document.getElementById('finalCashValue').value = '';
+            document.getElementById('finalCashValue').focus();
+            this.calculateCashDifference();
+        }
+    }
+
+    hideCloseCashModal() {
+        const modal = document.getElementById('closeCashModal');
+        if (modal) {
+            modal.style.display = 'none';
+            document.getElementById('finalCashValue').value = '';
+            document.getElementById('closeObservations').value = '';
+        }
+    }
+
+    openCash() {
+        const initialCash = parseFloat(document.getElementById('initialCashValue').value) || 0;
+        const observations = document.getElementById('cashObservations').value || '';
+
+        if (initialCash < 0) {
+            alert('Valor inicial não pode ser negativo!');
+            return;
+        }
+
+        if (initialCash === 0 && !confirm('Valor inicial é R$ 0,00. Deseja continuar?')) {
+            return;
+        }
+
+        if (this.cashControl.isOpen) {
+            alert('Caixa já está aberto!');
+            return;
+        }
+
+        // Abrir caixa
+        this.cashControl = {
+            isOpen: true,
+            initialCash: initialCash,
+            currentBalance: initialCash,
+            todaySales: 0,
+            lastOpened: new Date().toISOString(),
+            lastClosed: null,
+            observations: observations
+        };
+
+        this.saveCashControl();
+        this.hideOpenCashModal();
+        this.updateUI();
+        
+        alert('Caixa aberto com sucesso!');
+    }
+
+    closeCash() {
+        if (!confirm('Tem certeza que deseja fechar o caixa?')) {
+            return;
+        }
+
+        const finalCash = parseFloat(document.getElementById('finalCashValue').value);
+        const observations = document.getElementById('closeObservations').value || '';
+
+        if (isNaN(finalCash) || finalCash < 0) {
+            alert('Por favor, informe um valor válido para o fechamento!');
+            return;
+        }
+
+        // Calcular diferença
+        const difference = finalCash - this.cashControl.currentBalance;
+        const differenceText = difference >= 0 
+            ? `Sobra: ${this.formatCurrency(difference)}`
+            : `Falta: ${this.formatCurrency(Math.abs(difference))}`;
+
+        // Salvar relatório (aqui você pode enviar para a API)
+        const report = {
+            date: new Date().toISOString(),
+            initialCash: this.cashControl.initialCash,
+            finalCash: finalCash,
+            expectedBalance: this.cashControl.currentBalance,
+            difference: difference,
+            todaySales: this.cashControl.todaySales,
+            observations: observations
+        };
+
+        console.log('Relatório de fechamento:', report);
+
+        // Fechar caixa
+        this.cashControl.isOpen = false;
+        this.cashControl.lastClosed = new Date().toISOString();
+        this.cashControl.initialCash = 0;
+        this.cashControl.currentBalance = 0;
+        this.cashControl.todaySales = 0;
+        this.cashControl.observations = '';
+
+        this.saveCashControl();
+        this.hideCloseCashModal();
+        this.updateUI();
+
+        alert(`Caixa fechado com sucesso!\n${differenceText}`);
+    }
+
+    calculateCashDifference() {
+        const finalCash = parseFloat(document.getElementById('finalCashValue').value) || 0;
+        const expected = this.cashControl.currentBalance;
+        const difference = finalCash - expected;
+        const differenceDiv = document.getElementById('cashDifference');
+
+        if (differenceDiv) {
+            if (difference > 0) {
+                differenceDiv.innerHTML = `<div style="color: green; font-weight: bold;">Sobra: ${this.formatCurrency(difference)}</div>`;
+            } else if (difference < 0) {
+                differenceDiv.innerHTML = `<div style="color: red; font-weight: bold;">Falta: ${this.formatCurrency(Math.abs(difference))}</div>`;
+            } else {
+                differenceDiv.innerHTML = `<div style="color: blue; font-weight: bold;">Valor exato!</div>`;
+            }
+        }
+    }
+
+    addSale(amount) {
+        if (this.cashControl.isOpen) {
+            this.cashControl.todaySales += amount;
+            this.cashControl.currentBalance = this.cashControl.initialCash + this.cashControl.todaySales;
+            this.saveCashControl();
+            this.updateCashStatus();
+        }
+    }
+
+    formatCurrency(value) {
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        }).format(value);
+    }
+}
+
+// Inicializar sistema de caixa
+let caixaSystem;
+
+document.addEventListener('DOMContentLoaded', function() {
+    caixaSystem = new CaixaSystem();
+    
+    // Integrar com PDV para atualizar vendas
+    if (window.pdv) {
+        const originalFinalize = window.pdv.finalizeSale;
+        if (originalFinalize) {
+            window.pdv.finalizeSale = function() {
+                const result = originalFinalize.apply(this, arguments);
+                if (caixaSystem && caixaSystem.cashControl.isOpen) {
+                    const total = parseFloat(document.getElementById('total').textContent.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
+                    caixaSystem.addSale(total);
+                }
+                return result;
+            };
+        }
+    }
+});
+
+

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Show - Dashboard</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>📱 Smart Show</h1>
+            <div class="user-info">
+                <span id="userName">Usuário</span>
+                <button id="logoutBtn" class="btn btn-secondary">Sair</button>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav">
+            <a href="index.html" class="nav-item active">Dashboard</a>
+            <a href="caixa.html" class="nav-item">Caixa</a>
+            <a href="produtos.html" class="nav-item">Produtos</a>
+            <a href="clientes.html" class="nav-item">Clientes</a>
+            <a href="assistencia.html" class="nav-item">Assistência</a>
+            <a href="financeiro.html" class="nav-item">Financeiro</a>
+            <a href="relatorios.html" class="nav-item">Relatórios</a>
+            <a href="configuracao.html" class="nav-item" id="configNavItem" style="display: none;">Configuração</a>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main">
+            <h2>Dashboard</h2>
+
+            <!-- Cards de Resumo -->
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>Vendas Hoje</h3>
+                    <div class="card-value" id="todaySales">R$ 0,00</div>
+                    <div class="card-count" id="todaySalesCount">0 vendas</div>
+                </div>
+
+                <div class="card">
+                    <h3>Vendas do Mês</h3>
+                    <div class="card-value" id="monthSales">R$ 0,00</div>
+                    <div class="card-count" id="monthSalesCount">0 vendas</div>
+                </div>
+
+                <div class="card">
+                    <h3>Estoque Baixo</h3>
+                    <div class="card-value" id="lowStock">0</div>
+                    <div class="card-count">produtos</div>
+                </div>
+
+                <div class="card">
+                    <h3>Contas a Receber</h3>
+                    <div class="card-value" id="receivable">R$ 0,00</div>
+                    <div class="card-count" id="receivableCount">0 contas</div>
+                </div>
+
+                <div class="card">
+                    <h3>Contas a Pagar</h3>
+                    <div class="card-value" id="payable">R$ 0,00</div>
+                    <div class="card-count" id="payableCount">0 contas</div>
+                </div>
+
+                <!-- Cards de OS por Status -->
+                <div class="card">
+                    <h3>OS Prontas</h3>
+                    <div class="card-value" id="osPronta">0</div>
+                    <div class="card-count">ordens</div>
+                </div>
+                <div class="card">
+                    <h3>Aguardando Autorização</h3>
+                    <div class="card-value" id="osAguardandoAutorizacao">0</div>
+                    <div class="card-count">ordens</div>
+                </div>
+                <div class="card">
+                    <h3>Sem Concerto</h3>
+                    <div class="card-value" id="osSemConcerto">0</div>
+                    <div class="card-count">ordens</div>
+                </div>
+                <div class="card">
+                    <h3>Entregue</h3>
+                    <div class="card-value" id="osEntregue">0</div>
+                    <div class="card-count">ordens</div>
+                </div>
+                <div class="card">
+                    <h3>Em Manutenção</h3>
+                    <div class="card-value" id="osEmManutencao">0</div>
+                    <div class="card-count">ordens</div>
+                </div>
+                <div class="card">
+                    <h3>Aguardando Peça</h3>
+                    <div class="card-value" id="osAguardandoPeca">0</div>
+                    <div class="card-count">ordens</div>
+                </div>
+            </div>
+
+            <!-- Gráficos -->
+            <div class="dashboard-charts" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+                <div class="chart-card">
+                    <h3>Vendas dos Últimos 7 Dias</h3>
+                    <canvas id="salesChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Vendas por Forma de Pagamento</h3>
+                    <canvas id="paymentChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Tabelas -->
+            <div class="dashboard-charts">
+                <div class="chart-card">
+                    <h3>Vendas Recentes</h3>
+                    <div id="recentSales" class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Nº Venda</th>
+                                    <th>Cliente</th>
+                                    <th>Vendedor</th>
+                                    <th>Forma de Pagamento</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentSalesBody">
+                                <tr><td colspan="6">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Produtos com Estoque Baixo -->
+            <div class="dashboard-charts" style="margin-top: 2rem;">
+                <div class="chart-card">
+                    <h3>Produtos com Estoque Baixo</h3>
+                    <div id="lowStockProducts" class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>Código de Barras</th>
+                                    <th>Estoque Atual</th>
+                                    <th>Estoque Mínimo</th>
+                                    <th>Preço de Venda</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lowStockProductsBody">
+                                <tr><td colspan="5">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/access-control.js"></script>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>
+
+
+

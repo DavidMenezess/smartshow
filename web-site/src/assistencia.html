@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistência Técnica - Smart Show</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>📱 Smart Show</h1>
+            <div class="user-info">
+                <span id="userName">Usuário</span>
+                <button id="logoutBtn" class="btn btn-secondary">Sair</button>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav">
+            <a href="index.html" class="nav-item">Dashboard</a>
+            <a href="caixa.html" class="nav-item">Caixa</a>
+            <a href="produtos.html" class="nav-item">Produtos</a>
+            <a href="clientes.html" class="nav-item">Clientes</a>
+            <a href="assistencia.html" class="nav-item active">Assistência</a>
+            <a href="financeiro.html" class="nav-item">Financeiro</a>
+            <a href="relatorios.html" class="nav-item">Relatórios</a>
+            <a href="configuracao.html" class="nav-item" id="configNavItem" style="display: none;">Configuração</a>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2>Ordens de Serviço</h2>
+                <button id="addOSBtn" class="btn btn-primary">+ Nova OS</button>
+            </div>
+
+            <!-- Filtros -->
+            <div class="filters" style="margin-bottom: 2rem;">
+                <select id="filterStatus" class="form-control" style="max-width: 200px;">
+                    <option value="">Todos os status</option>
+                    <option value="pronta">Pronta</option>
+                    <option value="aguardando_autorizacao">Aguardando Autorização</option>
+                    <option value="sem_concerto">Sem Concerto</option>
+                    <option value="entregue">Entregue</option>
+                    <option value="em_manutencao">Em Manutenção</option>
+                    <option value="aguardando_peca">Aguardando Peça</option>
+                </select>
+            </div>
+
+            <!-- Tabela de OS -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Nº OS</th>
+                            <th>Cliente</th>
+                            <th>Equipamento</th>
+                            <th>Status</th>
+                            <th>Data Entrada</th>
+                            <th>Valor</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="osTableBody">
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 2rem;">
+                                Carregando ordens de serviço...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal de OS -->
+    <div id="osModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="close" onclick="closeOSModal()">&times;</span>
+            <h2 id="osModalTitle">Nova Ordem de Serviço</h2>
+            <form id="osForm">
+                <input type="hidden" id="osId">
+                <div class="form-group">
+                    <label for="osCustomerId">Cliente *</label>
+                    <select id="osCustomerId" class="form-control" required>
+                        <option value="">Selecione um cliente</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="osDeviceType">Tipo de Equipamento</label>
+                    <select id="osDeviceType" class="form-control">
+                        <option value="">Selecione</option>
+                        <option value="Celular">Celular</option>
+                        <option value="Tablet">Tablet</option>
+                        <option value="Notebook">Notebook</option>
+                        <option value="Desktop">Desktop</option>
+                        <option value="TV">TV</option>
+                        <option value="Monitor">Monitor</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="osBrand">Marca</label>
+                        <input type="text" id="osBrand" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="osModel">Modelo</label>
+                        <input type="text" id="osModel" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="osSerialNumber">Número de Série</label>
+                    <input type="text" id="osSerialNumber" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="osProblemDescription">Descrição do Problema *</label>
+                    <textarea id="osProblemDescription" class="form-control" rows="4" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="osStatus">Status Inicial *</label>
+                    <select id="osStatus" class="form-control" required>
+                        <option value="aguardando_autorizacao">Aguardando Autorização</option>
+                        <option value="em_manutencao">Em Manutenção</option>
+                        <option value="aguardando_peca">Aguardando Peça</option>
+                        <option value="pronta">Pronta</option>
+                        <option value="sem_concerto">Sem Concerto</option>
+                        <option value="entregue">Entregue</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeOSModal()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/access-control.js"></script>
+    <script>
+        let orders = [];
+        let customers = [];
+
+        // Carregar clientes para o select
+        async function loadCustomersForOS() {
+            try {
+                const response = await fetch('/api/customers');
+                customers = await response.json();
+                const select = document.getElementById('osCustomerId');
+                
+                // Limpar opções existentes (exceto a primeira)
+                while (select.options.length > 1) {
+                    select.remove(1);
+                }
+                
+                customers.forEach(customer => {
+                    const option = document.createElement('option');
+                    option.value = customer.id;
+                    option.textContent = customer.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar clientes:', error);
+            }
+        }
+
+        // Carregar ordens de serviço
+        async function loadOrders() {
+            try {
+                const response = await fetch('/api/service-orders');
+                orders = await response.json();
+                
+                const tbody = document.getElementById('osTableBody');
+                if (orders.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">Nenhuma ordem de serviço cadastrada</td></tr>';
+                } else {
+                    tbody.innerHTML = orders.map(order => `
+                        <tr>
+                            <td>#${order.id}</td>
+                            <td>${order.customer_name || '-'}</td>
+                            <td>${order.device_type || '-'}</td>
+                            <td><span style="padding: 0.25rem 0.5rem; border-radius: 4px; background: ${getStatusColor(order.status)}; color: white;">${getStatusText(order.status || 'pending')}</span></td>
+                            <td>${order.created_at ? new Date(order.created_at).toLocaleDateString('pt-BR') : '-'}</td>
+                            <td>R$ ${parseFloat(order.total_value || 0).toFixed(2).replace('.', ',')}</td>
+                            <td>
+                                <button class="btn btn-sm btn-secondary" onclick="viewOS(${order.id})">Ver</button>
+                                <button class="btn btn-sm btn-primary" onclick="editOS(${order.id})">Editar</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar ordens de serviço:', error);
+                document.getElementById('osTableBody').innerHTML = 
+                    '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar ordens de serviço</td></tr>';
+            }
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'pronta': '#10b981',
+                'aguardando_autorizacao': '#f59e0b',
+                'sem_concerto': '#ef4444',
+                'entregue': '#3b82f6',
+                'em_manutencao': '#8b5cf6',
+                'aguardando_peca': '#f97316'
+            };
+            return colors[status] || '#6b7280';
+        }
+
+        function getStatusText(status) {
+            const texts = {
+                'pronta': 'Pronta',
+                'aguardando_autorizacao': 'Aguardando Autorização',
+                'sem_concerto': 'Sem Concerto',
+                'entregue': 'Entregue',
+                'em_manutencao': 'Em Manutenção',
+                'aguardando_peca': 'Aguardando Peça'
+            };
+            return texts[status] || status;
+        }
+
+        // Abrir modal de OS
+        function openOSModal(orderId = null) {
+            const modal = document.getElementById('osModal');
+            const form = document.getElementById('osForm');
+            const title = document.getElementById('osModalTitle');
+            
+            if (orderId) {
+                const order = orders.find(o => o.id === orderId);
+                if (order) {
+                    title.textContent = 'Editar Ordem de Serviço';
+                    document.getElementById('osId').value = order.id;
+                    document.getElementById('osCustomerId').value = order.customer_id || '';
+                    document.getElementById('osDeviceType').value = order.device_type || '';
+                    document.getElementById('osBrand').value = order.brand || '';
+                    document.getElementById('osModel').value = order.model || '';
+                    document.getElementById('osSerialNumber').value = order.serial_number || '';
+                    document.getElementById('osProblemDescription').value = order.problem_description || '';
+                    document.getElementById('osStatus').value = order.status || 'aguardando_autorizacao';
+                }
+            } else {
+                title.textContent = 'Nova Ordem de Serviço';
+                form.reset();
+                document.getElementById('osId').value = '';
+            }
+            
+            modal.style.display = 'block';
+        }
+
+        // Fechar modal
+        function closeOSModal() {
+            document.getElementById('osModal').style.display = 'none';
+            document.getElementById('osForm').reset();
+        }
+
+        // Salvar OS
+        document.getElementById('osForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const osId = document.getElementById('osId').value;
+            const osData = {
+                customerId: parseInt(document.getElementById('osCustomerId').value),
+                deviceType: document.getElementById('osDeviceType').value || null,
+                brand: document.getElementById('osBrand').value || null,
+                model: document.getElementById('osModel').value || null,
+                serialNumber: document.getElementById('osSerialNumber').value || null,
+                problemDescription: document.getElementById('osProblemDescription').value,
+                status: document.getElementById('osStatus').value
+            };
+
+            try {
+                let response;
+                if (osId) {
+                    response = await fetch(`/api/service-orders/${osId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(osData)
+                    });
+                } else {
+                    response = await fetch('/api/service-orders', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(osData)
+                    });
+                }
+
+                if (response.ok) {
+                    closeOSModal();
+                    loadOrders();
+                    alert(osId ? 'Ordem de serviço atualizada com sucesso!' : 'Ordem de serviço criada com sucesso!');
+                } else {
+                    const error = await response.json();
+                    alert('Erro: ' + (error.error || 'Erro ao salvar ordem de serviço'));
+                }
+            } catch (error) {
+                console.error('Erro ao salvar ordem de serviço:', error);
+                alert('Erro ao salvar ordem de serviço');
+            }
+        });
+
+        // Ver OS
+        function viewOS(id) {
+            const order = orders.find(o => o.id === id);
+            if (order) {
+                alert(`OS #${order.id}\nCliente: ${order.customer_name}\nEquipamento: ${order.device_type}\nProblema: ${order.problem_description}`);
+            }
+        }
+
+        // Editar OS
+        function editOS(id) {
+            openOSModal(id);
+        }
+
+        // Event listeners
+        document.getElementById('addOSBtn').addEventListener('click', () => openOSModal());
+        
+        // Fechar modal ao clicar fora
+        window.onclick = function(event) {
+            const modal = document.getElementById('osModal');
+            if (event.target === modal) {
+                closeOSModal();
+            }
+        }
+
+        // Carregar dados ao iniciar
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadCustomersForOS();
+            await loadOrders();
+        });
+    </script>
+</body>
+</html>
+

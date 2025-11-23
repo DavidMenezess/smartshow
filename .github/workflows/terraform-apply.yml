@@ -1,0 +1,87 @@
+name: Terraform Apply
+
+on:
+  # Removido push automático - só executa manualmente ou via workflow_dispatch
+  # push:
+  #   branches: [ main ]
+  #   paths:
+  #     - 'terraform/**'
+  #     - '.github/workflows/terraform-apply.yml'
+  workflow_dispatch:
+    inputs:
+      terraform_action:
+        description: "Ação do Terraform (apply/plan/destroy)"
+        required: true
+        default: "apply"
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_VERSION: "1.9.5"
+  AWS_REGION: "sa-east-1"
+
+jobs:
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configurar Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        # Executa plan para todas as ações exceto destroy
+        if: github.event.inputs.terraform_action != 'destroy'
+        run: terraform plan -input=false -out=tfplan
+        continue-on-error: false
+
+      - name: Terraform Apply
+        # SÓ executa apply se for workflow_dispatch com action='apply'
+        # NÃO executa automaticamente em push!
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.terraform_action == 'apply'
+        run: terraform apply -auto-approve tfplan
+        continue-on-error: false
+
+      - name: Terraform Destroy
+        if: github.event.inputs.terraform_action == 'destroy'
+        run: terraform destroy -auto-approve
+        continue-on-error: false
+
+      - name: Output Terraform
+        if: github.event.inputs.terraform_action != 'destroy'
+        run: terraform output -json
+
+      - name: Limpar arquivos temporários
+        if: always()
+        run: |
+          rm -f tfplan || true
+          rm -f terraform.tfplan || true

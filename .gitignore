@@ -1,0 +1,41 @@
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+
+# Variáveis sensíveis
+terraform/terraform.tfvars
+*.pem
+*.key
+*.ppk
+.env
+.env.local
+.env.production
+*.secret
+*secret*
+*credentials*
+
+# Backups
+backups/
+*.tar.gz
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+
+
+
+
+
+
+

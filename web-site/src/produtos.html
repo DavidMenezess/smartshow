@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produtos - Smart Show</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>📱 Smart Show</h1>
+            <div class="user-info">
+                <span id="userName">Usuário</span>
+                <button id="logoutBtn" class="btn btn-secondary">Sair</button>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav">
+            <a href="index.html" class="nav-item">Dashboard</a>
+            <a href="caixa.html" class="nav-item">Caixa</a>
+            <a href="produtos.html" class="nav-item active">Produtos</a>
+            <a href="clientes.html" class="nav-item">Clientes</a>
+            <a href="assistencia.html" class="nav-item">Assistência</a>
+            <a href="financeiro.html" class="nav-item">Financeiro</a>
+            <a href="relatorios.html" class="nav-item">Relatórios</a>
+            <a href="configuracao.html" class="nav-item" id="configNavItem" style="display: none;">Configuração</a>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2>Produtos</h2>
+                <button id="addProductBtn" class="btn btn-primary">+ Novo Produto</button>
+            </div>
+
+            <!-- Filtros -->
+            <div class="filters" style="margin-bottom: 2rem;">
+                <input type="text" id="searchProduct" class="form-control" placeholder="Buscar produto..." style="max-width: 300px;">
+                <select id="filterCategory" class="form-control" style="max-width: 200px;">
+                    <option value="">Todas as categorias</option>
+                </select>
+            </div>
+
+            <!-- Tabela de Produtos -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Código de Barras</th>
+                            <th>Nome</th>
+                            <th>Categoria</th>
+                            <th>Estoque</th>
+                            <th>Preço Custo</th>
+                            <th>Preço Venda</th>
+                            <th>Lucro</th>
+                            <th>% Lucro</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsTableBody">
+                        <tr>
+                            <td colspan="9" style="text-align: center; padding: 2rem;">
+                                Carregando produtos...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal de Produto -->
+    <div id="productModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeProductModal()">&times;</span>
+            <h2 id="productModalTitle">Novo Produto</h2>
+            <form id="productForm">
+                <input type="hidden" id="productId">
+                <div class="form-group">
+                    <label for="productName">Nome *</label>
+                    <input type="text" id="productName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="productBarcode">Código de Barras</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="productBarcode" class="form-control" style="flex: 1;">
+                        <button type="button" id="generateBarcodeBtn" class="btn btn-secondary" onclick="generateUniqueBarcode()" title="Gerar código único">
+                            🔄 Gerar
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="productDescription">Descrição</label>
+                    <textarea id="productDescription" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="productCategory">Categoria</label>
+                    <input type="text" id="productCategory" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="productPrice">Preço de Venda *</label>
+                    <input type="number" id="productPrice" class="form-control" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="productCost">Preço de Custo</label>
+                    <input type="number" id="productCost" class="form-control" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="productStock">Estoque</label>
+                    <input type="number" id="productStock" class="form-control" min="0" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="productMinStock">Estoque Mínimo</label>
+                    <input type="number" id="productMinStock" class="form-control" min="0" value="0">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeProductModal()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/access-control.js"></script>
+    <script>
+        let products = [];
+        let allProducts = []; // Todos os produtos (sem filtro)
+        let categories = [];
+
+        // Carregar categorias
+        async function loadCategories() {
+            try {
+                const response = await fetch('/api/categories');
+                categories = await response.json();
+                
+                const select = document.getElementById('filterCategory');
+                // Limpar opções existentes (exceto a primeira)
+                while (select.options.length > 1) {
+                    select.remove(1);
+                }
+                
+                categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category.id;
+                    option.textContent = category.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar categorias:', error);
+            }
+        }
+
+        // Carregar produtos
+        async function loadProducts(searchTerm = '', categoryId = '') {
+            try {
+                let url = '/api/products';
+                const params = [];
+                
+                if (searchTerm) {
+                    params.push(`search=${encodeURIComponent(searchTerm)}`);
+                }
+                
+                if (categoryId) {
+                    params.push(`category=${categoryId}`);
+                }
+                
+                if (params.length > 0) {
+                    url += '?' + params.join('&');
+                }
+                
+                const response = await fetch(url);
+                products = await response.json();
+                
+                // Salvar todos os produtos na primeira carga
+                if (!searchTerm && !categoryId) {
+                    allProducts = products;
+                }
+                
+                renderProducts(products);
+            } catch (error) {
+                console.error('Erro ao carregar produtos:', error);
+                document.getElementById('productsTableBody').innerHTML = 
+                    '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar produtos</td></tr>';
+            }
+        }
+
+        // Renderizar produtos na tabela
+        function renderProducts(productsToRender) {
+            const tbody = document.getElementById('productsTableBody');
+            if (productsToRender.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem;">Nenhum produto encontrado</td></tr>';
+            } else {
+                tbody.innerHTML = productsToRender.map(product => {
+                    const costPrice = parseFloat(product.cost_price || 0);
+                    const salePrice = parseFloat(product.sale_price || product.price || 0);
+                    const profit = salePrice - costPrice;
+                    const profitPercent = costPrice > 0 ? ((profit / costPrice) * 100) : 0;
+                    
+                    return `
+                    <tr>
+                        <td>${product.barcode || '-'}</td>
+                        <td>${product.name}</td>
+                        <td>${product.category_name || '-'}</td>
+                        <td>${product.stock || 0}</td>
+                        <td>R$ ${costPrice.toFixed(2).replace('.', ',')}</td>
+                        <td>R$ ${salePrice.toFixed(2).replace('.', ',')}</td>
+                        <td style="color: ${profit >= 0 ? '#10b981' : '#ef4444'}; font-weight: bold;">
+                            R$ ${profit.toFixed(2).replace('.', ',')}
+                        </td>
+                        <td style="color: ${profitPercent >= 0 ? '#10b981' : '#ef4444'}; font-weight: bold;">
+                            ${profitPercent.toFixed(2).replace('.', ',')}%
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-secondary" onclick="editProduct(${product.id})">Editar</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteProduct(${product.id})">Excluir</button>
+                        </td>
+                    </tr>
+                `;
+                }).join('');
+            }
+        }
+
+        // Abrir modal de produto
+        function openProductModal(productId = null) {
+            const modal = document.getElementById('productModal');
+            const form = document.getElementById('productForm');
+            const title = document.getElementById('productModalTitle');
+            
+            if (productId) {
+                const product = products.find(p => p.id === productId);
+                if (product) {
+                    title.textContent = 'Editar Produto';
+                    document.getElementById('productId').value = product.id;
+                    document.getElementById('productName').value = product.name || '';
+                    document.getElementById('productBarcode').value = product.barcode || '';
+                    document.getElementById('productDescription').value = product.description || '';
+                    document.getElementById('productCategory').value = product.category_name || '';
+                    document.getElementById('productPrice').value = product.sale_price || product.price || '';
+                    document.getElementById('productCost').value = product.cost_price || '';
+                    document.getElementById('productStock').value = product.stock || 0;
+                    document.getElementById('productMinStock').value = product.min_stock || 0;
+                }
+            } else {
+                title.textContent = 'Novo Produto';
+                form.reset();
+                document.getElementById('productId').value = '';
+            }
+            
+            modal.style.display = 'block';
+        }
+
+        // Fechar modal
+        function closeProductModal() {
+            document.getElementById('productModal').style.display = 'none';
+            document.getElementById('productForm').reset();
+        }
+
+        // Gerar código de barras único
+        async function generateUniqueBarcode() {
+            const barcodeInput = document.getElementById('productBarcode');
+            const generateBtn = document.getElementById('generateBarcodeBtn');
+            
+            // Desabilitar botão durante geração
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Gerando...';
+            
+            try {
+                let attempts = 0;
+                let newBarcode = '';
+                let isUnique = false;
+                
+                while (!isUnique && attempts < 10) {
+                    // Gerar código aleatório de 8 dígitos
+                    newBarcode = Math.floor(10000000 + Math.random() * 90000000).toString();
+                    
+                    // Verificar se já existe
+                    try {
+                        const existing = await fetch(`/api/products/barcode/${newBarcode}`);
+                        if (existing.status === 404) {
+                            // Código não existe, pode usar
+                            isUnique = true;
+                        } else if (existing.ok) {
+                            // Código existe, tentar outro
+                            attempts++;
+                        }
+                    } catch (error) {
+                        // Erro na verificação, assumir que pode usar
+                        isUnique = true;
+                    }
+                }
+                
+                if (isUnique) {
+                    barcodeInput.value = newBarcode;
+                    barcodeInput.focus();
+                } else {
+                    alert('Não foi possível gerar um código único. Tente novamente.');
+                }
+            } catch (error) {
+                console.error('Erro ao gerar código:', error);
+                alert('Erro ao gerar código de barras');
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.textContent = '🔄 Gerar';
+            }
+        }
+
+        // Criar ou buscar categoria
+        async function getOrCreateCategory(categoryName) {
+            if (!categoryName || categoryName.trim() === '') {
+                return null;
+            }
+            
+            try {
+                // Buscar categoria existente
+                const searchResponse = await fetch(`/api/categories?search=${encodeURIComponent(categoryName)}`);
+                if (searchResponse.ok) {
+                    const categories = await searchResponse.json();
+                    const existing = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
+                    if (existing) {
+                        return existing.id;
+                    }
+                }
+                
+                // Criar nova categoria
+                const createResponse = await fetch('/api/categories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: categoryName.trim() })
+                });
+                
+                if (createResponse.ok) {
+                    const newCategory = await createResponse.json();
+                    return newCategory.id;
+                }
+            } catch (error) {
+                console.error('Erro ao criar/buscar categoria:', error);
+            }
+            
+            return null;
+        }
+
+        // Salvar produto
+        document.getElementById('productForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const productId = document.getElementById('productId').value;
+            const categoryName = document.getElementById('productCategory').value;
+            
+            // Obter ID da categoria
+            const categoryId = await getOrCreateCategory(categoryName);
+            
+            const productData = {
+                name: document.getElementById('productName').value,
+                barcode: document.getElementById('productBarcode').value || null,
+                description: document.getElementById('productDescription').value || null,
+                category_id: categoryId,
+                sale_price: parseFloat(document.getElementById('productPrice').value),
+                cost_price: parseFloat(document.getElementById('productCost').value) || 0,
+                stock: parseInt(document.getElementById('productStock').value) || 0,
+                min_stock: parseInt(document.getElementById('productMinStock').value) || 0
+            };
+
+            try {
+                let response;
+                if (productId) {
+                    response = await fetch(`/api/products/${productId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(productData)
+                    });
+                } else {
+                    response = await fetch('/api/products', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(productData)
+                    });
+                }
+
+                if (response.ok) {
+                    closeProductModal();
+                    // Recarregar categorias (pode ter criado uma nova)
+                    await loadCategories();
+                    // Recarregar produtos com filtros atuais
+                    const searchTerm = document.getElementById('searchProduct').value.trim();
+                    const categoryId = document.getElementById('filterCategory').value;
+                    await loadProducts(searchTerm, categoryId);
+                    alert(productId ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!');
+                } else {
+                    const error = await response.json();
+                    alert('Erro: ' + (error.error || 'Erro ao salvar produto'));
+                }
+            } catch (error) {
+                console.error('Erro ao salvar produto:', error);
+                alert('Erro ao salvar produto');
+            }
+        });
+
+        // Editar produto
+        function editProduct(id) {
+            openProductModal(id);
+        }
+
+        // Deletar produto
+        async function deleteProduct(id) {
+            if (!confirm('Tem certeza que deseja excluir este produto?')) return;
+            
+            try {
+                const response = await fetch(`/api/products/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    const searchTerm = document.getElementById('searchProduct').value.trim();
+                    const categoryId = document.getElementById('filterCategory').value;
+                    await loadProducts(searchTerm, categoryId);
+                    alert('Produto excluído com sucesso!');
+                } else {
+                    alert('Erro ao excluir produto');
+                }
+            } catch (error) {
+                console.error('Erro ao excluir produto:', error);
+                alert('Erro ao excluir produto');
+            }
+        }
+
+        // Event listeners
+        document.getElementById('addProductBtn').addEventListener('click', () => openProductModal());
+        
+        // Busca de produtos
+        let searchTimeout;
+        document.getElementById('searchProduct').addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
+            const searchTerm = e.target.value.trim();
+            const categoryId = document.getElementById('filterCategory').value;
+            
+            searchTimeout = setTimeout(() => {
+                loadProducts(searchTerm, categoryId);
+            }, 300); // Aguardar 300ms após parar de digitar
+        });
+
+        // Filtro por categoria
+        document.getElementById('filterCategory').addEventListener('change', function(e) {
+            const categoryId = e.target.value;
+            const searchTerm = document.getElementById('searchProduct').value.trim();
+            loadProducts(searchTerm, categoryId);
+        });
+        
+        // Fechar modal ao clicar fora
+        window.onclick = function(event) {
+            const modal = document.getElementById('productModal');
+            if (event.target === modal) {
+                closeProductModal();
+            }
+        }
+
+        // Carregar dados ao iniciar
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadCategories();
+            await loadProducts();
+        });
+    </script>
+</body>
+</html>
+

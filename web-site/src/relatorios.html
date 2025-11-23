@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatórios - Smart Show</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>📱 Smart Show</h1>
+            <div class="user-info">
+                <span id="userName">Usuário</span>
+                <button id="logoutBtn" class="btn btn-secondary">Sair</button>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav">
+            <a href="index.html" class="nav-item">Dashboard</a>
+            <a href="caixa.html" class="nav-item">Caixa</a>
+            <a href="produtos.html" class="nav-item">Produtos</a>
+            <a href="clientes.html" class="nav-item">Clientes</a>
+            <a href="assistencia.html" class="nav-item">Assistência</a>
+            <a href="financeiro.html" class="nav-item">Financeiro</a>
+            <a href="relatorios.html" class="nav-item active">Relatórios</a>
+            <a href="configuracao.html" class="nav-item" id="configNavItem" style="display: none;">Configuração</a>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main">
+            <h2>Relatórios</h2>
+
+            <!-- Filtros -->
+            <div class="filters" style="margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+                <select id="reportType" class="form-control" style="max-width: 250px;">
+                    <option value="sales">Vendas</option>
+                    <option value="products">Produtos</option>
+                    <option value="customers">Clientes</option>
+                    <option value="financial">Financeiro</option>
+                    <option value="service">Assistência Técnica</option>
+                </select>
+                <input type="date" id="startDate" class="form-control">
+                <input type="date" id="endDate" class="form-control">
+                <button class="btn btn-primary" onclick="generateReport()">Gerar Relatório</button>
+                <button class="btn btn-secondary" onclick="exportReport()">Exportar</button>
+            </div>
+
+            <!-- Área do Relatório -->
+            <div id="reportContent" class="report-content" style="background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <p style="text-align: center; color: #718096; padding: 3rem;">
+                    Selecione o tipo de relatório e o período, depois clique em "Gerar Relatório"
+                </p>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/access-control.js"></script>
+    <script>
+        async function generateReport() {
+            const reportType = document.getElementById('reportType').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            if (!startDate || !endDate) {
+                alert('Por favor, selecione o período!');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/reports?type=${reportType}&start=${startDate}&end=${endDate}`);
+                const data = await response.json();
+                
+                const content = document.getElementById('reportContent');
+                content.innerHTML = `
+                    <h3>Relatório de ${reportType}</h3>
+                    <p>Período: ${new Date(startDate).toLocaleDateString('pt-BR')} a ${new Date(endDate).toLocaleDateString('pt-BR')}</p>
+                    <div style="margin-top: 2rem;">
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Erro ao gerar relatório:', error);
+                alert('Erro ao gerar relatório');
+            }
+        }
+
+        function exportReport() {
+            alert('Funcionalidade de exportação em desenvolvimento');
+        }
+
+        // Definir datas padrão (últimos 30 dias)
+        document.addEventListener('DOMContentLoaded', function() {
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - 30);
+
+            document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+            document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+        });
+    </script>
+</body>
+</html>
+
+
