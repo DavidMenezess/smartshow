@@ -42,7 +42,7 @@ jobs:
       - name: Terraform Plan
         id: plan
         env:
-          AWS_PROFILE: ${{ secrets.AWS_PROFILE != '' && secrets.AWS_PROFILE || 'smartshow' }}
+          AWS_PROFILE: ${{ secrets.AWS_PROFILE || 'smartshow' }}
         run: |
           terraform plan -no-color -out=tfplan || echo "Plan failed but continuing"
         continue-on-error: true
