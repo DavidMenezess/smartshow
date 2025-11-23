@@ -43,8 +43,9 @@ jobs:
         id: plan
         env:
           # AWS_PROFILE é opcional - usa 'smartshow' como padrão se não configurado
-          AWS_PROFILE: ${{ secrets.AWS_PROFILE || 'smartshow' }}
+          AWS_PROFILE: ${{ secrets.AWS_PROFILE }}
         run: |
+          export AWS_PROFILE="${AWS_PROFILE:-smartshow}"
           terraform plan -no-color -out=tfplan || echo "Plan failed but continuing"
         continue-on-error: true
 
