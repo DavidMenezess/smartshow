@@ -35,7 +35,7 @@ variable "key_name" {
 variable "your_ip" {
   description = "Seu IP público para acesso SSH (formato: x.x.x.x/32). Descubra seu IP: curl ifconfig.me"
   type        = string
-  default     = "0.0.0.0/32"  # ⚠️ ALTERE no terraform.tfvars com seu IP real
+  default     = "0.0.0.0/32" # ⚠️ ALTERE no terraform.tfvars com seu IP real
 }
 
 variable "ebs_volume_size" {
