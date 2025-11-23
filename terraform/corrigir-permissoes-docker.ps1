@@ -51,7 +51,9 @@ $commandId = aws ssm send-command `
         "  ls -la /opt/smartshow/smartshow/ 2>/dev/null || echo 'Diretório não existe'",
         "  exit 1",
         "}",
+        # Suppress PSScriptAnalyzer warning: pwd is used in bash string, not PowerShell
         # pwd será executado em bash na EC2, não em PowerShell
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingCmdletAliases', '')]
         "echo '✅ Diretório: '`$(pwd)",
         "echo ''",
         "echo '7️⃣ Parando containers existentes (com sudo)...'",
