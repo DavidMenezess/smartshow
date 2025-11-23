@@ -3,6 +3,10 @@
 # ========================================
 # Script simples para iniciar a aplicação imediatamente
 
+# Suppress PSScriptAnalyzer warning for pwd alias (used in bash strings, not PowerShell)
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingCmdletAliases', '', Justification = 'pwd is used in bash strings executed on EC2, not PowerShell')]
+param()
+
 $ErrorActionPreference = "Continue"
 
 Write-Host "==========================================" -ForegroundColor Cyan
@@ -32,9 +36,7 @@ $commandId = aws ssm send-command `
         "  ls -la /opt/smartshow/smartshow/ 2>/dev/null || echo 'Diretório não existe'",
         "  exit 1",
         "}",
-        # Suppress PSScriptAnalyzer warning: pwd is used in bash string, not PowerShell
         # pwd será executado em bash na EC2, não em PowerShell
-        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingCmdletAliases', '')]
         "echo '✅ Diretório: '`$(pwd)",
         "echo ''",
         "echo '📋 Verificando docker-compose.yml...'",
