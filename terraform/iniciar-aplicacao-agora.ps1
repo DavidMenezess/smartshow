@@ -32,7 +32,8 @@ $commandId = aws ssm send-command `
         "  ls -la /opt/smartshow/smartshow/ 2>/dev/null || echo 'Diretório não existe'",
         "  exit 1",
         "}",
-        "echo '✅ Diretório: $(pwd)'",
+        # pwd será executado em bash na EC2, não em PowerShell  
+        "echo '✅ Diretório: '`$(pwd)",
         "echo ''",
         "echo '📋 Verificando docker-compose.yml...'",
         "if [ ! -f docker-compose.yml ]; then",
