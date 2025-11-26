@@ -20,6 +20,20 @@ class CaixaSystem {
         this.loadCashControl();
         this.setupEventListeners();
         this.updateUI();
+        
+        // Atualizar vendas do dia periodicamente se o caixa estiver aberto
+        if (this.cashControl.isOpen) {
+            // Atualizar imediatamente
+            this.updateCashStatus();
+            // Atualizar a cada 10 segundos
+            this.updateInterval = setInterval(() => {
+                if (this.cashControl.isOpen) {
+                    this.updateCashStatus();
+                } else {
+                    clearInterval(this.updateInterval);
+                }
+            }, 10000);
+        }
     }
 
     loadCashControl() {
@@ -114,20 +128,30 @@ class CaixaSystem {
         // Buscar vendas reais do banco de dados
         try {
             const todaySalesData = await api.getTodaySales();
-            this.cashControl.todaySales = parseFloat(todaySalesData.total || 0);
-            this.cashControl.currentBalance = this.cashControl.initialCash + this.cashControl.todaySales;
-            this.saveCashControl();
+            if (todaySalesData && todaySalesData.total !== undefined) {
+                this.cashControl.todaySales = parseFloat(todaySalesData.total || 0);
+                this.cashControl.currentBalance = this.cashControl.initialCash + this.cashControl.todaySales;
+                this.saveCashControl();
+            }
         } catch (error) {
             console.error('Erro ao buscar vendas do dia:', error);
-            // Em caso de erro, usar valor do localStorage
+            // Em caso de erro, manter valores atuais
         }
         
-        document.getElementById('initialCash').textContent = 
-            this.formatCurrency(this.cashControl.initialCash);
-        document.getElementById('todaySales').textContent = 
-            this.formatCurrency(this.cashControl.todaySales);
-        document.getElementById('currentBalance').textContent = 
-            this.formatCurrency(this.cashControl.currentBalance);
+        // Atualizar interface sempre, mesmo se houver erro
+        const initialCashEl = document.getElementById('initialCash');
+        const todaySalesEl = document.getElementById('todaySales');
+        const currentBalanceEl = document.getElementById('currentBalance');
+        
+        if (initialCashEl) {
+            initialCashEl.textContent = this.formatCurrency(this.cashControl.initialCash);
+        }
+        if (todaySalesEl) {
+            todaySalesEl.textContent = this.formatCurrency(this.cashControl.todaySales);
+        }
+        if (currentBalanceEl) {
+            currentBalanceEl.textContent = this.formatCurrency(this.cashControl.currentBalance);
+        }
     }
 
     showOpenCashModal() {
@@ -209,6 +233,18 @@ class CaixaSystem {
         this.hideOpenCashModal();
         this.updateUI();
         
+        // Iniciar atualização periódica
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+        }
+        this.updateInterval = setInterval(() => {
+            if (this.cashControl.isOpen) {
+                this.updateCashStatus();
+            } else {
+                clearInterval(this.updateInterval);
+            }
+        }, 10000);
+        
         alert('Caixa aberto com sucesso!');
     }
 
@@ -244,6 +280,12 @@ class CaixaSystem {
 
         console.log('Relatório de fechamento:', report);
 
+        // Parar atualização periódica
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+            this.updateInterval = null;
+        }
+        
         // Fechar caixa
         this.cashControl.isOpen = false;
         this.cashControl.lastClosed = new Date().toISOString();
