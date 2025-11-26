@@ -209,37 +209,14 @@ jobs:
           echo "$DEPLOY_SCRIPT" > /tmp/deploy-script.sh
           
           # Converter script em array JSON para SSM
-          DEPLOY_COMMANDS="cd /opt/smartshow/smartshow || exit 1
-sudo cp -r web-site/api/data web-site/api/data.backup.\$(date +%Y%m%d_%H%M%S) || true
-sudo git fetch origin
-sudo git reset --hard origin/main
-sudo git pull origin main || true
-sudo chown -R ubuntu:ubuntu /opt/smartshow || true
-cd web-site
-docker-compose down || true
-docker-compose build --no-cache
-docker-compose up -d
-sleep 10
-docker-compose ps"
-          
+          # Usar array direto para evitar problemas com YAML
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$EC2_INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters "commands=[$(echo "$DEPLOY_COMMANDS" | jq -Rs 'split("\n") | map(select(length > 0))')]" \
+            --parameters '{"commands":["cd /opt/smartshow/smartshow || exit 1","sudo cp -r web-site/api/data web-site/api/data.backup.$(date +%Y%m%d_%H%M%S) || true","sudo git fetch origin","sudo git reset --hard origin/main","sudo git pull origin main || true","sudo chown -R ubuntu:ubuntu /opt/smartshow || true","cd web-site","docker-compose down || true","docker-compose build --no-cache","docker-compose up -d","sleep 10","docker-compose ps"]}' \
             --region ${{ env.AWS_REGION }} \
             --query "Command.CommandId" \
             --output text 2>/dev/null || echo "")
-          
-          # Se jq não estiver disponível, usar método alternativo
-          if [ -z "$COMMAND_ID" ] || [ "$COMMAND_ID" == "None" ]; then
-            COMMAND_ID=$(aws ssm send-command \
-              --instance-ids "$EC2_INSTANCE_ID" \
-              --document-name "AWS-RunShellScript" \
-              --parameters commands="cd /opt/smartshow/smartshow || exit 1","sudo cp -r web-site/api/data web-site/api/data.backup.\$(date +%Y%m%d_%H%M%S) || true","sudo git fetch origin","sudo git reset --hard origin/main","sudo git pull origin main || true","sudo chown -R ubuntu:ubuntu /opt/smartshow || true","cd web-site","docker-compose down || true","docker-compose build --no-cache","docker-compose up -d","sleep 10","docker-compose ps" \
-              --region ${{ env.AWS_REGION }} \
-              --query "Command.CommandId" \
-              --output text 2>/dev/null || echo "")
-          fi
           
           if [ -n "$COMMAND_ID" ] && [ "$COMMAND_ID" != "None" ]; then
             echo "✅ Comando SSM enviado: $COMMAND_ID"
