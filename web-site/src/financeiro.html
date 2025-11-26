@@ -321,19 +321,21 @@
                     body: JSON.stringify({
                         amount: parseFloat(amount),
                         paymentMethod: 'money',
-                        paymentDate: new Date().toISOString().split('T')[0]
+                        paymentDate: new Date().toISOString().split('T')[0],
+                        type: type
                     })
                 });
 
                 if (!response.ok) {
-                    throw new Error('Erro ao pagar conta');
+                    const error = await response.json();
+                    throw new Error(error.error || 'Erro ao pagar conta');
                 }
 
                 await loadFinancialData();
                 alert('Conta paga com sucesso!');
             } catch (error) {
                 console.error('Erro ao pagar conta:', error);
-                alert('Erro ao pagar conta');
+                alert('Erro ao pagar conta: ' + error.message);
             }
         }
 

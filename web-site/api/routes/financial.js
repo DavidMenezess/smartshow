@@ -150,9 +150,12 @@ router.post('/payable', async (req, res) => {
 router.post('/pay/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { amount, paymentMethod, paymentDate } = req.body;
+        const { amount, paymentMethod, paymentDate, type } = req.body;
 
-        const account = await db.get('SELECT * FROM accounts_receivable WHERE id = ?', [id]);
+        // Determinar qual tabela usar
+        const tableName = type === 'payable' ? 'accounts_payable' : 'accounts_receivable';
+        
+        const account = await db.get(`SELECT * FROM ${tableName} WHERE id = ?`, [id]);
         if (!account) {
             return res.status(404).json({ error: 'Conta não encontrada' });
         }
@@ -161,17 +164,17 @@ router.post('/pay/:id', async (req, res) => {
         const status = paidAmount >= account.amount ? 'paid' : 'pending';
 
         await db.run(
-            `UPDATE accounts_receivable SET
+            `UPDATE ${tableName} SET
              paid_amount = ?, status = ?, payment_date = ?, payment_method = ?
              WHERE id = ?`,
             [paidAmount, status, paymentDate || new Date().toISOString().split('T')[0], paymentMethod || null, id]
         );
 
-        const updated = await db.get('SELECT * FROM accounts_receivable WHERE id = ?', [id]);
+        const updated = await db.get(`SELECT * FROM ${tableName} WHERE id = ?`, [id]);
         res.json(updated);
     } catch (error) {
         console.error('Erro ao pagar conta:', error);
-        res.status(500).json({ error: 'Erro ao pagar conta' });
+        res.status(500).json({ error: 'Erro ao pagar conta', details: error.message });
     }
 });
 
