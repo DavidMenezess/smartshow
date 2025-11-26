@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: smartshow-api
+    # container_name removido para evitar conflitos - Docker gerará nome único automaticamente
     ports:
       - "3000:3000"
     volumes:
