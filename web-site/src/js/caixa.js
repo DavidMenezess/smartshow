@@ -114,13 +114,33 @@ class CaixaSystem {
             if (cashStatus) cashStatus.style.display = 'block';
             
             // Atualizar informações do caixa (buscar do banco)
+            // Forçar atualização imediata e depois periódica
+            console.log('🔄 Caixa aberto, atualizando vendas...');
             this.updateCashStatus();
+            
+            // Garantir que a atualização periódica está rodando
+            if (this.updateInterval) {
+                clearInterval(this.updateInterval);
+            }
+            this.updateInterval = setInterval(() => {
+                if (this.cashControl.isOpen) {
+                    this.updateCashStatus();
+                } else {
+                    clearInterval(this.updateInterval);
+                }
+            }, 10000);
         } else {
             if (openBtn) openBtn.style.display = 'inline-block';
             if (closeBtn) closeBtn.style.display = 'none';
             if (pdvMain) pdvMain.style.display = 'none';
             if (closedMessage) closedMessage.style.display = 'block';
             if (cashStatus) cashStatus.style.display = 'none';
+            
+            // Parar atualização periódica se o caixa estiver fechado
+            if (this.updateInterval) {
+                clearInterval(this.updateInterval);
+                this.updateInterval = null;
+            }
         }
     }
 
@@ -352,6 +372,9 @@ let caixaSystem;
 
 document.addEventListener('DOMContentLoaded', function() {
     caixaSystem = new CaixaSystem();
+    
+    // Tornar caixaSystem acessível globalmente para o botão de atualizar
+    window.caixaSystem = caixaSystem;
     
     // Integrar com PDV para atualizar vendas
     // Aguardar o PDV ser inicializado
