@@ -163,50 +163,8 @@ jobs:
         run: |
           echo "🚀 Atualizando aplicação na EC2..."
           
-          # Script de deploy para executar na EC2
-          DEPLOY_SCRIPT=$(cat << 'DEPLOY_EOF'
-            set -e
-            echo "📦 Atualizando repositório..."
-            cd /opt/smartshow/smartshow || exit 1
-            
-            # Fazer backup antes de atualizar
-            echo "💾 Fazendo backup..."
-            sudo cp -r web-site/api/data web-site/api/data.backup.$(date +%Y%m%d_%H%M%S) || true
-            
-            # Atualizar código
-            echo "🔄 Atualizando código do repositório..."
-            sudo git fetch origin
-            sudo git reset --hard origin/main
-            sudo git pull origin main || true
-            
-            # Corrigir propriedade
-            echo "🔧 Corrigindo propriedade dos arquivos..."
-            sudo chown -R ubuntu:ubuntu /opt/smartshow || true
-            
-            # Reconstruir e reiniciar containers
-            echo "🐳 Reconstruindo containers..."
-            cd web-site
-            docker-compose down || true
-            docker-compose build --no-cache
-            docker-compose up -d
-            
-            # Aguardar containers iniciarem
-            echo "⏳ Aguardando containers iniciarem..."
-            sleep 10
-            
-            # Verificar status
-            echo "✅ Verificando status dos containers..."
-            docker-compose ps
-            
-            echo "🎉 Deploy concluído com sucesso!"
-          DEPLOY_EOF
-          )
-          
           # Tentar usar AWS SSM (mais seguro, não requer SSH)
           echo "🔐 Tentando usar AWS Systems Manager (SSM)..."
-          
-          # Criar arquivo temporário com o script
-          echo "$DEPLOY_SCRIPT" > /tmp/deploy-script.sh
           
           # Converter script em array JSON para SSM
           # Usar array direto para evitar problemas com YAML
