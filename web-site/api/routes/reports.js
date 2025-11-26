@@ -144,19 +144,12 @@ router.get('/', async (req, res) => {
                         u.name as seller_name,
                         u.username as seller_username,
                         COALESCE(c.name, 'Cliente não informado') as customer_name,
-                        c.cpf_cnpj as customer_document,
-                        GROUP_CONCAT(
-                            p.name || ' (x' || si.quantity || ')',
-                            ', '
-                        ) as products
+                        c.cpf_cnpj as customer_document
                      FROM sales s
                      LEFT JOIN users u ON s.seller_id = u.id
                      LEFT JOIN customers c ON s.customer_id = c.id
-                     LEFT JOIN sale_items si ON s.id = si.sale_id
-                     LEFT JOIN products p ON si.product_id = p.id
                      WHERE DATE(datetime(s.created_at, '-3 hours')) >= ? 
                      AND DATE(datetime(s.created_at, '-3 hours')) <= ?
-                     GROUP BY s.id
                      ORDER BY s.created_at DESC`,
                     [startDate, endDate]
                 );
