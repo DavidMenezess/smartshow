@@ -151,7 +151,14 @@ router.get('/sales', async (req, res) => {
 router.get('/today-sales', async (req, res) => {
     try {
         const { date } = req.query;
-        const targetDate = date || new Date().toISOString().split('T')[0];
+        
+        // Usar data atual no timezone do Brasil (UTC-3)
+        const now = new Date();
+        const brazilOffset = -3 * 60; // UTC-3 em minutos
+        const brazilTime = new Date(now.getTime() + (brazilOffset - now.getTimezoneOffset()) * 60 * 1000);
+        const targetDate = date || brazilTime.toISOString().split('T')[0];
+        
+        console.log(`📅 Buscando vendas para a data: ${targetDate}`);
         
         // Usar timezone do Brasil (UTC-3)
         const todaySales = await db.get(
@@ -161,10 +168,13 @@ router.get('/today-sales', async (req, res) => {
             [targetDate]
         );
         
-        res.json(todaySales || { count: 0, total: 0 });
+        const result = todaySales || { count: 0, total: 0 };
+        console.log(`💰 Vendas encontradas: ${result.count} vendas, Total: R$ ${result.total}`);
+        
+        res.json(result);
     } catch (error) {
-        console.error('Erro ao buscar vendas do dia:', error);
-        res.status(500).json({ error: 'Erro ao buscar vendas do dia' });
+        console.error('❌ Erro ao buscar vendas do dia:', error);
+        res.status(500).json({ error: 'Erro ao buscar vendas do dia', details: error.message });
     }
 });
 

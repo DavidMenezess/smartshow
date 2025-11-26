@@ -151,8 +151,16 @@ class API {
     }
 
     async getTodaySales() {
-        const today = new Date().toISOString().split('T')[0];
-        return await this.request(`/reports/today-sales?date=${today}`);
+        // Usar data atual no timezone do Brasil (UTC-3)
+        const now = new Date();
+        const brazilOffset = -3 * 60; // UTC-3 em minutos
+        const brazilTime = new Date(now.getTime() + (brazilOffset - now.getTimezoneOffset()) * 60 * 1000);
+        const today = brazilTime.toISOString().split('T')[0];
+        
+        console.log(`📅 Buscando vendas do dia: ${today}`);
+        const result = await this.request(`/reports/today-sales?date=${today}`);
+        console.log(`📊 Resultado da API:`, result);
+        return result;
     }
 
     // Print
