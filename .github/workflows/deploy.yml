@@ -18,6 +18,8 @@ jobs:
   deploy-aplicacao:
     name: Deploy Aplicação
     runs-on: ubuntu-latest
+    # Executar mesmo se outros workflows falharem (deploy é independente)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     
     steps:
       - name: Checkout código
