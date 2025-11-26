@@ -158,7 +158,7 @@
                                             const timeStr = saleDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                                             const productsList = sale.items && sale.items.length > 0 
                                                 ? sale.items.map(item => `${item.product_name} (x${item.quantity})`).join(', ')
-                                                : sale.products || 'N/A';
+                                                : 'Nenhum produto encontrado';
                                             return `
                                                 <tr>
                                                     <td>
