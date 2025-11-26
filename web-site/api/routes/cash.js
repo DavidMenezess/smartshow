@@ -59,14 +59,24 @@ router.get('/status', async (req, res) => {
 router.post('/open', async (req, res) => {
     try {
         const { initialCash, observations } = req.body;
-        const userId = req.user?.id || 1; // Usar ID do usuário autenticado ou padrão
+        
+        // Buscar o primeiro usuário admin ou usar ID 1
+        let userId = 1;
+        try {
+            const adminUser = await db.get('SELECT id FROM users WHERE role = ? LIMIT 1', ['admin']);
+            if (adminUser) {
+                userId = adminUser.id;
+            }
+        } catch (userError) {
+            console.warn('Não foi possível buscar usuário admin, usando ID 1:', userError);
+        }
         
         // Verificar se já existe caixa aberto hoje
         const today = new Date().toISOString().split('T')[0];
         const existingCash = await db.get(
             `SELECT * FROM cash_control 
              WHERE DATE(datetime(opening_date, '-3 hours')) = ? 
-             AND closing_date IS NULL 
+             AND (closing_date IS NULL OR closing_date = '')
              AND is_open = 1`,
             [today]
         );
@@ -79,7 +89,7 @@ router.post('/open', async (req, res) => {
         const result = await db.run(
             `INSERT INTO cash_control (user_id, initial_cash, observations, opening_date, is_open)
              VALUES (?, ?, ?, datetime('now'), 1)`,
-            [userId, initialCash || 0, observations || '']
+            [userId, parseFloat(initialCash) || 0, observations || '']
         );
         
         res.json({
@@ -89,6 +99,7 @@ router.post('/open', async (req, res) => {
         });
     } catch (error) {
         console.error('Erro ao abrir caixa:', error);
+        console.error('Stack trace:', error.stack);
         res.status(500).json({ error: 'Erro ao abrir caixa', details: error.message });
     }
 });

@@ -9,16 +9,19 @@ class API {
         this.token = localStorage.getItem('token');
     }
 
-    async request(endpoint, options = {}) {
+    async request(endpoint, method = 'GET', body = null) {
         const url = `${API_BASE_URL}${endpoint}`;
         const config = {
-            ...options,
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
-                ...(this.token && { 'Authorization': `Bearer ${this.token}` }),
-                ...options.headers
+                ...(this.token && { 'Authorization': `Bearer ${this.token}` })
             }
         };
+
+        if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+            config.body = JSON.stringify(body);
+        }
 
         try {
             const response = await fetch(url, config);
