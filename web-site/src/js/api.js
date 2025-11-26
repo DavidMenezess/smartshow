@@ -163,6 +163,24 @@ class API {
         return result;
     }
 
+    async getCashStatus() {
+        return await this.request('/cash/status');
+    }
+
+    async openCash(initialCash, observations) {
+        return await this.request('/cash/open', 'POST', {
+            initialCash: parseFloat(initialCash) || 0,
+            observations: observations || ''
+        });
+    }
+
+    async closeCash(finalCash, observations) {
+        return await this.request('/cash/close', 'POST', {
+            finalCash: parseFloat(finalCash) || 0,
+            observations: observations || ''
+        });
+    }
+
     // Print
     async printFiscalReceipt(sale) {
         return await this.request('/print/fiscal/receipt', {

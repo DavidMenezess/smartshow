@@ -16,8 +16,9 @@ class CaixaSystem {
         this.init();
     }
 
-    init() {
-        this.loadCashControl();
+    async init() {
+        // Primeiro, buscar estado do servidor
+        await this.loadCashControlFromServer();
         this.setupEventListeners();
         this.updateUI();
         
@@ -33,6 +34,46 @@ class CaixaSystem {
                     clearInterval(this.updateInterval);
                 }
             }, 10000);
+        }
+    }
+
+    async loadCashControlFromServer() {
+        try {
+            console.log('🔄 Buscando estado do caixa no servidor...');
+            const serverState = await api.getCashStatus();
+            console.log('📊 Estado do servidor:', serverState);
+            
+            if (serverState && serverState.isOpen) {
+                // Caixa está aberto no servidor
+                this.cashControl = {
+                    isOpen: true,
+                    initialCash: serverState.initialCash || 0,
+                    currentBalance: serverState.currentBalance || 0,
+                    todaySales: serverState.todaySales || 0,
+                    lastOpened: serverState.openedAt || new Date().toISOString(),
+                    lastClosed: null,
+                    observations: serverState.observations || ''
+                };
+                this.saveCashControl();
+                console.log('✅ Caixa aberto no servidor, estado sincronizado');
+            } else {
+                // Caixa está fechado no servidor
+                this.cashControl = {
+                    isOpen: false,
+                    initialCash: 0,
+                    currentBalance: 0,
+                    todaySales: 0,
+                    lastOpened: null,
+                    lastClosed: null,
+                    observations: ''
+                };
+                this.saveCashControl();
+                console.log('ℹ️ Caixa fechado no servidor');
+            }
+        } catch (error) {
+            console.error('❌ Erro ao buscar estado do servidor, usando localStorage:', error);
+            // Em caso de erro, tentar carregar do localStorage
+            this.loadCashControl();
         }
     }
 
@@ -297,7 +338,7 @@ class CaixaSystem {
         }
     }
 
-    openCash() {
+    async openCash() {
         const initialCash = parseFloat(document.getElementById('initialCashValue').value) || 0;
         const observations = document.getElementById('cashObservations').value || '';
 
@@ -315,24 +356,29 @@ class CaixaSystem {
             return;
         }
 
-        // Abrir caixa
-        const now = new Date();
-        this.cashControl = {
-            isOpen: true,
-            initialCash: initialCash,
-            currentBalance: initialCash,
-            todaySales: 0,
-            lastOpened: now.toISOString(),
-            lastClosed: null,
-            observations: observations
-        };
+        try {
+            // Abrir caixa no servidor
+            console.log('💰 Abrindo caixa no servidor...');
+            await api.openCash(initialCash, observations);
+            
+            // Atualizar estado local
+            const now = new Date();
+            this.cashControl = {
+                isOpen: true,
+                initialCash: initialCash,
+                currentBalance: initialCash,
+                todaySales: 0,
+                lastOpened: now.toISOString(),
+                lastClosed: null,
+                observations: observations
+            };
 
-        console.log('💰 Abrindo caixa:', this.cashControl);
-        this.saveCashControl();
-        this.hideOpenCashModal();
-        
-        // Atualizar vendas imediatamente ao abrir
-        this.updateCashStatus().then(() => {
+            console.log('✅ Caixa aberto:', this.cashControl);
+            this.saveCashControl();
+            this.hideOpenCashModal();
+            
+            // Atualizar vendas imediatamente ao abrir
+            await this.updateCashStatus();
             this.updateUI();
             
             // Iniciar atualização periódica
@@ -348,7 +394,10 @@ class CaixaSystem {
             }, 10000);
             
             alert('Caixa aberto com sucesso!');
-        });
+        } catch (error) {
+            console.error('❌ Erro ao abrir caixa:', error);
+            alert('Erro ao abrir caixa: ' + (error.message || 'Erro desconhecido'));
+        }
     }
 
     closeCash() {
