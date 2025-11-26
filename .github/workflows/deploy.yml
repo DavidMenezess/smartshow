@@ -259,23 +259,22 @@ jobs:
               
               # Fallback para SSH
               if [ -f ~/.ssh/smartshow.pem ]; then
-                SSH_CMD="ssh -i ~/.ssh/smartshow.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@$EC2_IP"
-                $SSH_CMD << 'SSH_EOF'
-                  set -e
-                  echo "📦 Atualizando repositório..."
-                  cd /opt/smartshow/smartshow || exit 1
-                  sudo git fetch origin
-                  sudo git reset --hard origin/main
-                  sudo git pull origin main || true
-                  sudo chown -R ubuntu:ubuntu /opt/smartshow || true
-                  cd web-site
-                  docker-compose down || true
-                  docker-compose build --no-cache
-                  docker-compose up -d
-                  sleep 10
-                  docker-compose ps
-                  echo "🎉 Deploy concluído com sucesso!"
-                SSH_EOF
+                ssh -i ~/.ssh/smartshow.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@$EC2_IP bash << 'SSH_EOF'
+set -e
+echo "📦 Atualizando repositório..."
+cd /opt/smartshow/smartshow || exit 1
+sudo git fetch origin
+sudo git reset --hard origin/main
+sudo git pull origin main || true
+sudo chown -R ubuntu:ubuntu /opt/smartshow || true
+cd web-site
+docker-compose down || true
+docker-compose build --no-cache
+docker-compose up -d
+sleep 10
+docker-compose ps
+echo "🎉 Deploy concluído com sucesso!"
+SSH_EOF
               else
                 echo "❌ SSM falhou e SSH não está disponível"
                 echo "💡 Configure o secret EC2_SSH_PRIVATE_KEY no GitHub ou habilite SSM na EC2"
@@ -289,24 +288,23 @@ jobs:
             
             # Fallback para SSH
             if [ -f ~/.ssh/smartshow.pem ]; then
-              SSH_CMD="ssh -i ~/.ssh/smartshow.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@$EC2_IP"
-              $SSH_CMD << 'SSH_EOF'
-                set -e
-                echo "📦 Atualizando repositório..."
-                cd /opt/smartshow/smartshow || exit 1
-                sudo cp -r web-site/api/data web-site/api/data.backup.$(date +%Y%m%d_%H%M%S) || true
-                sudo git fetch origin
-                sudo git reset --hard origin/main
-                sudo git pull origin main || true
-                sudo chown -R ubuntu:ubuntu /opt/smartshow || true
-                cd web-site
-                docker-compose down || true
-                docker-compose build --no-cache
-                docker-compose up -d
-                sleep 10
-                docker-compose ps
-                echo "🎉 Deploy concluído com sucesso!"
-              SSH_EOF
+              ssh -i ~/.ssh/smartshow.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@$EC2_IP bash << 'SSH_EOF'
+set -e
+echo "📦 Atualizando repositório..."
+cd /opt/smartshow/smartshow || exit 1
+sudo cp -r web-site/api/data web-site/api/data.backup.$(date +%Y%m%d_%H%M%S) || true
+sudo git fetch origin
+sudo git reset --hard origin/main
+sudo git pull origin main || true
+sudo chown -R ubuntu:ubuntu /opt/smartshow || true
+cd web-site
+docker-compose down || true
+docker-compose build --no-cache
+docker-compose up -d
+sleep 10
+docker-compose ps
+echo "🎉 Deploy concluído com sucesso!"
+SSH_EOF
             else
               echo "❌ Nenhum método de acesso disponível"
               echo "💡 Configure uma das opções:"
