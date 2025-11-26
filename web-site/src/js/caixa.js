@@ -400,7 +400,7 @@ class CaixaSystem {
         }
     }
 
-    closeCash() {
+    async closeCash() {
         if (!confirm('Tem certeza que deseja fechar o caixa?')) {
             return;
         }
@@ -413,44 +413,54 @@ class CaixaSystem {
             return;
         }
 
-        // Calcular diferença
-        const difference = finalCash - this.cashControl.currentBalance;
-        const differenceText = difference >= 0 
-            ? `Sobra: ${this.formatCurrency(difference)}`
-            : `Falta: ${this.formatCurrency(Math.abs(difference))}`;
+        try {
+            // Fechar caixa no servidor
+            console.log('🔒 Fechando caixa no servidor...');
+            const result = await api.closeCash(finalCash, observations);
+            console.log('✅ Caixa fechado no servidor:', result);
+            
+            // Calcular diferença
+            const difference = result.difference || (finalCash - this.cashControl.currentBalance);
+            const differenceText = difference >= 0 
+                ? `Sobra: ${this.formatCurrency(difference)}`
+                : `Falta: ${this.formatCurrency(Math.abs(difference))}`;
 
-        // Salvar relatório (aqui você pode enviar para a API)
-        const report = {
-            date: new Date().toISOString(),
-            initialCash: this.cashControl.initialCash,
-            finalCash: finalCash,
-            expectedBalance: this.cashControl.currentBalance,
-            difference: difference,
-            todaySales: this.cashControl.todaySales,
-            observations: observations
-        };
+            // Salvar relatório
+            const report = {
+                date: new Date().toISOString(),
+                initialCash: this.cashControl.initialCash,
+                finalCash: finalCash,
+                expectedBalance: this.cashControl.currentBalance,
+                difference: difference,
+                todaySales: this.cashControl.todaySales,
+                observations: observations
+            };
 
-        console.log('Relatório de fechamento:', report);
+            console.log('Relatório de fechamento:', report);
 
-        // Parar atualização periódica
-        if (this.updateInterval) {
-            clearInterval(this.updateInterval);
-            this.updateInterval = null;
+            // Parar atualização periódica
+            if (this.updateInterval) {
+                clearInterval(this.updateInterval);
+                this.updateInterval = null;
+            }
+            
+            // Fechar caixa localmente
+            this.cashControl.isOpen = false;
+            this.cashControl.lastClosed = new Date().toISOString();
+            this.cashControl.initialCash = 0;
+            this.cashControl.currentBalance = 0;
+            this.cashControl.todaySales = 0;
+            this.cashControl.observations = '';
+
+            this.saveCashControl();
+            this.hideCloseCashModal();
+            this.updateUI();
+
+            alert(`Caixa fechado com sucesso!\n${differenceText}`);
+        } catch (error) {
+            console.error('❌ Erro ao fechar caixa:', error);
+            alert('Erro ao fechar caixa: ' + (error.message || 'Erro desconhecido'));
         }
-        
-        // Fechar caixa
-        this.cashControl.isOpen = false;
-        this.cashControl.lastClosed = new Date().toISOString();
-        this.cashControl.initialCash = 0;
-        this.cashControl.currentBalance = 0;
-        this.cashControl.todaySales = 0;
-        this.cashControl.observations = '';
-
-        this.saveCashControl();
-        this.hideCloseCashModal();
-        this.updateUI();
-
-        alert(`Caixa fechado com sucesso!\n${differenceText}`);
     }
 
     calculateCashDifference() {
