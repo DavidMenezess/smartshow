@@ -238,7 +238,11 @@ function loadLowStockProducts(products) {
 
 async function loadRecentSales() {
     try {
-        const today = new Date().toISOString().split('T')[0];
+        // Usar data atual no timezone do Brasil (UTC-3)
+        const now = new Date();
+        const brazilOffset = -3 * 60; // UTC-3 em minutos
+        const brazilTime = new Date(now.getTime() + (brazilOffset - now.getTimezoneOffset()) * 60 * 1000);
+        const today = brazilTime.toISOString().split('T')[0];
         const sales = await api.getSales(today, today);
 
         const tbody = document.getElementById('recentSalesBody');

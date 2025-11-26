@@ -99,7 +99,7 @@ class CaixaSystem {
             if (closedMessage) closedMessage.style.display = 'none';
             if (cashStatus) cashStatus.style.display = 'block';
             
-            // Atualizar informações do caixa
+            // Atualizar informações do caixa (buscar do banco)
             this.updateCashStatus();
         } else {
             if (openBtn) openBtn.style.display = 'inline-block';
@@ -110,7 +110,18 @@ class CaixaSystem {
         }
     }
 
-    updateCashStatus() {
+    async updateCashStatus() {
+        // Buscar vendas reais do banco de dados
+        try {
+            const todaySalesData = await api.getTodaySales();
+            this.cashControl.todaySales = parseFloat(todaySalesData.total || 0);
+            this.cashControl.currentBalance = this.cashControl.initialCash + this.cashControl.todaySales;
+            this.saveCashControl();
+        } catch (error) {
+            console.error('Erro ao buscar vendas do dia:', error);
+            // Em caso de erro, usar valor do localStorage
+        }
+        
         document.getElementById('initialCash').textContent = 
             this.formatCurrency(this.cashControl.initialCash);
         document.getElementById('todaySales').textContent = 
@@ -140,13 +151,15 @@ class CaixaSystem {
         if (modal) {
             modal.style.display = 'block';
             
-            // Atualizar valores no modal
-            document.getElementById('summaryInitialCash').textContent = 
-                this.formatCurrency(this.cashControl.initialCash);
-            document.getElementById('summaryTodaySales').textContent = 
-                this.formatCurrency(this.cashControl.todaySales);
-            document.getElementById('summaryExpectedBalance').textContent = 
-                this.formatCurrency(this.cashControl.currentBalance);
+            // Atualizar valores no modal (buscar vendas reais antes)
+            this.updateCashStatus().then(() => {
+                document.getElementById('summaryInitialCash').textContent = 
+                    this.formatCurrency(this.cashControl.initialCash);
+                document.getElementById('summaryTodaySales').textContent = 
+                    this.formatCurrency(this.cashControl.todaySales);
+                document.getElementById('summaryExpectedBalance').textContent = 
+                    this.formatCurrency(this.cashControl.currentBalance);
+            });
             
             document.getElementById('finalCashValue').value = '';
             document.getElementById('finalCashValue').focus();
@@ -264,10 +277,9 @@ class CaixaSystem {
     }
 
     addSale(amount) {
+        // Não precisa mais somar manualmente - o updateCashStatus busca do banco
+        // Apenas atualizar a interface
         if (this.cashControl.isOpen) {
-            this.cashControl.todaySales += amount;
-            this.cashControl.currentBalance = this.cashControl.initialCash + this.cashControl.todaySales;
-            this.saveCashControl();
             this.updateCashStatus();
         }
     }
@@ -287,19 +299,28 @@ document.addEventListener('DOMContentLoaded', function() {
     caixaSystem = new CaixaSystem();
     
     // Integrar com PDV para atualizar vendas
-    if (window.pdv) {
-        const originalFinalize = window.pdv.finalizeSale;
-        if (originalFinalize) {
-            window.pdv.finalizeSale = function() {
-                const result = originalFinalize.apply(this, arguments);
-                if (caixaSystem && caixaSystem.cashControl.isOpen) {
-                    const total = parseFloat(document.getElementById('total').textContent.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
-                    caixaSystem.addSale(total);
-                }
-                return result;
-            };
+    // Aguardar o PDV ser inicializado
+    setTimeout(() => {
+        if (window.pdv) {
+            const originalFinalize = window.pdv.finalizeSale;
+            if (originalFinalize) {
+                window.pdv.finalizeSale = async function() {
+                    const result = await originalFinalize.apply(this, arguments);
+                    // Aguardar um pouco para garantir que a venda foi salva no banco
+                    if (caixaSystem && caixaSystem.cashControl.isOpen) {
+                        setTimeout(() => {
+                            caixaSystem.updateCashStatus();
+                        }, 1000);
+                    }
+                    return result;
+                };
+            }
         }
-    }
+    }, 100);
 });
+
+
+
+
 
 

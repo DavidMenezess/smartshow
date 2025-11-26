@@ -150,6 +150,11 @@ class API {
         return await this.request(`/reports/sales?${params}`);
     }
 
+    async getTodaySales() {
+        const today = new Date().toISOString().split('T')[0];
+        return await this.request(`/reports/today-sales?date=${today}`);
+    }
+
     // Print
     async printFiscalReceipt(sale) {
         return await this.request('/print/fiscal/receipt', {

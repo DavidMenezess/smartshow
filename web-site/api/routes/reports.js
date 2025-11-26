@@ -10,20 +10,27 @@ const router = express.Router();
 // Dashboard - resumo geral
 router.get('/dashboard', async (req, res) => {
     try {
-        const today = new Date().toISOString().split('T')[0];
-        const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+        // Usar data atual no timezone do Brasil (UTC-3)
+        const now = new Date();
+        const brazilOffset = -3 * 60; // UTC-3 em minutos
+        const brazilTime = new Date(now.getTime() + (brazilOffset - now.getTimezoneOffset()) * 60 * 1000);
+        const today = brazilTime.toISOString().split('T')[0];
+        
+        const monthStart = new Date(brazilTime.getFullYear(), brazilTime.getMonth(), 1).toISOString().split('T')[0];
 
-        // Vendas do dia
+        // Vendas do dia - considerar timezone do Brasil
         const todaySales = await db.get(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
-             FROM sales WHERE DATE(created_at) = ?`,
+             FROM sales 
+             WHERE DATE(datetime(created_at, '-3 hours')) = ?`,
             [today]
         );
 
-        // Vendas do mês
+        // Vendas do mês - considerar timezone do Brasil
         const monthSales = await db.get(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
-             FROM sales WHERE DATE(created_at) >= ?`,
+             FROM sales 
+             WHERE DATE(datetime(created_at, '-3 hours')) >= ?`,
             [monthStart]
         );
 
@@ -60,24 +67,24 @@ router.get('/dashboard', async (req, res) => {
             osByStatus[status] = result.count;
         }
 
-        // Vendas por dia dos últimos 7 dias (para gráfico)
+        // Vendas por dia dos últimos 7 dias (para gráfico) - considerar timezone do Brasil
         const salesByDay = await db.all(
-            `SELECT DATE(created_at) as date, 
+            `SELECT DATE(datetime(created_at, '-3 hours')) as date, 
                     COUNT(*) as count, 
                     COALESCE(SUM(total), 0) as total
              FROM sales 
-             WHERE DATE(created_at) >= date('now', '-7 days')
-             GROUP BY DATE(created_at)
+             WHERE DATE(datetime(created_at, '-3 hours')) >= date('now', '-7 days')
+             GROUP BY DATE(datetime(created_at, '-3 hours'))
              ORDER BY date ASC`
         );
 
-        // Vendas por forma de pagamento (últimos 30 dias)
+        // Vendas por forma de pagamento (últimos 30 dias) - considerar timezone do Brasil
         const salesByPayment = await db.all(
             `SELECT payment_method, 
                     COUNT(*) as count, 
                     COALESCE(SUM(total), 0) as total
              FROM sales 
-             WHERE DATE(created_at) >= date('now', '-30 days')
+             WHERE DATE(datetime(created_at, '-3 hours')) >= date('now', '-30 days')
              GROUP BY payment_method
              ORDER BY total DESC`
         );
@@ -137,6 +144,27 @@ router.get('/sales', async (req, res) => {
     } catch (error) {
         console.error('Erro ao gerar relatório de vendas:', error);
         res.status(500).json({ error: 'Erro ao gerar relatório de vendas' });
+    }
+});
+
+// Vendas do dia (para o caixa)
+router.get('/today-sales', async (req, res) => {
+    try {
+        const { date } = req.query;
+        const targetDate = date || new Date().toISOString().split('T')[0];
+        
+        // Usar timezone do Brasil (UTC-3)
+        const todaySales = await db.get(
+            `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
+             FROM sales 
+             WHERE DATE(datetime(created_at, '-3 hours')) = ?`,
+            [targetDate]
+        );
+        
+        res.json(todaySales || { count: 0, total: 0 });
+    } catch (error) {
+        console.error('Erro ao buscar vendas do dia:', error);
+        res.status(500).json({ error: 'Erro ao buscar vendas do dia' });
     }
 });
 
