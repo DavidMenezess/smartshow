@@ -9,8 +9,25 @@ class API {
         this.token = localStorage.getItem('token');
     }
 
-    async request(endpoint, method = 'GET', body = null) {
+    async request(endpoint, methodOrOptions = 'GET', bodyOrOptions = null) {
         const url = `${API_BASE_URL}${endpoint}`;
+        
+        // Suportar ambos os formatos: novo (method, body) e antigo (options)
+        let method = 'GET';
+        let body = null;
+        let returnNullOn404 = false;
+        
+        if (typeof methodOrOptions === 'string') {
+            // Novo formato: request(endpoint, method, body)
+            method = methodOrOptions;
+            body = bodyOrOptions;
+        } else if (typeof methodOrOptions === 'object' && methodOrOptions !== null) {
+            // Formato antigo: request(endpoint, options)
+            method = methodOrOptions.method || 'GET';
+            body = methodOrOptions.body ? JSON.parse(methodOrOptions.body) : null;
+            returnNullOn404 = methodOrOptions.returnNullOn404 || false;
+        }
+        
         const config = {
             method: method,
             headers: {
@@ -27,7 +44,7 @@ class API {
             const response = await fetch(url, config);
             
             // Se for 404 e foi solicitado retornar null, retornar null sem fazer parse
-            if (response.status === 404 && options.returnNullOn404) {
+            if (response.status === 404 && returnNullOn404) {
                 return null;
             }
             
@@ -54,10 +71,7 @@ class API {
 
     // Auth
     async login(username, password) {
-        const data = await this.request('/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ username, password })
-        });
+        const data = await this.request('/auth/login', 'POST', { username, password });
         if (data.token) {
             this.token = data.token;
             localStorage.setItem('token', data.token);
