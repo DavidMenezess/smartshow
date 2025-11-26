@@ -29,15 +29,26 @@ class PDV {
             this.updateTotals();
         });
 
-        document.getElementById('paymentMethod')?.addEventListener('change', (e) => {
+        // Função para atualizar visibilidade do campo Valor Pago
+        const updatePaidAmountVisibility = () => {
             const paidAmountGroup = document.getElementById('paidAmountGroup');
+            const paymentMethod = document.getElementById('paymentMethod')?.value;
+            if (paymentMethod === 'Dinheiro') {
+                if (paidAmountGroup) paidAmountGroup.style.display = 'block';
+            } else {
+                if (paidAmountGroup) paidAmountGroup.style.display = 'none';
+            }
+        };
+
+        // Verificar visibilidade inicial (se Dinheiro já está selecionado)
+        updatePaidAmountVisibility();
+
+        document.getElementById('paymentMethod')?.addEventListener('change', (e) => {
+            updatePaidAmountVisibility();
             if (e.target.value === 'Dinheiro') {
-                paidAmountGroup.style.display = 'block';
                 document.getElementById('paidAmount')?.addEventListener('input', () => {
                     this.calculateChange();
                 });
-            } else {
-                paidAmountGroup.style.display = 'none';
             }
         });
 
