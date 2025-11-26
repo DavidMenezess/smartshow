@@ -209,9 +209,8 @@ jobs:
           echo "$DEPLOY_SCRIPT" > /tmp/deploy-script.sh
           
           # Converter script em array JSON para SSM
-          DEPLOY_COMMANDS=$(cat << 'COMMANDS_EOF'
-cd /opt/smartshow/smartshow || exit 1
-sudo cp -r web-site/api/data web-site/api/data.backup.$(date +%Y%m%d_%H%M%S) || true
+          DEPLOY_COMMANDS="cd /opt/smartshow/smartshow || exit 1
+sudo cp -r web-site/api/data web-site/api/data.backup.\$(date +%Y%m%d_%H%M%S) || true
 sudo git fetch origin
 sudo git reset --hard origin/main
 sudo git pull origin main || true
@@ -221,9 +220,7 @@ docker-compose down || true
 docker-compose build --no-cache
 docker-compose up -d
 sleep 10
-docker-compose ps
-COMMANDS_EOF
-          )
+docker-compose ps"
           
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$EC2_INSTANCE_ID" \
