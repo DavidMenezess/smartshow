@@ -118,8 +118,9 @@
         function formatReportData(type, data) {
             switch (type) {
                 case 'sales':
-                    const totalSales = data.reduce((sum, item) => sum + (parseFloat(item.total_sales) || 0), 0);
-                    const totalCount = data.reduce((sum, item) => sum + (parseInt(item.sales_count) || 0), 0);
+                    const totalSales = data.reduce((sum, item) => sum + (parseFloat(item.total) || 0), 0);
+                    const totalCount = data.length;
+                    const totalDiscount = data.reduce((sum, item) => sum + (parseFloat(item.discount) || 0), 0);
                     return `
                         <div style="margin-top: 2rem;">
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
@@ -131,27 +132,79 @@
                                     <div style="font-size: 0.875rem; color: #718096;">Valor Total</div>
                                     <div style="font-size: 1.5rem; font-weight: bold; color: #2d3748;">R$ ${totalSales.toFixed(2).replace('.', ',')}</div>
                                 </div>
+                                <div style="background: #f7fafc; padding: 1rem; border-radius: 8px;">
+                                    <div style="font-size: 0.875rem; color: #718096;">Total de Descontos</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #2d3748;">R$ ${totalDiscount.toFixed(2).replace('.', ',')}</div>
+                                </div>
                             </div>
-                            <table class="data-table" style="width: 100%;">
-                                <thead>
-                                    <tr>
-                                        <th>Data</th>
-                                        <th>Quantidade</th>
-                                        <th>Total</th>
-                                        <th>Desconto</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${data.map(item => `
+                            <div style="overflow-x: auto;">
+                                <table class="data-table" style="width: 100%; min-width: 800px;">
+                                    <thead>
                                         <tr>
-                                            <td>${new Date(item.date).toLocaleDateString('pt-BR')}</td>
-                                            <td>${item.sales_count || 0}</td>
-                                            <td>R$ ${parseFloat(item.total_sales || 0).toFixed(2).replace('.', ',')}</td>
-                                            <td>R$ ${parseFloat(item.total_discount || 0).toFixed(2).replace('.', ',')}</td>
+                                            <th>Data/Hora</th>
+                                            <th>Nº Venda</th>
+                                            <th>Vendedor</th>
+                                            <th>Cliente</th>
+                                            <th>Produtos</th>
+                                            <th>Forma Pagamento</th>
+                                            <th>Desconto</th>
+                                            <th>Total</th>
                                         </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        ${data.map(sale => {
+                                            const saleDate = new Date(sale.date_time);
+                                            const dateStr = saleDate.toLocaleDateString('pt-BR');
+                                            const timeStr = saleDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                                            const productsList = sale.items && sale.items.length > 0 
+                                                ? sale.items.map(item => `${item.product_name} (x${item.quantity})`).join(', ')
+                                                : sale.products || 'N/A';
+                                            return `
+                                                <tr>
+                                                    <td>
+                                                        <div style="font-weight: 500;">${dateStr}</div>
+                                                        <div style="font-size: 0.875rem; color: #718096;">${timeStr}</div>
+                                                    </td>
+                                                    <td>${sale.sale_number || 'N/A'}</td>
+                                                    <td>${sale.seller_name || sale.seller_username || 'N/A'}</td>
+                                                    <td>${sale.customer_name || 'Cliente não informado'}</td>
+                                                    <td style="max-width: 300px; word-wrap: break-word;">
+                                                        <div style="font-size: 0.875rem;">${productsList}</div>
+                                                        ${sale.items && sale.items.length > 0 ? `
+                                                            <details style="margin-top: 0.5rem;">
+                                                                <summary style="cursor: pointer; color: #4299e1; font-size: 0.75rem;">Ver detalhes</summary>
+                                                                <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f7fafc; border-radius: 4px;">
+                                                                    ${sale.items.map(item => `
+                                                                        <div style="font-size: 0.75rem; margin-bottom: 0.25rem;">
+                                                                            • ${item.product_name} - Qtd: ${item.quantity} - 
+                                                                            Unit: R$ ${parseFloat(item.unit_price).toFixed(2).replace('.', ',')} - 
+                                                                            Total: R$ ${parseFloat(item.item_total).toFixed(2).replace('.', ',')}
+                                                                        </div>
+                                                                    `).join('')}
+                                                                </div>
+                                                            </details>
+                                                        ` : ''}
+                                                    </td>
+                                                    <td>
+                                                        <span style="padding: 0.25rem 0.5rem; background: #e6fffa; color: #234e52; border-radius: 4px; font-size: 0.875rem;">
+                                                            ${getPaymentMethodName(sale.payment_method)}
+                                                        </span>
+                                                    </td>
+                                                    <td>R$ ${parseFloat(sale.discount || 0).toFixed(2).replace('.', ',')}</td>
+                                                    <td style="font-weight: bold; color: #2d3748;">R$ ${parseFloat(sale.total || 0).toFixed(2).replace('.', ',')}</td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr style="background: #f7fafc; font-weight: bold;">
+                                            <td colspan="6" style="text-align: right; padding: 1rem;">TOTAL GERAL:</td>
+                                            <td style="padding: 1rem;">R$ ${totalDiscount.toFixed(2).replace('.', ',')}</td>
+                                            <td style="padding: 1rem;">R$ ${totalSales.toFixed(2).replace('.', ',')}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
                         </div>
                     `;
 
@@ -270,6 +323,17 @@
                 'aguardando_peca': 'Aguardando Peça'
             };
             return names[status] || status;
+        }
+
+        function getPaymentMethodName(method) {
+            const names = {
+                'money': '💵 Dinheiro',
+                'pix': '💳 PIX',
+                'debit': '💳 Débito',
+                'credit': '💳 Crédito',
+                'cash': '💵 Dinheiro'
+            };
+            return names[method] || method || 'N/A';
         }
 
         function exportReport() {

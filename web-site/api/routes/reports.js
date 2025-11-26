@@ -129,19 +129,60 @@ router.get('/', async (req, res) => {
 
         switch (type) {
             case 'sales':
+                // Buscar vendas individuais com todos os detalhes
                 const salesReport = await db.all(
-                    `SELECT DATE(datetime(s.created_at, '-3 hours')) as date,
-                            COUNT(*) as sales_count,
-                            SUM(s.total) as total_sales,
-                            SUM(s.discount) as total_discount
+                    `SELECT 
+                        s.id,
+                        s.sale_number,
+                        datetime(s.created_at, '-3 hours') as date_time,
+                        DATE(datetime(s.created_at, '-3 hours')) as date,
+                        TIME(datetime(s.created_at, '-3 hours')) as time,
+                        s.total,
+                        s.discount,
+                        s.payment_method,
+                        s.observations,
+                        u.name as seller_name,
+                        u.username as seller_username,
+                        COALESCE(c.name, 'Cliente não informado') as customer_name,
+                        c.cpf_cnpj as customer_document,
+                        GROUP_CONCAT(
+                            p.name || ' (x' || si.quantity || ')',
+                            ', '
+                        ) as products
                      FROM sales s
+                     LEFT JOIN users u ON s.seller_id = u.id
+                     LEFT JOIN customers c ON s.customer_id = c.id
+                     LEFT JOIN sale_items si ON s.id = si.sale_id
+                     LEFT JOIN products p ON si.product_id = p.id
                      WHERE DATE(datetime(s.created_at, '-3 hours')) >= ? 
                      AND DATE(datetime(s.created_at, '-3 hours')) <= ?
-                     GROUP BY DATE(datetime(s.created_at, '-3 hours'))
-                     ORDER BY date DESC`,
+                     GROUP BY s.id
+                     ORDER BY s.created_at DESC`,
                     [startDate, endDate]
                 );
-                return res.json({ type: 'sales', data: salesReport });
+                
+                // Buscar itens detalhados de cada venda
+                const salesWithItems = await Promise.all(salesReport.map(async (sale) => {
+                    const items = await db.all(
+                        `SELECT 
+                            si.quantity,
+                            si.unit_price,
+                            si.total as item_total,
+                            p.name as product_name,
+                            p.barcode
+                         FROM sale_items si
+                         JOIN products p ON si.product_id = p.id
+                         WHERE si.sale_id = ?
+                         ORDER BY si.id`,
+                        [sale.id]
+                    );
+                    return {
+                        ...sale,
+                        items: items
+                    };
+                }));
+                
+                return res.json({ type: 'sales', data: salesWithItems });
 
             case 'products':
                 const productsReport = await db.all(
