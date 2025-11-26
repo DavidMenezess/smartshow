@@ -127,14 +127,25 @@ class CaixaSystem {
     async updateCashStatus() {
         // Buscar vendas reais do banco de dados
         try {
+            console.log('🔄 Atualizando vendas do caixa...');
             const todaySalesData = await api.getTodaySales();
+            console.log('📊 Dados recebidos:', todaySalesData);
+            
             if (todaySalesData && todaySalesData.total !== undefined) {
-                this.cashControl.todaySales = parseFloat(todaySalesData.total || 0);
+                const newTotal = parseFloat(todaySalesData.total || 0);
+                console.log(`💰 Total de vendas: R$ ${newTotal.toFixed(2)}`);
+                
+                this.cashControl.todaySales = newTotal;
                 this.cashControl.currentBalance = this.cashControl.initialCash + this.cashControl.todaySales;
                 this.saveCashControl();
+                
+                console.log(`✅ Vendas atualizadas: R$ ${this.cashControl.todaySales.toFixed(2)}`);
+                console.log(`✅ Saldo atual: R$ ${this.cashControl.currentBalance.toFixed(2)}`);
+            } else {
+                console.warn('⚠️ Resposta da API não contém total:', todaySalesData);
             }
         } catch (error) {
-            console.error('Erro ao buscar vendas do dia:', error);
+            console.error('❌ Erro ao buscar vendas do dia:', error);
             // Em caso de erro, manter valores atuais
         }
         
@@ -148,9 +159,11 @@ class CaixaSystem {
         }
         if (todaySalesEl) {
             todaySalesEl.textContent = this.formatCurrency(this.cashControl.todaySales);
+            console.log(`🖥️ Interface atualizada - Vendas do Dia: ${todaySalesEl.textContent}`);
         }
         if (currentBalanceEl) {
             currentBalanceEl.textContent = this.formatCurrency(this.cashControl.currentBalance);
+            console.log(`🖥️ Interface atualizada - Saldo Atual: ${currentBalanceEl.textContent}`);
         }
     }
 
@@ -344,21 +357,57 @@ document.addEventListener('DOMContentLoaded', function() {
     // Aguardar o PDV ser inicializado
     setTimeout(() => {
         if (window.pdv) {
+            console.log('✅ PDV encontrado, integrando com caixa...');
             const originalFinalize = window.pdv.finalizeSale;
             if (originalFinalize) {
                 window.pdv.finalizeSale = async function() {
+                    console.log('🛒 Venda finalizada, atualizando caixa...');
                     const result = await originalFinalize.apply(this, arguments);
                     // Aguardar um pouco para garantir que a venda foi salva no banco
                     if (caixaSystem && caixaSystem.cashControl.isOpen) {
+                        console.log('⏳ Aguardando 2 segundos antes de atualizar caixa...');
                         setTimeout(() => {
+                            console.log('🔄 Atualizando caixa após venda...');
                             caixaSystem.updateCashStatus();
-                        }, 1000);
+                        }, 2000);
+                    } else {
+                        console.warn('⚠️ Caixa não está aberto, não será atualizado');
                     }
                     return result;
                 };
+            } else {
+                console.warn('⚠️ Método finalizeSale não encontrado no PDV');
             }
+        } else {
+            console.warn('⚠️ PDV não encontrado, tentando novamente em 1 segundo...');
+            // Tentar novamente após 1 segundo
+            setTimeout(() => {
+                if (window.pdv) {
+                    const originalFinalize = window.pdv.finalizeSale;
+                    if (originalFinalize) {
+                        window.pdv.finalizeSale = async function() {
+                            console.log('🛒 Venda finalizada, atualizando caixa...');
+                            const result = await originalFinalize.apply(this, arguments);
+                            if (caixaSystem && caixaSystem.cashControl.isOpen) {
+                                setTimeout(() => {
+                                    caixaSystem.updateCashStatus();
+                                }, 2000);
+                            }
+                            return result;
+                        };
+                    }
+                }
+            }, 1000);
         }
     }, 100);
+    
+    // Atualizar ao focar na janela (quando voltar para a aba)
+    window.addEventListener('focus', () => {
+        if (caixaSystem && caixaSystem.cashControl.isOpen) {
+            console.log('🔄 Janela focada, atualizando caixa...');
+            caixaSystem.updateCashStatus();
+        }
+    });
 });
 
 
