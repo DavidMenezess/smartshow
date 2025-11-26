@@ -39,7 +39,55 @@ class CaixaSystem {
     loadCashControl() {
         const stored = localStorage.getItem('smartshow_cash_control');
         if (stored) {
-            this.cashControl = JSON.parse(stored);
+            try {
+                const parsed = JSON.parse(stored);
+                
+                // Verificar se o caixa foi aberto hoje
+                if (parsed.isOpen && parsed.lastOpened) {
+                    const lastOpenedDate = new Date(parsed.lastOpened);
+                    const today = new Date();
+                    
+                    // Comparar apenas a data (sem hora)
+                    const lastOpenedDay = lastOpenedDate.toDateString();
+                    const todayDay = today.toDateString();
+                    
+                    if (lastOpenedDay !== todayDay) {
+                        // Caixa foi aberto em outro dia, considerar fechado
+                        console.log('⚠️ Caixa foi aberto em outro dia, fechando automaticamente...');
+                        this.cashControl = {
+                            isOpen: false,
+                            initialCash: 0,
+                            currentBalance: 0,
+                            todaySales: 0,
+                            lastOpened: null,
+                            lastClosed: parsed.lastClosed || null,
+                            observations: ''
+                        };
+                        this.saveCashControl();
+                    } else {
+                        // Caixa foi aberto hoje, manter estado
+                        this.cashControl = parsed;
+                        console.log('✅ Caixa aberto hoje, restaurando estado:', this.cashControl);
+                    }
+                } else {
+                    // Caixa não estava aberto, usar dados salvos
+                    this.cashControl = parsed;
+                }
+            } catch (error) {
+                console.error('❌ Erro ao carregar estado do caixa:', error);
+                // Em caso de erro, usar estado padrão
+                this.cashControl = {
+                    isOpen: false,
+                    initialCash: 0,
+                    currentBalance: 0,
+                    todaySales: 0,
+                    lastOpened: null,
+                    lastClosed: null,
+                    observations: ''
+                };
+            }
+        } else {
+            console.log('ℹ️ Nenhum estado do caixa encontrado no localStorage');
         }
     }
 
@@ -145,27 +193,43 @@ class CaixaSystem {
     }
 
     async updateCashStatus() {
+        // Só atualizar se o caixa estiver aberto
+        if (!this.cashControl.isOpen) {
+            console.log('⚠️ Caixa não está aberto, não atualizando vendas');
+            return;
+        }
+        
         // Buscar vendas reais do banco de dados
         try {
             console.log('🔄 Atualizando vendas do caixa...');
             const todaySalesData = await api.getTodaySales();
-            console.log('📊 Dados recebidos:', todaySalesData);
+            console.log('📊 Dados recebidos da API:', todaySalesData);
             
-            if (todaySalesData && todaySalesData.total !== undefined) {
+            if (todaySalesData && (todaySalesData.total !== undefined || todaySalesData.total !== null)) {
                 const newTotal = parseFloat(todaySalesData.total || 0);
-                console.log(`💰 Total de vendas: R$ ${newTotal.toFixed(2)}`);
+                console.log(`💰 Total de vendas do banco: R$ ${newTotal.toFixed(2)}`);
                 
+                // Atualizar valores
+                const oldSales = this.cashControl.todaySales;
                 this.cashControl.todaySales = newTotal;
                 this.cashControl.currentBalance = this.cashControl.initialCash + this.cashControl.todaySales;
+                
+                // Salvar no localStorage
                 this.saveCashControl();
                 
+                console.log(`📈 Vendas anteriores: R$ ${oldSales.toFixed(2)}`);
                 console.log(`✅ Vendas atualizadas: R$ ${this.cashControl.todaySales.toFixed(2)}`);
                 console.log(`✅ Saldo atual: R$ ${this.cashControl.currentBalance.toFixed(2)}`);
             } else {
-                console.warn('⚠️ Resposta da API não contém total:', todaySalesData);
+                console.warn('⚠️ Resposta da API não contém total válido:', todaySalesData);
+                console.warn('⚠️ Mantendo valores atuais:', {
+                    todaySales: this.cashControl.todaySales,
+                    currentBalance: this.cashControl.currentBalance
+                });
             }
         } catch (error) {
             console.error('❌ Erro ao buscar vendas do dia:', error);
+            console.error('❌ Detalhes do erro:', error.message);
             // Em caso de erro, manter valores atuais
         }
         
@@ -252,33 +316,39 @@ class CaixaSystem {
         }
 
         // Abrir caixa
+        const now = new Date();
         this.cashControl = {
             isOpen: true,
             initialCash: initialCash,
             currentBalance: initialCash,
             todaySales: 0,
-            lastOpened: new Date().toISOString(),
+            lastOpened: now.toISOString(),
             lastClosed: null,
             observations: observations
         };
 
+        console.log('💰 Abrindo caixa:', this.cashControl);
         this.saveCashControl();
         this.hideOpenCashModal();
-        this.updateUI();
         
-        // Iniciar atualização periódica
-        if (this.updateInterval) {
-            clearInterval(this.updateInterval);
-        }
-        this.updateInterval = setInterval(() => {
-            if (this.cashControl.isOpen) {
-                this.updateCashStatus();
-            } else {
+        // Atualizar vendas imediatamente ao abrir
+        this.updateCashStatus().then(() => {
+            this.updateUI();
+            
+            // Iniciar atualização periódica
+            if (this.updateInterval) {
                 clearInterval(this.updateInterval);
             }
-        }, 10000);
-        
-        alert('Caixa aberto com sucesso!');
+            this.updateInterval = setInterval(() => {
+                if (this.cashControl.isOpen) {
+                    this.updateCashStatus();
+                } else {
+                    clearInterval(this.updateInterval);
+                }
+            }, 10000);
+            
+            alert('Caixa aberto com sucesso!');
+        });
     }
 
     closeCash() {
