@@ -118,8 +118,227 @@
             document.getElementById('payableTab').style.display = tab === 'payable' ? 'block' : 'none';
         }
 
-        // Carregar dados financeiros
-        document.addEventListener('DOMContentLoaded', async function() {
+        let customers = [];
+        let currentTab = 'receivable';
+
+        // Carregar clientes
+        async function loadCustomers() {
+            try {
+                const response = await fetch('/api/customers');
+                customers = await response.json();
+            } catch (error) {
+                console.error('Erro ao carregar clientes:', error);
+            }
+        }
+
+        // Carregar contas a receber
+        async function loadReceivable() {
+            try {
+                const response = await fetch('/api/financial/receivable');
+                const accounts = await response.json();
+                const tbody = document.getElementById('receivableTableBody');
+                
+                if (accounts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">Nenhuma conta encontrada</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = accounts.map(account => `
+                    <tr>
+                        <td>${account.description || '-'}</td>
+                        <td>${account.customer_name || '-'}</td>
+                        <td>R$ ${parseFloat(account.amount || 0).toFixed(2).replace('.', ',')}</td>
+                        <td>${new Date(account.due_date).toLocaleDateString('pt-BR')}</td>
+                        <td><span class="badge ${account.status === 'paid' ? 'badge-success' : account.status === 'overdue' ? 'badge-danger' : 'badge-warning'}">${account.status === 'paid' ? 'Paga' : account.status === 'overdue' ? 'Vencida' : 'Pendente'}</span></td>
+                        <td>
+                            ${account.status !== 'paid' ? `<button class="btn btn-sm btn-success" onclick="payAccount(${account.id}, 'receivable')">Pagar</button>` : ''}
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Erro ao carregar contas a receber:', error);
+                document.getElementById('receivableTableBody').innerHTML = 
+                    '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar dados</td></tr>';
+            }
+        }
+
+        // Carregar contas a pagar
+        async function loadPayable() {
+            try {
+                const response = await fetch('/api/financial/payable');
+                const accounts = await response.json();
+                const tbody = document.getElementById('payableTableBody');
+                
+                if (accounts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">Nenhuma conta encontrada</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = accounts.map(account => `
+                    <tr>
+                        <td>${account.description || '-'}</td>
+                        <td>${account.supplier_name || '-'}</td>
+                        <td>R$ ${parseFloat(account.amount || 0).toFixed(2).replace('.', ',')}</td>
+                        <td>${new Date(account.due_date).toLocaleDateString('pt-BR')}</td>
+                        <td><span class="badge ${account.status === 'paid' ? 'badge-success' : account.status === 'overdue' ? 'badge-danger' : 'badge-warning'}">${account.status === 'paid' ? 'Paga' : account.status === 'overdue' ? 'Vencida' : 'Pendente'}</span></td>
+                        <td>
+                            ${account.status !== 'paid' ? `<button class="btn btn-sm btn-success" onclick="payAccount(${account.id}, 'payable')">Pagar</button>` : ''}
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Erro ao carregar contas a pagar:', error);
+                document.getElementById('payableTableBody').innerHTML = 
+                    '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar dados</td></tr>';
+            }
+        }
+
+        // Adicionar conta a receber
+        function addReceivable() {
+            currentTab = 'receivable';
+            showAccountModal('receivable');
+        }
+
+        // Adicionar conta a pagar
+        function addPayable() {
+            currentTab = 'payable';
+            showAccountModal('payable');
+        }
+
+        // Mostrar modal de conta
+        function showAccountModal(type) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'block';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <h3>Nova Conta ${type === 'receivable' ? 'a Receber' : 'a Pagar'}</h3>
+                        <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
+                    </div>
+                    <form id="accountForm" onsubmit="saveAccount(event, '${type}')">
+                        ${type === 'receivable' ? `
+                            <div class="form-group">
+                                <label>Cliente *</label>
+                                <select id="customerId" class="form-control" required>
+                                    <option value="">Selecione um cliente</option>
+                                    ${customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                                </select>
+                            </div>
+                        ` : `
+                            <div class="form-group">
+                                <label>Fornecedor</label>
+                                <input type="text" id="supplierName" class="form-control" placeholder="Nome do fornecedor">
+                            </div>
+                        `}
+                        <div class="form-group">
+                            <label>Descrição ${type === 'payable' ? '*' : ''}</label>
+                            <input type="text" id="description" class="form-control" ${type === 'payable' ? 'required' : ''} placeholder="Descrição da conta">
+                        </div>
+                        <div class="form-group">
+                            <label>Valor *</label>
+                            <input type="number" id="amount" class="form-control" step="0.01" min="0.01" required placeholder="0,00">
+                        </div>
+                        <div class="form-group">
+                            <label>Data de Vencimento *</label>
+                            <input type="date" id="dueDate" class="form-control" required>
+                        </div>
+                        <div style="text-align: right; margin-top: 1rem;">
+                            <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            // Definir data padrão (hoje + 30 dias)
+            const defaultDate = new Date();
+            defaultDate.setDate(defaultDate.getDate() + 30);
+            document.getElementById('dueDate').value = defaultDate.toISOString().split('T')[0];
+        }
+
+        // Salvar conta
+        async function saveAccount(event, type) {
+            event.preventDefault();
+            
+            const description = document.getElementById('description').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const dueDate = document.getElementById('dueDate').value;
+
+            try {
+                const url = type === 'receivable' ? '/api/financial/receivable' : '/api/financial/payable';
+                const body = type === 'receivable' 
+                    ? {
+                        customerId: parseInt(document.getElementById('customerId').value),
+                        description: description,
+                        amount: amount,
+                        dueDate: dueDate
+                    }
+                    : {
+                        description: description,
+                        amount: amount,
+                        dueDate: dueDate,
+                        supplierId: null
+                    };
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Erro ao salvar conta');
+                }
+
+                // Fechar modal e recarregar dados
+                event.target.closest('.modal').remove();
+                await loadFinancialData();
+                alert('Conta salva com sucesso!');
+            } catch (error) {
+                console.error('Erro ao salvar conta:', error);
+                alert('Erro ao salvar conta: ' + error.message);
+            }
+        }
+
+        // Pagar conta
+        async function payAccount(id, type) {
+            const amount = prompt('Valor a pagar:');
+            if (!amount || parseFloat(amount) <= 0) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/financial/pay/${id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        amount: parseFloat(amount),
+                        paymentMethod: 'money',
+                        paymentDate: new Date().toISOString().split('T')[0]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erro ao pagar conta');
+                }
+
+                await loadFinancialData();
+                alert('Conta paga com sucesso!');
+            } catch (error) {
+                console.error('Erro ao pagar conta:', error);
+                alert('Erro ao pagar conta');
+            }
+        }
+
+        // Carregar todos os dados financeiros
+        async function loadFinancialData() {
             try {
                 const response = await fetch('/api/financial');
                 const data = await response.json();
@@ -134,11 +353,18 @@
                 document.getElementById('payableCount').textContent = 
                     `${data.payableCount || 0} contas`;
 
-                // Atualizar tabelas
-                // Implementar conforme necessário
+                // Carregar tabelas
+                await loadReceivable();
+                await loadPayable();
             } catch (error) {
                 console.error('Erro ao carregar dados financeiros:', error);
             }
+        }
+
+        // Carregar dados financeiros
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadCustomers();
+            await loadFinancialData();
         });
     </script>
 </body>

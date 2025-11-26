@@ -71,22 +71,205 @@
                 return;
             }
 
+            const content = document.getElementById('reportContent');
+            content.innerHTML = '<p style="text-align: center; padding: 2rem;">Gerando relatório...</p>';
+
             try {
                 const response = await fetch(`/api/reports?type=${reportType}&start=${startDate}&end=${endDate}`);
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Erro ao gerar relatório');
+                }
+
                 const data = await response.json();
                 
-                const content = document.getElementById('reportContent');
-                content.innerHTML = `
-                    <h3>Relatório de ${reportType}</h3>
-                    <p>Período: ${new Date(startDate).toLocaleDateString('pt-BR')} a ${new Date(endDate).toLocaleDateString('pt-BR')}</p>
-                    <div style="margin-top: 2rem;">
-                        <pre>${JSON.stringify(data, null, 2)}</pre>
-                    </div>
+                // Formatar relatório baseado no tipo
+                let html = `
+                    <h3>Relatório de ${getReportTypeName(reportType)}</h3>
+                    <p><strong>Período:</strong> ${new Date(startDate).toLocaleDateString('pt-BR')} a ${new Date(endDate).toLocaleDateString('pt-BR')}</p>
                 `;
+
+                if (data.data && data.data.length > 0) {
+                    html += formatReportData(data.type, data.data);
+                } else {
+                    html += '<p style="text-align: center; padding: 2rem; color: #718096;">Nenhum dado encontrado para o período selecionado.</p>';
+                }
+
+                content.innerHTML = html;
             } catch (error) {
                 console.error('Erro ao gerar relatório:', error);
-                alert('Erro ao gerar relatório');
+                content.innerHTML = `<p style="color: red; text-align: center; padding: 2rem;">Erro ao gerar relatório: ${error.message}</p>`;
+                alert('Erro ao gerar relatório: ' + error.message);
             }
+        }
+
+        function getReportTypeName(type) {
+            const names = {
+                'sales': 'Vendas',
+                'products': 'Produtos',
+                'customers': 'Clientes',
+                'financial': 'Financeiro',
+                'service': 'Assistência Técnica'
+            };
+            return names[type] || type;
+        }
+
+        function formatReportData(type, data) {
+            switch (type) {
+                case 'sales':
+                    const totalSales = data.reduce((sum, item) => sum + (parseFloat(item.total_sales) || 0), 0);
+                    const totalCount = data.reduce((sum, item) => sum + (parseInt(item.sales_count) || 0), 0);
+                    return `
+                        <div style="margin-top: 2rem;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                                <div style="background: #f7fafc; padding: 1rem; border-radius: 8px;">
+                                    <div style="font-size: 0.875rem; color: #718096;">Total de Vendas</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #2d3748;">${totalCount}</div>
+                                </div>
+                                <div style="background: #f7fafc; padding: 1rem; border-radius: 8px;">
+                                    <div style="font-size: 0.875rem; color: #718096;">Valor Total</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #2d3748;">R$ ${totalSales.toFixed(2).replace('.', ',')}</div>
+                                </div>
+                            </div>
+                            <table class="data-table" style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Quantidade</th>
+                                        <th>Total</th>
+                                        <th>Desconto</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.map(item => `
+                                        <tr>
+                                            <td>${new Date(item.date).toLocaleDateString('pt-BR')}</td>
+                                            <td>${item.sales_count || 0}</td>
+                                            <td>R$ ${parseFloat(item.total_sales || 0).toFixed(2).replace('.', ',')}</td>
+                                            <td>R$ ${parseFloat(item.total_discount || 0).toFixed(2).replace('.', ',')}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                case 'products':
+                    return `
+                        <div style="margin-top: 2rem;">
+                            <table class="data-table" style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Produto</th>
+                                        <th>Código de Barras</th>
+                                        <th>Quantidade Vendida</th>
+                                        <th>Receita Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.map(item => `
+                                        <tr>
+                                            <td>${item.name || '-'}</td>
+                                            <td>${item.barcode || '-'}</td>
+                                            <td>${item.total_quantity || 0}</td>
+                                            <td>R$ ${parseFloat(item.total_revenue || 0).toFixed(2).replace('.', ',')}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                case 'customers':
+                    return `
+                        <div style="margin-top: 2rem;">
+                            <table class="data-table" style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Cliente</th>
+                                        <th>CPF/CNPJ</th>
+                                        <th>Total de Compras</th>
+                                        <th>Receita Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.map(item => `
+                                        <tr>
+                                            <td>${item.name || '-'}</td>
+                                            <td>${item.cpf_cnpj || '-'}</td>
+                                            <td>${item.total_sales || 0}</td>
+                                            <td>R$ ${parseFloat(item.total_revenue || 0).toFixed(2).replace('.', ',')}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                case 'financial':
+                    return `
+                        <div style="margin-top: 2rem;">
+                            <table class="data-table" style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Tipo</th>
+                                        <th>Quantidade</th>
+                                        <th>Valor Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.map(item => `
+                                        <tr>
+                                            <td>${item.type === 'receivable' ? 'Contas a Receber' : 'Contas a Pagar'}</td>
+                                            <td>${item.count || 0}</td>
+                                            <td>R$ ${parseFloat(item.total || 0).toFixed(2).replace('.', ',')}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                case 'service':
+                    return `
+                        <div style="margin-top: 2rem;">
+                            <table class="data-table" style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Quantidade</th>
+                                        <th>Valor Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.map(item => `
+                                        <tr>
+                                            <td>${getServiceStatusName(item.status)}</td>
+                                            <td>${item.count || 0}</td>
+                                            <td>R$ ${parseFloat(item.total_value || 0).toFixed(2).replace('.', ',')}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                default:
+                    return `<pre style="background: #f7fafc; padding: 1rem; border-radius: 8px; overflow-x: auto;">${JSON.stringify(data, null, 2)}</pre>`;
+            }
+        }
+
+        function getServiceStatusName(status) {
+            const names = {
+                'pronta': 'Pronta',
+                'aguardando_autorizacao': 'Aguardando Autorização',
+                'sem_concerto': 'Sem Concerto',
+                'entregue': 'Entregue',
+                'em_manutencao': 'Em Manutenção',
+                'aguardando_peca': 'Aguardando Peça'
+            };
+            return names[status] || status;
         }
 
         function exportReport() {

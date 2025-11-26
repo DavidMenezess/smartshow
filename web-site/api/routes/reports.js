@@ -112,6 +112,105 @@ router.get('/dashboard', async (req, res) => {
     }
 });
 
+// Relatório genérico (compatibilidade com frontend)
+router.get('/', async (req, res) => {
+    try {
+        const { type, start, end } = req.query;
+        const startDate = start;
+        const endDate = end;
+
+        if (!type) {
+            return res.status(400).json({ error: 'Tipo de relatório é obrigatório' });
+        }
+
+        if (!startDate || !endDate) {
+            return res.status(400).json({ error: 'Período é obrigatório' });
+        }
+
+        switch (type) {
+            case 'sales':
+                const salesReport = await db.all(
+                    `SELECT DATE(datetime(s.created_at, '-3 hours')) as date,
+                            COUNT(*) as sales_count,
+                            SUM(s.total) as total_sales,
+                            SUM(s.discount) as total_discount
+                     FROM sales s
+                     WHERE DATE(datetime(s.created_at, '-3 hours')) >= ? 
+                     AND DATE(datetime(s.created_at, '-3 hours')) <= ?
+                     GROUP BY DATE(datetime(s.created_at, '-3 hours'))
+                     ORDER BY date DESC`,
+                    [startDate, endDate]
+                );
+                return res.json({ type: 'sales', data: salesReport });
+
+            case 'products':
+                const productsReport = await db.all(
+                    `SELECT p.id, p.name, p.barcode,
+                           SUM(si.quantity) as total_quantity,
+                           SUM(si.total) as total_revenue
+                    FROM sale_items si
+                    JOIN products p ON si.product_id = p.id
+                    JOIN sales s ON si.sale_id = s.id
+                    WHERE DATE(datetime(s.created_at, '-3 hours')) >= ? 
+                    AND DATE(datetime(s.created_at, '-3 hours')) <= ?
+                    GROUP BY p.id
+                    ORDER BY total_quantity DESC
+                    LIMIT 50`,
+                    [startDate, endDate]
+                );
+                return res.json({ type: 'products', data: productsReport });
+
+            case 'customers':
+                const customersReport = await db.all(
+                    `SELECT c.id, c.name, c.cpf_cnpj,
+                           COUNT(s.id) as total_sales,
+                           SUM(s.total) as total_revenue
+                    FROM customers c
+                    LEFT JOIN sales s ON c.id = s.customer_id
+                    WHERE (s.id IS NULL OR (DATE(datetime(s.created_at, '-3 hours')) >= ? 
+                    AND DATE(datetime(s.created_at, '-3 hours')) <= ?))
+                    GROUP BY c.id
+                    ORDER BY total_revenue DESC
+                    LIMIT 50`,
+                    [startDate, endDate]
+                );
+                return res.json({ type: 'customers', data: customersReport });
+
+            case 'financial':
+                const financialReport = await db.all(
+                    `SELECT 'receivable' as type, COUNT(*) as count, 
+                            COALESCE(SUM(amount - COALESCE(paid_amount, 0)), 0) as total
+                     FROM accounts_receivable
+                     WHERE due_date >= ? AND due_date <= ?
+                     UNION ALL
+                     SELECT 'payable' as type, COUNT(*) as count,
+                            COALESCE(SUM(amount - COALESCE(paid_amount, 0)), 0) as total
+                     FROM accounts_payable
+                     WHERE due_date >= ? AND due_date <= ?`,
+                    [startDate, endDate, startDate, endDate]
+                );
+                return res.json({ type: 'financial', data: financialReport });
+
+            case 'service':
+                const serviceReport = await db.all(
+                    `SELECT status, COUNT(*) as count,
+                            COALESCE(SUM(total_value), 0) as total_value
+                     FROM service_orders
+                     WHERE DATE(created_at) >= ? AND DATE(created_at) <= ?
+                     GROUP BY status`,
+                    [startDate, endDate]
+                );
+                return res.json({ type: 'service', data: serviceReport });
+
+            default:
+                return res.status(400).json({ error: 'Tipo de relatório inválido' });
+        }
+    } catch (error) {
+        console.error('Erro ao gerar relatório:', error);
+        res.status(500).json({ error: 'Erro ao gerar relatório', details: error.message });
+    }
+});
+
 // Relatório de vendas
 router.get('/sales', async (req, res) => {
     try {

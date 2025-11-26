@@ -7,6 +7,31 @@ const db = require('../database');
 
 const router = express.Router();
 
+// Resumo financeiro
+router.get('/', async (req, res) => {
+    try {
+        const receivable = await db.get(
+            `SELECT COUNT(*) as count, COALESCE(SUM(amount - COALESCE(paid_amount, 0)), 0) as total
+             FROM accounts_receivable WHERE status = 'pending'`
+        );
+        
+        const payable = await db.get(
+            `SELECT COUNT(*) as count, COALESCE(SUM(amount - COALESCE(paid_amount, 0)), 0) as total
+             FROM accounts_payable WHERE status = 'pending'`
+        );
+
+        res.json({
+            totalReceivable: receivable?.total || 0,
+            receivableCount: receivable?.count || 0,
+            totalPayable: payable?.total || 0,
+            payableCount: payable?.count || 0
+        });
+    } catch (error) {
+        console.error('Erro ao buscar resumo financeiro:', error);
+        res.status(500).json({ error: 'Erro ao buscar resumo financeiro' });
+    }
+});
+
 // Contas a receber
 router.get('/receivable', async (req, res) => {
     try {
@@ -97,6 +122,30 @@ router.post('/receivable', async (req, res) => {
     }
 });
 
+// Criar conta a pagar
+router.post('/payable', async (req, res) => {
+    try {
+        const { supplierId, description, dueDate, amount } = req.body;
+
+        if (!description || !dueDate || !amount) {
+            return res.status(400).json({ error: 'Descrição, data de vencimento e valor são obrigatórios' });
+        }
+
+        const result = await db.run(
+            `INSERT INTO accounts_payable 
+             (supplier_id, description, due_date, amount)
+             VALUES (?, ?, ?, ?)`,
+            [supplierId || null, description, dueDate, amount]
+        );
+
+        const account = await db.get('SELECT * FROM accounts_payable WHERE id = ?', [result.lastID]);
+        res.status(201).json(account);
+    } catch (error) {
+        console.error('Erro ao criar conta a pagar:', error);
+        res.status(500).json({ error: 'Erro ao criar conta a pagar' });
+    }
+});
+
 // Pagar conta
 router.post('/pay/:id', async (req, res) => {
     try {
@@ -127,6 +176,11 @@ router.post('/pay/:id', async (req, res) => {
 });
 
 module.exports = router;
+
+
+
+
+
 
 
 
