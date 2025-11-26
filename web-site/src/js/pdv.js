@@ -105,6 +105,13 @@ class PDV {
         document.getElementById('paidAmount').value = '';
         document.getElementById('changeDisplay').style.display = 'none';
         
+        // Garantir que o campo Valor Pago apareça se Dinheiro estiver selecionado
+        const paymentMethod = document.getElementById('paymentMethod')?.value;
+        const paidAmountGroup = document.getElementById('paidAmountGroup');
+        if (paymentMethod === 'Dinheiro' && paidAmountGroup) {
+            paidAmountGroup.style.display = 'block';
+        }
+        
         this.updateCart();
     }
 
