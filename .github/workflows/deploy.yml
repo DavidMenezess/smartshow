@@ -22,6 +22,16 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     
     steps:
+      - name: Debug - Informações do Workflow
+        run: |
+          echo "🔍 Informações do Workflow:"
+          echo "Event: ${{ github.event_name }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Autor: ${{ github.actor }}"
+          echo "Arquivos alterados:"
+          git diff --name-only HEAD~1 HEAD || echo "Não foi possível verificar arquivos alterados"
+      
       - name: Checkout código
         uses: actions/checkout@v4
 
