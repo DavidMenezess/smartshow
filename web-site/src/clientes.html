@@ -123,8 +123,7 @@
         // Carregar clientes
         async function loadCustomers() {
             try {
-                const response = await fetch('/api/customers');
-                customers = await response.json();
+                customers = await api.getCustomers();
                 
                 const tbody = document.getElementById('customersTableBody');
                 if (customers.length === 0) {

@@ -148,8 +148,7 @@
         // Carregar clientes para o select
         async function loadCustomersForOS() {
             try {
-                const response = await fetch('/api/customers');
-                customers = await response.json();
+                customers = await api.getCustomers();
                 const select = document.getElementById('osCustomerId');
                 
                 // Limpar opções existentes (exceto a primeira)
@@ -171,8 +170,7 @@
         // Carregar ordens de serviço
         async function loadOrders() {
             try {
-                const response = await fetch('/api/service-orders');
-                orders = await response.json();
+                orders = await api.getServiceOrders();
                 
                 const tbody = document.getElementById('osTableBody');
                 if (orders.length === 0) {

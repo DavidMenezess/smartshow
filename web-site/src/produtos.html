@@ -135,8 +135,7 @@
         // Carregar categorias
         async function loadCategories() {
             try {
-                const response = await fetch('/api/categories');
-                categories = await response.json();
+                categories = await api.getCategories();
                 
                 const select = document.getElementById('filterCategory');
                 // Limpar opções existentes (exceto a primeira)
@@ -158,23 +157,7 @@
         // Carregar produtos
         async function loadProducts(searchTerm = '', categoryId = '') {
             try {
-                let url = '/api/products';
-                const params = [];
-                
-                if (searchTerm) {
-                    params.push(`search=${encodeURIComponent(searchTerm)}`);
-                }
-                
-                if (categoryId) {
-                    params.push(`category=${categoryId}`);
-                }
-                
-                if (params.length > 0) {
-                    url += '?' + params.join('&');
-                }
-                
-                const response = await fetch(url);
-                products = await response.json();
+                products = await api.getProducts(searchTerm, categoryId);
                 
                 // Salvar todos os produtos na primeira carga
                 if (!searchTerm && !categoryId) {
