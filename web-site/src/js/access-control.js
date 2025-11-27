@@ -6,22 +6,27 @@
 const rolePermissions = {
     admin: {
         pages: ['dashboard', 'caixa', 'produtos', 'clientes', 'assistencia', 'financeiro', 'relatorios', 'configuracao'],
+        defaultPage: 'dashboard',
         canManageUsers: true
     },
     gerente: {
         pages: ['dashboard', 'caixa', 'produtos', 'clientes', 'assistencia', 'financeiro', 'relatorios'],
+        defaultPage: 'dashboard',
         canManageUsers: false
     },
     caixa: {
-        pages: ['dashboard', 'caixa', 'produtos', 'clientes', 'assistencia'],
+        pages: ['caixa', 'produtos', 'clientes', 'assistencia'],
+        defaultPage: 'caixa',
         canManageUsers: false
     },
     vendedor: {
-        pages: ['dashboard', 'caixa', 'produtos', 'clientes'],
+        pages: ['caixa', 'produtos', 'clientes'],
+        defaultPage: 'caixa',
         canManageUsers: false
     },
     tecnico: {
-        pages: ['dashboard', 'assistencia', 'produtos'],
+        pages: ['assistencia', 'produtos'],
+        defaultPage: 'assistencia',
         canManageUsers: false
     }
 };
@@ -47,18 +52,34 @@ function applyAccessControl() {
     
     // Verificar se tem acesso
     if (!hasAccessToPage(pageName)) {
-        alert('Você não tem permissão para acessar esta página.');
-        window.location.href = 'index.html';
+        // Redirecionar para a página padrão do usuário SEM alerta (mais suave)
+        const defaultPage = permissions.defaultPage || 'caixa';
+        console.log(`🚫 Usuário ${role} não tem acesso a ${pageName}. Redirecionando para ${defaultPage}.html`);
+        window.location.href = `${defaultPage}.html`;
         return;
     }
     
-    // Esconder itens de navegação sem acesso
+    // Esconder TODOS os itens de navegação primeiro
     const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.style.display = 'none';
+    });
+    
+    // Mostrar apenas os itens permitidos
     navItems.forEach(item => {
         const href = item.getAttribute('href');
         if (href) {
-            const page = href.replace('.html', '').replace('index', 'dashboard');
-            if (!permissions.pages.includes(page)) {
+            let page = href.replace('.html', '');
+            // Mapear index.html para dashboard
+            if (page === 'index' || page === '') {
+                page = 'dashboard';
+            }
+            
+            // Se a página está nas permissões, mostrar
+            if (permissions.pages.includes(page)) {
+                item.style.display = 'inline-block';
+            } else {
+                // Garantir que está oculto
                 item.style.display = 'none';
             }
         }
@@ -76,7 +97,22 @@ function applyAccessControl() {
 }
 
 // Aplicar controle ao carregar
-document.addEventListener('DOMContentLoaded', applyAccessControl);
+document.addEventListener('DOMContentLoaded', function() {
+    // Verificar autenticação primeiro
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    
+    if (!token || !user) {
+        // Se não estiver autenticado, redirecionar para login
+        if (!window.location.pathname.includes('login.html')) {
+            window.location.href = 'login.html';
+        }
+        return;
+    }
+    
+    // Aplicar controle de acesso
+    applyAccessControl();
+});
 
 // Exportar para uso em outros arquivos
 window.hasAccessToPage = hasAccessToPage;

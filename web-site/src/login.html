@@ -92,6 +92,7 @@
     </div>
 
     <script src="js/api.js"></script>
+    <script src="js/access-control.js"></script>
     <script>
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -102,7 +103,15 @@
 
             try {
                 const data = await api.login(username, password);
-                window.location.href = 'index.html';
+                
+                // Obter permissões do usuário para redirecionar corretamente
+                const user = data.user;
+                const role = user.role || 'vendedor';
+                const permissions = rolePermissions[role] || rolePermissions.vendedor;
+                const defaultPage = permissions.defaultPage || 'caixa';
+                
+                // Redirecionar para a página padrão do usuário
+                window.location.href = `${defaultPage}.html`;
             } catch (error) {
                 errorMessage.textContent = error.message || 'Erro ao fazer login';
                 errorMessage.style.display = 'block';
