@@ -4,13 +4,15 @@
 
 const express = require('express');
 const db = require('../database');
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 
 // Listar ordens de serviço
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
     try {
         const { status, customerId, technicianId } = req.query;
+        const user = req.user;
         
         let sql = `
             SELECT os.*, 
@@ -22,6 +24,12 @@ router.get('/', async (req, res) => {
             WHERE 1=1
         `;
         const params = [];
+
+        // Filtrar por loja (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            sql += ` AND os.store_id = ?`;
+            params.push(user.store_id);
+        }
 
         if (status) {
             sql += ` AND os.status = ?`;
@@ -49,20 +57,29 @@ router.get('/', async (req, res) => {
 });
 
 // Obter ordem de serviço por ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
         
-        const order = await db.get(
-            `SELECT os.*, 
-                    c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
-                    u.name as technician_name
-             FROM service_orders os
-             LEFT JOIN customers c ON os.customer_id = c.id
-             LEFT JOIN users u ON os.technician_id = u.id
-             WHERE os.id = ?`,
-            [id]
-        );
+        let sql = `
+            SELECT os.*, 
+                   c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
+                   u.name as technician_name
+            FROM service_orders os
+            LEFT JOIN customers c ON os.customer_id = c.id
+            LEFT JOIN users u ON os.technician_id = u.id
+            WHERE os.id = ?
+        `;
+        const params = [id];
+
+        // Filtrar por loja (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            sql += ` AND os.store_id = ?`;
+            params.push(user.store_id);
+        }
+        
+        const order = await db.get(sql, params);
 
         if (!order) {
             return res.status(404).json({ error: 'Ordem de serviço não encontrada' });
@@ -76,15 +93,24 @@ router.get('/:id', async (req, res) => {
 });
 
 // Criar ordem de serviço
-router.post('/', async (req, res) => {
+router.post('/', auth, async (req, res) => {
     try {
         const {
             customerId, deviceType, brand, model, serialNumber,
             problemDescription, technicianId
         } = req.body;
+        const user = req.user;
 
         if (!customerId || !problemDescription) {
             return res.status(400).json({ error: 'Cliente e descrição do problema são obrigatórios' });
+        }
+
+        // Verificar se o cliente pertence à loja do usuário (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            const customer = await db.get('SELECT store_id FROM customers WHERE id = ?', [customerId]);
+            if (!customer || customer.store_id !== user.store_id) {
+                return res.status(403).json({ error: 'Acesso negado. Cliente não pertence à sua loja.' });
+            }
         }
 
         const orderNumber = `OS-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
@@ -92,13 +118,16 @@ router.post('/', async (req, res) => {
         const { status } = req.body;
         const defaultStatus = status || 'aguardando_autorizacao';
 
+        // Definir store_id automaticamente (exceto admin)
+        const storeId = (user.role === 'admin' && req.body.store_id) ? req.body.store_id : user.store_id;
+
         const result = await db.run(
             `INSERT INTO service_orders 
              (order_number, customer_id, technician_id, device_type, brand, model, 
-              serial_number, problem_description, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              serial_number, problem_description, status, store_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [orderNumber, customerId, technicianId || null, deviceType || null, brand || null,
-             model || null, serialNumber || null, problemDescription, defaultStatus]
+             model || null, serialNumber || null, problemDescription, defaultStatus, storeId || null]
         );
 
         const order = await db.get('SELECT * FROM service_orders WHERE id = ?', [result.lastID]);
@@ -110,13 +139,22 @@ router.post('/', async (req, res) => {
 });
 
 // Atualizar ordem de serviço
-router.put('/:id', async (req, res) => {
+router.put('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
         const {
             technicianId, diagnostic, estimatedValue, laborCost, partsCost,
             totalValue, status
         } = req.body;
+
+        // Verificar se a OS pertence à loja do usuário (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            const order = await db.get('SELECT store_id FROM service_orders WHERE id = ?', [id]);
+            if (!order || order.store_id !== user.store_id) {
+                return res.status(403).json({ error: 'Acesso negado. Ordem de serviço não pertence à sua loja.' });
+            }
+        }
 
         const updateFields = [];
         const params = [];

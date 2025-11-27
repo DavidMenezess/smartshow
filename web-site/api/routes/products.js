@@ -4,13 +4,15 @@
 
 const express = require('express');
 const db = require('../database');
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 
 // Listar todos os produtos
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
     try {
         const { search, category, active } = req.query;
+        const user = req.user;
         
         let sql = `
             SELECT p.*, c.name as category_name, s.name as supplier_name
@@ -20,6 +22,12 @@ router.get('/', async (req, res) => {
             WHERE 1=1
         `;
         const params = [];
+
+        // Filtrar por loja (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            sql += ` AND p.store_id = ?`;
+            params.push(user.store_id);
+        }
 
         if (search) {
             sql += ` AND (p.name LIKE ? OR p.barcode LIKE ? OR p.description LIKE ?)`;
@@ -51,17 +59,26 @@ router.get('/', async (req, res) => {
 });
 
 // Buscar produto por código de barras
-router.get('/barcode/:barcode', async (req, res) => {
+router.get('/barcode/:barcode', auth, async (req, res) => {
     try {
         const { barcode } = req.params;
+        const user = req.user;
         
-        const product = await db.get(
-            `SELECT p.*, c.name as category_name 
-             FROM products p 
-             LEFT JOIN categories c ON p.category_id = c.id 
-             WHERE p.barcode = ? AND p.is_active = 1`,
-            [barcode]
-        );
+        let sql = `
+            SELECT p.*, c.name as category_name 
+            FROM products p 
+            LEFT JOIN categories c ON p.category_id = c.id 
+            WHERE p.barcode = ? AND p.is_active = 1
+        `;
+        const params = [barcode];
+
+        // Filtrar por loja (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            sql += ` AND p.store_id = ?`;
+            params.push(user.store_id);
+        }
+        
+        const product = await db.get(sql, params);
 
         if (product) {
             res.json(product);
@@ -75,18 +92,27 @@ router.get('/barcode/:barcode', async (req, res) => {
 });
 
 // Obter produto por ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
         
-        const product = await db.get(
-            `SELECT p.*, c.name as category_name, s.name as supplier_name
-             FROM products p
-             LEFT JOIN categories c ON p.category_id = c.id
-             LEFT JOIN suppliers s ON p.supplier_id = s.id
-             WHERE p.id = ?`,
-            [id]
-        );
+        let sql = `
+            SELECT p.*, c.name as category_name, s.name as supplier_name
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN suppliers s ON p.supplier_id = s.id
+            WHERE p.id = ?
+        `;
+        const params = [id];
+
+        // Filtrar por loja (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            sql += ` AND p.store_id = ?`;
+            params.push(user.store_id);
+        }
+        
+        const product = await db.get(sql, params);
 
         if (product) {
             res.json(product);
@@ -100,24 +126,28 @@ router.get('/:id', async (req, res) => {
 });
 
 // Criar produto
-router.post('/', async (req, res) => {
+router.post('/', auth, async (req, res) => {
     try {
         const {
             barcode, name, description, category_id, supplier_id,
             brand, model, cost_price, sale_price, stock, min_stock
         } = req.body;
+        const user = req.user;
 
         if (!name || !sale_price) {
             return res.status(400).json({ error: 'Nome e preço de venda são obrigatórios' });
         }
 
+        // Definir store_id automaticamente (exceto admin)
+        const storeId = (user.role === 'admin' && req.body.store_id) ? req.body.store_id : user.store_id;
+
         const result = await db.run(
             `INSERT INTO products 
              (barcode, name, description, category_id, supplier_id, brand, model, 
-              cost_price, sale_price, stock, min_stock)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              cost_price, sale_price, stock, min_stock, store_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [barcode || null, name, description || null, category_id || null, supplier_id || null,
-             brand || null, model || null, cost_price || 0, sale_price, stock || 0, min_stock || 0]
+             brand || null, model || null, cost_price || 0, sale_price, stock || 0, min_stock || 0, storeId || null]
         );
 
         const product = await db.get('SELECT * FROM products WHERE id = ?', [result.lastID]);
@@ -133,13 +163,22 @@ router.post('/', async (req, res) => {
 });
 
 // Atualizar produto
-router.put('/:id', async (req, res) => {
+router.put('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
         const {
             barcode, name, description, category_id, supplier_id,
             brand, model, cost_price, sale_price, stock, min_stock, is_active
         } = req.body;
+
+        // Verificar se o produto pertence à loja do usuário (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            const product = await db.get('SELECT store_id FROM products WHERE id = ?', [id]);
+            if (!product || product.store_id !== user.store_id) {
+                return res.status(403).json({ error: 'Acesso negado. Produto não pertence à sua loja.' });
+            }
+        }
 
         await db.run(
             `UPDATE products SET
@@ -161,9 +200,19 @@ router.put('/:id', async (req, res) => {
 });
 
 // Deletar produto
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
+
+        // Verificar se o produto pertence à loja do usuário (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            const product = await db.get('SELECT store_id FROM products WHERE id = ?', [id]);
+            if (!product || product.store_id !== user.store_id) {
+                return res.status(403).json({ error: 'Acesso negado. Produto não pertence à sua loja.' });
+            }
+        }
+
         await db.run('UPDATE products SET is_active = 0 WHERE id = ?', [id]);
         res.json({ success: true, message: 'Produto desativado' });
     } catch (error) {

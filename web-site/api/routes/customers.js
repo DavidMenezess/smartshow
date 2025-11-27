@@ -4,16 +4,24 @@
 
 const express = require('express');
 const db = require('../database');
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 
 // Listar clientes
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
     try {
         const { search, active } = req.query;
+        const user = req.user;
         
         let sql = 'SELECT * FROM customers WHERE 1=1';
         const params = [];
+
+        // Filtrar por loja (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            sql += ` AND store_id = ?`;
+            params.push(user.store_id);
+        }
 
         if (search) {
             sql += ` AND (name LIKE ? OR cpf_cnpj LIKE ? OR phone LIKE ?)`;
@@ -37,10 +45,21 @@ router.get('/', async (req, res) => {
 });
 
 // Obter cliente por ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
-        const customer = await db.get('SELECT * FROM customers WHERE id = ?', [id]);
+        const user = req.user;
+        
+        let sql = 'SELECT * FROM customers WHERE id = ?';
+        const params = [id];
+
+        // Filtrar por loja (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            sql += ` AND store_id = ?`;
+            params.push(user.store_id);
+        }
+        
+        const customer = await db.get(sql, params);
         
         if (customer) {
             res.json(customer);
@@ -54,20 +73,24 @@ router.get('/:id', async (req, res) => {
 });
 
 // Criar cliente
-router.post('/', async (req, res) => {
+router.post('/', auth, async (req, res) => {
     try {
         const { name, cpf_cnpj, phone, email, address, city, state, zip_code, credit_limit } = req.body;
+        const user = req.user;
 
         if (!name) {
             return res.status(400).json({ error: 'Nome é obrigatório' });
         }
 
+        // Definir store_id automaticamente (exceto admin)
+        const storeId = (user.role === 'admin' && req.body.store_id) ? req.body.store_id : user.store_id;
+
         const result = await db.run(
             `INSERT INTO customers 
-             (name, cpf_cnpj, phone, email, address, city, state, zip_code, credit_limit)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (name, cpf_cnpj, phone, email, address, city, state, zip_code, credit_limit, store_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [name, cpf_cnpj || null, phone || null, email || null, address || null,
-             city || null, state || null, zip_code || null, credit_limit || 0]
+             city || null, state || null, zip_code || null, credit_limit || 0, storeId || null]
         );
 
         const customer = await db.get('SELECT * FROM customers WHERE id = ?', [result.lastID]);
@@ -79,10 +102,19 @@ router.post('/', async (req, res) => {
 });
 
 // Atualizar cliente
-router.put('/:id', async (req, res) => {
+router.put('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
         const { name, cpf_cnpj, phone, email, address, city, state, zip_code, credit_limit, is_active } = req.body;
+
+        // Verificar se o cliente pertence à loja do usuário (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            const customer = await db.get('SELECT store_id FROM customers WHERE id = ?', [id]);
+            if (!customer || customer.store_id !== user.store_id) {
+                return res.status(403).json({ error: 'Acesso negado. Cliente não pertence à sua loja.' });
+            }
+        }
 
         await db.run(
             `UPDATE customers SET
@@ -103,6 +135,11 @@ router.put('/:id', async (req, res) => {
 });
 
 module.exports = router;
+
+
+
+
+
 
 
 
