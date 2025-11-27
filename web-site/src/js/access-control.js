@@ -13,15 +13,15 @@ const rolePermissions = {
         canManageUsers: false
     },
     caixa: {
-        pages: ['caixa', 'produtos', 'clientes', 'assistencia'],
+        pages: ['dashboard', 'caixa', 'produtos', 'clientes', 'assistencia'],
         canManageUsers: false
     },
     vendedor: {
-        pages: ['caixa', 'produtos', 'clientes'],
+        pages: ['dashboard', 'caixa', 'produtos', 'clientes'],
         canManageUsers: false
     },
     tecnico: {
-        pages: ['assistencia', 'produtos'],
+        pages: ['dashboard', 'assistencia', 'produtos'],
         canManageUsers: false
     }
 };
@@ -81,4 +81,9 @@ document.addEventListener('DOMContentLoaded', applyAccessControl);
 // Exportar para uso em outros arquivos
 window.hasAccessToPage = hasAccessToPage;
 window.rolePermissions = rolePermissions;
+
+
+
+
+
 

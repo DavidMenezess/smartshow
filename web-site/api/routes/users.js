@@ -25,7 +25,13 @@ const requireAdmin = async (req, res, next) => {
 // Listar usuários (apenas admin)
 router.get('/', auth, requireAdmin, async (req, res) => {
     try {
-        const users = await db.all('SELECT id, username, name, role, is_active, last_login, created_at FROM users ORDER BY name');
+        const users = await db.all(
+            `SELECT u.id, u.username, u.name, u.role, u.is_active, u.store_id, u.last_login, u.created_at,
+                    s.name as store_name
+             FROM users u
+             LEFT JOIN stores s ON u.store_id = s.id
+             ORDER BY u.name`
+        );
         res.json(users);
     } catch (error) {
         console.error('Erro ao listar usuários:', error);
@@ -37,7 +43,14 @@ router.get('/', auth, requireAdmin, async (req, res) => {
 router.get('/:id', auth, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const user = await db.get('SELECT id, username, name, role, is_active, last_login, created_at FROM users WHERE id = ?', [id]);
+        const user = await db.get(
+            `SELECT u.id, u.username, u.name, u.role, u.is_active, u.store_id, u.last_login, u.created_at,
+                    s.name as store_name
+             FROM users u
+             LEFT JOIN stores s ON u.store_id = s.id
+             WHERE u.id = ?`,
+            [id]
+        );
         
         if (user) {
             res.json(user);
@@ -53,7 +66,7 @@ router.get('/:id', auth, requireAdmin, async (req, res) => {
 // Criar usuário (apenas admin)
 router.post('/', auth, requireAdmin, async (req, res) => {
     try {
-        const { username, password, name, role, is_active } = req.body;
+        const { username, password, name, role, is_active, store_id } = req.body;
 
         if (!username || !password || !name || !role) {
             return res.status(400).json({ error: 'Username, senha, nome e função são obrigatórios' });
@@ -71,16 +84,32 @@ router.post('/', auth, requireAdmin, async (req, res) => {
             return res.status(400).json({ error: 'Username já existe' });
         }
 
+        // Validar store_id se fornecido (deve existir na tabela stores)
+        let finalStoreId = null;
+        if (store_id) {
+            const store = await db.get('SELECT id FROM stores WHERE id = ?', [store_id]);
+            if (!store) {
+                return res.status(400).json({ error: 'Loja não encontrada' });
+            }
+            finalStoreId = store_id;
+        }
+
         // Hash da senha
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Criar usuário
         const result = await db.run(
-            'INSERT INTO users (username, password, name, role, is_active) VALUES (?, ?, ?, ?, ?)',
-            [username, hashedPassword, name, role, is_active !== undefined ? is_active : 1]
+            'INSERT INTO users (username, password, name, role, is_active, store_id) VALUES (?, ?, ?, ?, ?, ?)',
+            [username, hashedPassword, name, role, is_active !== undefined ? is_active : 1, finalStoreId]
         );
 
-        const user = await db.get('SELECT id, username, name, role, is_active, created_at FROM users WHERE id = ?', [result.lastID]);
+        const user = await db.get(
+            `SELECT u.id, u.username, u.name, u.role, u.is_active, u.store_id, u.created_at, s.name as store_name
+             FROM users u
+             LEFT JOIN stores s ON u.store_id = s.id
+             WHERE u.id = ?`,
+            [result.lastID]
+        );
         res.status(201).json(user);
     } catch (error) {
         console.error('Erro ao criar usuário:', error);
@@ -92,7 +121,7 @@ router.post('/', auth, requireAdmin, async (req, res) => {
 router.put('/:id', auth, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const { username, password, name, role, is_active } = req.body;
+        const { username, password, name, role, is_active, store_id } = req.body;
 
         // Validar role se fornecido
         if (role) {
@@ -107,6 +136,21 @@ router.put('/:id', auth, requireAdmin, async (req, res) => {
             const existingUser = await db.get('SELECT id FROM users WHERE username = ? AND id != ?', [username, id]);
             if (existingUser) {
                 return res.status(400).json({ error: 'Username já existe' });
+            }
+        }
+
+        // Validar store_id se fornecido
+        let finalStoreId = null;
+        if (store_id !== undefined) {
+            if (store_id) {
+                const store = await db.get('SELECT id FROM stores WHERE id = ?', [store_id]);
+                if (!store) {
+                    return res.status(400).json({ error: 'Loja não encontrada' });
+                }
+                finalStoreId = store_id;
+            } else {
+                // store_id é null (explicitamente removido)
+                finalStoreId = null;
             }
         }
 
@@ -130,6 +174,10 @@ router.put('/:id', auth, requireAdmin, async (req, res) => {
             updates.push('is_active = ?');
             params.push(is_active ? 1 : 0);
         }
+        if (store_id !== undefined) {
+            updates.push('store_id = ?');
+            params.push(finalStoreId);
+        }
         if (password) {
             const hashedPassword = await bcrypt.hash(password, 10);
             updates.push('password = ?');
@@ -145,7 +193,13 @@ router.put('/:id', auth, requireAdmin, async (req, res) => {
 
         await db.run(sql, params);
 
-        const user = await db.get('SELECT id, username, name, role, is_active, created_at FROM users WHERE id = ?', [id]);
+        const user = await db.get(
+            `SELECT u.id, u.username, u.name, u.role, u.is_active, u.store_id, u.created_at, s.name as store_name
+             FROM users u
+             LEFT JOIN stores s ON u.store_id = s.id
+             WHERE u.id = ?`,
+            [id]
+        );
         res.json(user);
     } catch (error) {
         console.error('Erro ao atualizar usuário:', error);
