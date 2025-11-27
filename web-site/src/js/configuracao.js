@@ -129,7 +129,7 @@ async function loadUsers() {
         const tbody = document.getElementById('usersTableBody');
         
         if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6">Nenhum usuário encontrado</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7">Nenhum usuário encontrado</td></tr>';
             return;
         }
         
@@ -139,6 +139,7 @@ async function loadUsers() {
                 <td>${user.name}</td>
                 <td>${user.username}</td>
                 <td>${getRoleName(user.role)}</td>
+                <td>${user.store_name || '-'}</td>
                 <td>${user.is_active ? '<span style="color: green;">Ativo</span>' : '<span style="color: red;">Inativo</span>'}</td>
                 <td>
                     <button onclick="editUser(${user.id})" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; margin-right: 0.25rem;">Editar</button>
@@ -148,7 +149,7 @@ async function loadUsers() {
         `).join('');
     } catch (error) {
         console.error('Erro ao carregar usuários:', error);
-        document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="6" style="color: red;">Erro ao carregar usuários</td></tr>';
+        document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="7" style="color: red;">Erro ao carregar usuários</td></tr>';
     }
 }
 
