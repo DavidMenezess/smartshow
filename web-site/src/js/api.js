@@ -50,10 +50,8 @@ class API {
             }
         };
         
-        // Log para debug (apenas em desenvolvimento)
-        if (process.env.NODE_ENV !== 'production') {
-            console.log('📤 Requisição:', method, url, { hasToken: !!this.token });
-        }
+        // Log para debug
+        console.log('📤 Requisição:', method, url, { hasToken: !!this.token });
 
         if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
             config.body = JSON.stringify(body);
