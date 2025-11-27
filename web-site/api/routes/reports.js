@@ -140,6 +140,7 @@ router.get('/', async (req, res) => {
                         s.total,
                         s.discount,
                         s.payment_method,
+                        s.installments,
                         s.observations,
                         u.name as seller_name,
                         u.username as seller_username,
@@ -221,6 +222,7 @@ router.get('/', async (req, res) => {
                             s.total,
                             s.discount,
                             s.payment_method,
+                            s.installments,
                             u.name as seller_name
                          FROM sales s
                          LEFT JOIN users u ON s.seller_id = u.id

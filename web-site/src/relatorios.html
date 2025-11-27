@@ -187,7 +187,7 @@
                                                     </td>
                                                     <td>
                                                         <span style="padding: 0.25rem 0.5rem; background: #e6fffa; color: #234e52; border-radius: 4px; font-size: 0.875rem;">
-                                                            ${getPaymentMethodName(sale.payment_method)}
+                                                            ${getPaymentMethodName(sale.payment_method, sale.installments)}
                                                         </span>
                                                     </td>
                                                     <td>R$ ${parseFloat(sale.discount || 0).toFixed(2).replace('.', ',')}</td>
@@ -319,7 +319,7 @@
                                                                                         R$ ${parseFloat(sale.total).toFixed(2).replace('.', ',')}
                                                                                     </div>
                                                                                     <div style="font-size: 0.75rem; color: #718096; margin-top: 0.25rem;">
-                                                                                        ${getPaymentMethodName(sale.payment_method)}
+                                                                                        ${getPaymentMethodName(sale.payment_method, sale.installments)}
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
@@ -435,15 +435,28 @@
             return names[status] || status;
         }
 
-        function getPaymentMethodName(method) {
-            const names = {
-                'money': '💵 Dinheiro',
-                'pix': '💳 PIX',
-                'debit': '💳 Débito',
-                'credit': '💳 Crédito',
-                'cash': '💵 Dinheiro'
-            };
-            return names[method] || method || 'N/A';
+        function getPaymentMethodName(method, installments = null) {
+            // Mapear nomes dos métodos de pagamento
+            let methodName = method;
+            
+            // Se for cartão de crédito e tiver parcelas, adicionar informação de parcelas
+            if (method === 'Cartão de Crédito' && installments && installments > 1) {
+                methodName = `💳 Cartão de Crédito (${installments}x)`;
+            } else if (method === 'Cartão de Crédito') {
+                methodName = '💳 Cartão de Crédito';
+            } else if (method === 'Cartão de Débito') {
+                methodName = '💳 Cartão de Débito';
+            } else if (method === 'Dinheiro') {
+                methodName = '💵 Dinheiro';
+            } else if (method === 'PIX') {
+                methodName = '💳 PIX';
+            } else if (method === 'Boleto') {
+                methodName = '📄 Boleto';
+            } else if (method === 'Crediário') {
+                methodName = '📋 Crediário';
+            }
+            
+            return methodName || method || 'N/A';
         }
 
         function exportReport() {
