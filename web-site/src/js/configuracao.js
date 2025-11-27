@@ -204,7 +204,11 @@ async function loadUserData(userId) {
         
         // Carregar lojas e selecionar a loja do usuário
         await loadStoresForUserSelect();
-        document.getElementById('userStoreInput').value = user.store_id || '';
+        const storeSelect = document.getElementById('userStoreInput');
+        if (storeSelect) {
+            storeSelect.value = user.store_id || '';
+            console.log('✅ Loja selecionada no formulário:', user.store_id, 'Nome:', user.store_name);
+        }
     } catch (error) {
         console.error('Erro ao carregar usuário:', error);
         alert('Erro ao carregar dados do usuário');
@@ -222,14 +226,20 @@ document.getElementById('userForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const userId = document.getElementById('userId').value;
-    const storeId = document.getElementById('userStoreInput').value;
+    const storeIdInput = document.getElementById('userStoreInput');
+    const storeId = storeIdInput ? storeIdInput.value : '';
+    
+    console.log('💾 Salvando usuário. Store ID selecionado:', storeId);
+    
     const userData = {
         name: document.getElementById('userNameInput').value,
         username: document.getElementById('userUsernameInput').value,
         role: document.getElementById('userRoleInput').value,
         is_active: document.getElementById('userIsActive').checked,
-        store_id: storeId ? parseInt(storeId) : null
+        store_id: storeId && storeId !== '' ? parseInt(storeId) : null
     };
+    
+    console.log('💾 Dados do usuário a serem salvos:', userData);
     
     const password = document.getElementById('userPasswordInput').value;
     if (password) {
