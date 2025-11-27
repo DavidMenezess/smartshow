@@ -67,18 +67,27 @@ router.get('/', auth, async (req, res) => {
 });
 
 // Obter venda por ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
         
-        const sale = await db.get(
-            `SELECT s.*, c.name as customer_name, u.name as seller_name
-             FROM sales s
-             LEFT JOIN customers c ON s.customer_id = c.id
-             LEFT JOIN users u ON s.seller_id = u.id
-             WHERE s.id = ?`,
-            [id]
-        );
+        let sql = `
+            SELECT s.*, c.name as customer_name, u.name as seller_name
+            FROM sales s
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN users u ON s.seller_id = u.id
+            WHERE s.id = ?
+        `;
+        const params = [id];
+
+        // Filtrar por loja (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            sql += ` AND s.store_id = ?`;
+            params.push(user.store_id);
+        }
+        
+        const sale = await db.get(sql, params);
 
         if (!sale) {
             return res.status(404).json({ error: 'Venda não encontrada' });

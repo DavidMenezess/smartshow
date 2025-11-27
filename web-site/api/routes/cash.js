@@ -5,31 +5,45 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
+const auth = require('../middleware/auth');
 
 // Obter estado atual do caixa
-router.get('/status', async (req, res) => {
+router.get('/status', auth, async (req, res) => {
     try {
+        const user = req.user;
         // Buscar o último registro de caixa aberto hoje
         const today = new Date().toISOString().split('T')[0];
         
-        const cashControl = await db.get(
-            `SELECT * FROM cash_control 
-             WHERE DATE(datetime(opening_date, '-3 hours')) = ? 
-             AND closing_date IS NULL 
-             AND is_open = 1
-             ORDER BY opening_date DESC 
-             LIMIT 1`,
-            [today]
-        );
+        let cashControlSql = `
+            SELECT * FROM cash_control 
+            WHERE DATE(datetime(opening_date, '-3 hours')) = ? 
+            AND closing_date IS NULL 
+            AND is_open = 1
+        `;
+        const cashControlParams = [today];
+        
+        // Filtrar por loja (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            cashControlSql += ` AND store_id = ?`;
+            cashControlParams.push(user.store_id);
+        }
+        cashControlSql += ` ORDER BY opening_date DESC LIMIT 1`;
+        
+        const cashControl = await db.get(cashControlSql, cashControlParams);
         
         if (cashControl) {
             // Buscar vendas do dia
-            const todaySales = await db.get(
-                `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
-                 FROM sales 
-                 WHERE DATE(datetime(created_at, '-3 hours')) = ?`,
-                [today]
-            );
+            let todaySalesSql = `
+                SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
+                FROM sales 
+                WHERE DATE(datetime(created_at, '-3 hours')) = ?
+            `;
+            const todaySalesParams = [today];
+            if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+                todaySalesSql += ` AND store_id = ?`;
+                todaySalesParams.push(user.store_id);
+            }
+            const todaySales = await db.get(todaySalesSql, todaySalesParams);
             
             res.json({
                 isOpen: true,
@@ -56,40 +70,44 @@ router.get('/status', async (req, res) => {
 });
 
 // Abrir caixa
-router.post('/open', async (req, res) => {
+router.post('/open', auth, async (req, res) => {
     try {
         const { initialCash, observations } = req.body;
+        const user = req.user;
         
-        // Buscar o primeiro usuário admin ou usar ID 1
-        let userId = 1;
-        try {
-            const adminUser = await db.get('SELECT id FROM users WHERE role = ? LIMIT 1', ['admin']);
-            if (adminUser) {
-                userId = adminUser.id;
-            }
-        } catch (userError) {
-            console.warn('Não foi possível buscar usuário admin, usando ID 1:', userError);
-        }
+        // Usar o ID do usuário logado
+        const userId = user.id;
         
         // Verificar se já existe caixa aberto hoje
         const today = new Date().toISOString().split('T')[0];
-        const existingCash = await db.get(
-            `SELECT * FROM cash_control 
-             WHERE DATE(datetime(opening_date, '-3 hours')) = ? 
-             AND (closing_date IS NULL OR closing_date = '')
-             AND is_open = 1`,
-            [today]
-        );
+        let existingCashSql = `
+            SELECT * FROM cash_control 
+            WHERE DATE(datetime(opening_date, '-3 hours')) = ? 
+            AND (closing_date IS NULL OR closing_date = '')
+            AND is_open = 1
+        `;
+        const existingCashParams = [today];
+        
+        // Filtrar por loja (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            existingCashSql += ` AND store_id = ?`;
+            existingCashParams.push(user.store_id);
+        }
+        
+        const existingCash = await db.get(existingCashSql, existingCashParams);
         
         if (existingCash) {
             return res.status(400).json({ error: 'Caixa já está aberto hoje' });
         }
         
+        // Definir store_id automaticamente (exceto admin)
+        const storeId = (user.role === 'admin' && req.body.store_id) ? req.body.store_id : user.store_id;
+        
         // Criar novo registro de abertura
         const result = await db.run(
-            `INSERT INTO cash_control (user_id, initial_cash, observations, opening_date, is_open)
-             VALUES (?, ?, ?, datetime('now'), 1)`,
-            [userId, parseFloat(initialCash) || 0, observations || '']
+            `INSERT INTO cash_control (user_id, initial_cash, observations, opening_date, is_open, store_id)
+             VALUES (?, ?, ?, datetime('now'), 1, ?)`,
+            [userId, parseFloat(initialCash) || 0, observations || '', storeId || null]
         );
         
         res.json({
@@ -105,33 +123,46 @@ router.post('/open', async (req, res) => {
 });
 
 // Fechar caixa
-router.post('/close', async (req, res) => {
+router.post('/close', auth, async (req, res) => {
     try {
         const { finalCash, observations } = req.body;
+        const user = req.user;
         
         // Buscar o caixa aberto hoje
         const today = new Date().toISOString().split('T')[0];
-        const cashControl = await db.get(
-            `SELECT * FROM cash_control 
-             WHERE DATE(datetime(opening_date, '-3 hours')) = ? 
-             AND closing_date IS NULL 
-             AND is_open = 1
-             ORDER BY opening_date DESC 
-             LIMIT 1`,
-            [today]
-        );
+        let cashControlSql = `
+            SELECT * FROM cash_control 
+            WHERE DATE(datetime(opening_date, '-3 hours')) = ? 
+            AND closing_date IS NULL 
+            AND is_open = 1
+        `;
+        const cashControlParams = [today];
+        
+        // Filtrar por loja (exceto admin/gerente)
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            cashControlSql += ` AND store_id = ?`;
+            cashControlParams.push(user.store_id);
+        }
+        cashControlSql += ` ORDER BY opening_date DESC LIMIT 1`;
+        
+        const cashControl = await db.get(cashControlSql, cashControlParams);
         
         if (!cashControl) {
             return res.status(400).json({ error: 'Nenhum caixa aberto encontrado' });
         }
         
         // Buscar vendas do dia
-        const todaySales = await db.get(
-            `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
-             FROM sales 
-             WHERE DATE(datetime(created_at, '-3 hours')) = ?`,
-            [today]
-        );
+        let todaySalesSql = `
+            SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
+            FROM sales 
+            WHERE DATE(datetime(created_at, '-3 hours')) = ?
+        `;
+        const todaySalesParams = [today];
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            todaySalesSql += ` AND store_id = ?`;
+            todaySalesParams.push(user.store_id);
+        }
+        const todaySales = await db.get(todaySalesSql, todaySalesParams);
         
         const expectedCash = (cashControl.initial_cash || 0) + parseFloat(todaySales?.total || 0);
         const difference = (finalCash || 0) - expectedCash;

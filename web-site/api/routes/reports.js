@@ -4,12 +4,14 @@
 
 const express = require('express');
 const db = require('../database');
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 
 // Dashboard - resumo geral
-router.get('/dashboard', async (req, res) => {
+router.get('/dashboard', auth, async (req, res) => {
     try {
+        const user = req.user;
         // Usar data atual no timezone do Brasil (UTC-3)
         const now = new Date();
         const brazilOffset = -3 * 60; // UTC-3 em minutos
@@ -18,30 +20,43 @@ router.get('/dashboard', async (req, res) => {
         
         const monthStart = new Date(brazilTime.getFullYear(), brazilTime.getMonth(), 1).toISOString().split('T')[0];
 
+        // Construir filtro de loja
+        let storeFilter = '';
+        const storeParams = [];
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            storeFilter = ' AND store_id = ?';
+            storeParams.push(user.store_id);
+        }
+
         // Vendas do dia - considerar timezone do Brasil
         const todaySales = await db.get(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
              FROM sales 
-             WHERE DATE(datetime(created_at, '-3 hours')) = ?`,
-            [today]
+             WHERE DATE(datetime(created_at, '-3 hours')) = ?${storeFilter}`,
+            [today, ...storeParams]
         );
 
         // Vendas do mês - considerar timezone do Brasil
         const monthSales = await db.get(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
              FROM sales 
-             WHERE DATE(datetime(created_at, '-3 hours')) >= ?`,
-            [monthStart]
+             WHERE DATE(datetime(created_at, '-3 hours')) >= ?${storeFilter}`,
+            [monthStart, ...storeParams]
         );
 
         // Produtos em estoque baixo (com lista)
-        const lowStockProducts = await db.all(
-            `SELECT id, name, barcode, stock, min_stock, sale_price
-             FROM products 
-             WHERE (stock <= min_stock OR stock = 0) AND is_active = 1
-             ORDER BY stock ASC, name ASC
-             LIMIT 20`
-        );
+        let lowStockSql = `
+            SELECT id, name, barcode, stock, min_stock, sale_price
+            FROM products 
+            WHERE (stock <= min_stock OR stock = 0) AND is_active = 1
+        `;
+        const lowStockParams = [];
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            lowStockSql += ` AND store_id = ?`;
+            lowStockParams.push(user.store_id);
+        }
+        lowStockSql += ` ORDER BY stock ASC, name ASC LIMIT 20`;
+        const lowStockProducts = await db.all(lowStockSql, lowStockParams);
 
         // Contas a receber
         const receivable = await db.get(
@@ -60,10 +75,13 @@ router.get('/dashboard', async (req, res) => {
         const osByStatus = {};
         
         for (const status of osStatuses) {
-            const result = await db.get(
-                `SELECT COUNT(*) as count FROM service_orders WHERE status = ?`,
-                [status]
-            );
+            let osSql = `SELECT COUNT(*) as count FROM service_orders WHERE status = ?`;
+            const osParams = [status];
+            if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+                osSql += ` AND store_id = ?`;
+                osParams.push(user.store_id);
+            }
+            const result = await db.get(osSql, osParams);
             osByStatus[status] = result.count;
         }
 
@@ -73,9 +91,10 @@ router.get('/dashboard', async (req, res) => {
                     COUNT(*) as count, 
                     COALESCE(SUM(total), 0) as total
              FROM sales 
-             WHERE DATE(datetime(created_at, '-3 hours')) >= date('now', '-7 days')
+             WHERE DATE(datetime(created_at, '-3 hours')) >= date('now', '-7 days')${storeFilter}
              GROUP BY DATE(datetime(created_at, '-3 hours'))
-             ORDER BY date ASC`
+             ORDER BY date ASC`,
+            storeParams
         );
 
         // Vendas por forma de pagamento (últimos 30 dias) - considerar timezone do Brasil
@@ -84,9 +103,10 @@ router.get('/dashboard', async (req, res) => {
                     COUNT(*) as count, 
                     COALESCE(SUM(total), 0) as total
              FROM sales 
-             WHERE DATE(datetime(created_at, '-3 hours')) >= date('now', '-30 days')
+             WHERE DATE(datetime(created_at, '-3 hours')) >= date('now', '-30 days')${storeFilter}
              GROUP BY payment_method
-             ORDER BY total DESC`
+             ORDER BY total DESC`,
+            storeParams
         );
 
         res.json({
@@ -113,7 +133,7 @@ router.get('/dashboard', async (req, res) => {
 });
 
 // Relatório genérico (compatibilidade com frontend)
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
     try {
         const { type, start, end } = req.query;
         const startDate = start;
@@ -341,9 +361,10 @@ router.get('/sales', async (req, res) => {
 });
 
 // Vendas do dia (para o caixa)
-router.get('/today-sales', async (req, res) => {
+router.get('/today-sales', auth, async (req, res) => {
     try {
         const { date } = req.query;
+        const user = req.user;
         
         // Usar data atual no timezone do Brasil (UTC-3)
         const now = new Date();
@@ -353,12 +374,20 @@ router.get('/today-sales', async (req, res) => {
         
         console.log(`📅 Buscando vendas para a data: ${targetDate}`);
         
+        // Construir filtro de loja
+        let storeFilter = '';
+        const storeParams = [];
+        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            storeFilter = ' AND store_id = ?';
+            storeParams.push(user.store_id);
+        }
+        
         // Usar timezone do Brasil (UTC-3)
         const todaySales = await db.get(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
              FROM sales 
-             WHERE DATE(datetime(created_at, '-3 hours')) = ?`,
-            [targetDate]
+             WHERE DATE(datetime(created_at, '-3 hours')) = ?${storeFilter}`,
+            [targetDate, ...storeParams]
         );
         
         const result = todaySales || { count: 0, total: 0 };
