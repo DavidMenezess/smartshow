@@ -241,6 +241,27 @@ class API {
             method: 'DELETE'
         });
     }
+
+    // Stores
+    async getStores() {
+        return await this.request('/stores');
+    }
+
+    async getStore(id) {
+        return await this.request(`/stores/${id}`);
+    }
+
+    async createStore(store) {
+        return await this.request('/stores', 'POST', store);
+    }
+
+    async updateStore(id, store) {
+        return await this.request(`/stores/${id}`, 'PUT', store);
+    }
+
+    async deleteStore(id) {
+        return await this.request(`/stores/${id}`, 'DELETE');
+    }
 }
 
 const api = new API();

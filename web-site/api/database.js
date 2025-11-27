@@ -59,6 +59,19 @@ class Database {
 
     createTables() {
         const tables = [
+            // Lojas/Filiais
+            `CREATE TABLE IF NOT EXISTS stores (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                address TEXT,
+                city TEXT,
+                state TEXT,
+                phone TEXT,
+                email TEXT,
+                is_active BOOLEAN DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`,
+
             // Usuários
             `CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,9 +79,11 @@ class Database {
                 password TEXT NOT NULL,
                 name TEXT NOT NULL,
                 role TEXT NOT NULL CHECK(role IN ('admin', 'gerente', 'vendedor', 'tecnico', 'caixa')),
+                store_id INTEGER,
                 is_active BOOLEAN DEFAULT 1,
                 last_login DATETIME,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (store_id) REFERENCES stores(id)
             )`,
 
             // Categorias de produtos
@@ -93,11 +108,12 @@ class Database {
             // Produtos
             `CREATE TABLE IF NOT EXISTS products (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                barcode TEXT UNIQUE,
+                barcode TEXT,
                 name TEXT NOT NULL,
                 description TEXT,
                 category_id INTEGER,
                 supplier_id INTEGER,
+                store_id INTEGER,
                 brand TEXT,
                 model TEXT,
                 cost_price REAL DEFAULT 0,
@@ -109,7 +125,8 @@ class Database {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (category_id) REFERENCES categories(id),
-                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+                FOREIGN KEY (store_id) REFERENCES stores(id)
             )`,
 
             // Clientes
@@ -124,8 +141,10 @@ class Database {
                 state TEXT,
                 zip_code TEXT,
                 credit_limit REAL DEFAULT 0,
+                store_id INTEGER,
                 is_active BOOLEAN DEFAULT 1,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (store_id) REFERENCES stores(id)
             )`,
 
             // Vendas
@@ -134,6 +153,7 @@ class Database {
                 sale_number TEXT UNIQUE NOT NULL,
                 customer_id INTEGER,
                 seller_id INTEGER NOT NULL,
+                store_id INTEGER NOT NULL,
                 total REAL NOT NULL,
                 discount REAL DEFAULT 0,
                 payment_method TEXT NOT NULL,
@@ -142,7 +162,8 @@ class Database {
                 observations TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (customer_id) REFERENCES customers(id),
-                FOREIGN KEY (seller_id) REFERENCES users(id)
+                FOREIGN KEY (seller_id) REFERENCES users(id),
+                FOREIGN KEY (store_id) REFERENCES stores(id)
             )`,
 
             // Itens de venda
@@ -163,6 +184,7 @@ class Database {
                 order_number TEXT UNIQUE NOT NULL,
                 customer_id INTEGER NOT NULL,
                 technician_id INTEGER,
+                store_id INTEGER NOT NULL,
                 device_type TEXT,
                 brand TEXT,
                 model TEXT,
@@ -178,13 +200,15 @@ class Database {
                 completed_at DATETIME,
                 delivered_at DATETIME,
                 FOREIGN KEY (customer_id) REFERENCES customers(id),
-                FOREIGN KEY (technician_id) REFERENCES users(id)
+                FOREIGN KEY (technician_id) REFERENCES users(id),
+                FOREIGN KEY (store_id) REFERENCES stores(id)
             )`,
 
             // Controle de caixa
             `CREATE TABLE IF NOT EXISTS cash_control (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
+                store_id INTEGER NOT NULL,
                 opening_date DATETIME NOT NULL,
                 closing_date DATETIME,
                 initial_cash REAL DEFAULT 0,
@@ -195,7 +219,8 @@ class Database {
                 difference REAL DEFAULT 0,
                 observations TEXT,
                 is_open BOOLEAN DEFAULT 1,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (store_id) REFERENCES stores(id)
             )`,
 
             // Contas a receber
@@ -291,9 +316,55 @@ class Database {
         } catch (error) {
             console.error('❌ Erro ao adicionar coluna installments:', error);
         }
+
+        // Migrações para multi-loja: adicionar store_id nas tabelas
+        const migrations = [
+            { table: 'users', column: 'store_id', type: 'INTEGER', fk: 'stores(id)' },
+            { table: 'products', column: 'store_id', type: 'INTEGER', fk: 'stores(id)' },
+            { table: 'customers', column: 'store_id', type: 'INTEGER', fk: 'stores(id)' },
+            { table: 'sales', column: 'store_id', type: 'INTEGER NOT NULL DEFAULT 1', fk: 'stores(id)' },
+            { table: 'service_orders', column: 'store_id', type: 'INTEGER NOT NULL DEFAULT 1', fk: 'stores(id)' },
+            { table: 'cash_control', column: 'store_id', type: 'INTEGER NOT NULL DEFAULT 1', fk: 'stores(id)' }
+        ];
+
+        for (const migration of migrations) {
+            try {
+                const columnExists = await this.get(
+                    `SELECT COUNT(*) as count FROM pragma_table_info('${migration.table}') WHERE name='${migration.column}'`
+                );
+                
+                if (columnExists && columnExists.count === 0) {
+                    console.log(`🔄 Adicionando coluna ${migration.column} na tabela ${migration.table}...`);
+                    await this.run(`ALTER TABLE ${migration.table} ADD COLUMN ${migration.column} ${migration.type}`);
+                    if (migration.fk) {
+                        // SQLite não suporta ADD FOREIGN KEY em ALTER TABLE, então apenas adicionamos a coluna
+                        console.log(`✅ Coluna ${migration.column} adicionada (FK será aplicada na próxima criação da tabela)`);
+                    } else {
+                        console.log(`✅ Coluna ${migration.column} adicionada com sucesso`);
+                    }
+                }
+            } catch (error) {
+                console.error(`❌ Erro ao adicionar coluna ${migration.column} na tabela ${migration.table}:`, error);
+            }
+        }
+
+        // Criar loja padrão se não existir
+        try {
+            const storeExists = await this.get(`SELECT COUNT(*) as count FROM stores`);
+            if (storeExists && storeExists.count === 0) {
+                console.log('🔄 Criando loja padrão...');
+                await this.run(
+                    `INSERT INTO stores (name, address, city, state, is_active) VALUES (?, ?, ?, ?, ?)`,
+                    ['Loja Principal', 'Endereço não informado', 'Cidade não informada', 'Estado não informado', 1]
+                );
+                console.log('✅ Loja padrão criada com sucesso');
+            }
+        } catch (error) {
+            console.error('❌ Erro ao criar loja padrão:', error);
+        }
     }
 
-    insertInitialData() {
+    async insertInitialData() {
         // Verificar se já existem usuários
         this.db.get("SELECT COUNT(*) as count FROM users", (err, row) => {
             if (err) {
@@ -304,48 +375,66 @@ class Database {
             if (row.count === 0) {
                 console.log('📝 Inserindo usuários iniciais...');
                 
-                const bcrypt = require('bcryptjs');
-                const initialUsers = [
-                    {
-                        username: 'admin',
-                        password: bcrypt.hashSync('admin123', 10),
-                        name: 'Administrador',
-                        role: 'admin'
-                    },
-                    {
-                        username: 'vendedor',
-                        password: bcrypt.hashSync('vendedor123', 10),
-                        name: 'Vendedor',
-                        role: 'vendedor'
-                    },
-                    {
-                        username: 'caixa',
-                        password: bcrypt.hashSync('caixa123', 10),
-                        name: 'Caixa',
-                        role: 'caixa'
-                    },
-                    {
-                        username: 'tecnico',
-                        password: bcrypt.hashSync('tecnico123', 10),
-                        name: 'Técnico',
-                        role: 'tecnico'
+                // Primeiro, garantir que existe uma loja
+                this.db.get("SELECT id FROM stores LIMIT 1", async (err, storeRow) => {
+                    if (err) {
+                        console.error('Erro ao buscar loja:', err);
+                        return;
                     }
-                ];
-
-                const insertUser = `INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)`;
-
-                initialUsers.forEach(user => {
-                    this.db.run(insertUser, [user.username, user.password, user.name, user.role], (err) => {
-                        if (err) {
-                            console.error('Erro ao inserir usuário:', err);
-                        } else {
-                            console.log(`✅ Usuário ${user.username} inserido`);
+                    
+                    let storeId = 1; // Default
+                    if (storeRow) {
+                        storeId = storeRow.id;
+                    }
+                    
+                    const bcrypt = require('bcryptjs');
+                    const initialUsers = [
+                        {
+                            username: 'admin',
+                            password: bcrypt.hashSync('admin123', 10),
+                            name: 'Administrador',
+                            role: 'admin',
+                            store_id: null // Admin não tem loja específica
+                        },
+                        {
+                            username: 'vendedor',
+                            password: bcrypt.hashSync('vendedor123', 10),
+                            name: 'Vendedor',
+                            role: 'vendedor',
+                            store_id: storeId
+                        },
+                        {
+                            username: 'caixa',
+                            password: bcrypt.hashSync('caixa123', 10),
+                            name: 'Caixa',
+                            role: 'caixa',
+                            store_id: storeId
+                        },
+                        {
+                            username: 'tecnico',
+                            password: bcrypt.hashSync('tecnico123', 10),
+                            name: 'Técnico',
+                            role: 'tecnico',
+                            store_id: storeId
                         }
+                    ];
+
+                    const insertUser = `INSERT INTO users (username, password, name, role, store_id) VALUES (?, ?, ?, ?, ?)`;
+
+                    initialUsers.forEach(user => {
+                        this.db.run(insertUser, [user.username, user.password, user.name, user.role, user.store_id], (err) => {
+                            if (err) {
+                                console.error('Erro ao inserir usuário:', err);
+                            } else {
+                                console.log(`✅ Usuário ${user.username} inserido`);
+                            }
+                        });
                     });
                 });
             }
         });
     }
+
 
     // Métodos auxiliares
     run(sql, params = []) {

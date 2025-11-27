@@ -4,22 +4,26 @@
 
 const express = require('express');
 const db = require('../database');
+const auth = require('../middleware/auth');
+const { getStoreFilter } = require('../middleware/store-filter');
 
 const router = express.Router();
 
 // Listar vendas
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
     try {
-        const { startDate, endDate, customerId, sellerId } = req.query;
+        const { startDate, endDate, customerId, sellerId, store_id } = req.query;
         
         let sql = `
             SELECT s.*, 
                    c.name as customer_name,
                    u.name as seller_name,
+                   st.name as store_name,
                    COUNT(si.id) as items_count
             FROM sales s
             LEFT JOIN customers c ON s.customer_id = c.id
             LEFT JOIN users u ON s.seller_id = u.id
+            LEFT JOIN stores st ON s.store_id = st.id
             LEFT JOIN sale_items si ON s.id = si.sale_id
             WHERE 1=1
         `;
@@ -43,6 +47,13 @@ router.get('/', async (req, res) => {
         if (sellerId) {
             sql += ` AND s.seller_id = ?`;
             params.push(sellerId);
+        }
+
+        // Filtrar por loja
+        const filter = getStoreFilter(req.user, store_id);
+        if (!filter.canSeeAll || filter.store_id) {
+            sql += ` AND s.store_id = ?`;
+            params.push(filter.store_id);
         }
 
         sql += ` GROUP BY s.id ORDER BY s.created_at DESC`;
@@ -89,7 +100,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Criar venda
-router.post('/', async (req, res) => {
+router.post('/', auth, async (req, res) => {
     try {
         const { customerId, sellerId, items, discount, paymentMethod, installments, observations } = req.body;
 
@@ -99,6 +110,25 @@ router.post('/', async (req, res) => {
 
         if (!sellerId) {
             return res.status(400).json({ error: 'Vendedor é obrigatório' });
+        }
+
+        // Obter store_id do vendedor (ou do usuário logado se for ele mesmo)
+        const seller = await db.get('SELECT store_id FROM users WHERE id = ?', [sellerId]);
+        if (!seller) {
+            return res.status(400).json({ error: 'Vendedor não encontrado' });
+        }
+        
+        // Se o usuário logado não for admin/gerente, garantir que está vendendo na sua loja
+        const userStoreId = req.user.store_id;
+        if (req.user.role !== 'admin' && req.user.role !== 'gerente') {
+            if (seller.store_id !== userStoreId) {
+                return res.status(403).json({ error: 'Você só pode realizar vendas na sua loja' });
+            }
+        }
+        
+        const storeId = seller.store_id || userStoreId;
+        if (!storeId) {
+            return res.status(400).json({ error: 'Vendedor deve estar vinculado a uma loja' });
         }
 
         // Calcular total
@@ -113,9 +143,9 @@ router.post('/', async (req, res) => {
         
         const saleResult = await db.run(
             `INSERT INTO sales 
-             (sale_number, customer_id, seller_id, total, discount, payment_method, installments, observations)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [saleNumber, customerId || null, sellerId, total, discount || 0, paymentMethod, installmentsValue, observations || null]
+             (sale_number, customer_id, seller_id, store_id, total, discount, payment_method, installments, observations)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [saleNumber, customerId || null, sellerId, storeId, total, discount || 0, paymentMethod, installmentsValue, observations || null]
         );
 
         const saleId = saleResult.lastID;

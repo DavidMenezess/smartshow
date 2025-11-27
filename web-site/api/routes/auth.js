@@ -19,9 +19,12 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ error: 'Usuário e senha são obrigatórios' });
         }
 
-        // Buscar usuário
+        // Buscar usuário com informações da loja
         const user = await db.get(
-            'SELECT * FROM users WHERE username = ? AND is_active = 1',
+            `SELECT u.*, s.name as store_name, s.id as store_id
+             FROM users u
+             LEFT JOIN stores s ON u.store_id = s.id
+             WHERE u.username = ? AND u.is_active = 1`,
             [username]
         );
 
@@ -41,9 +44,15 @@ router.post('/login', async (req, res) => {
             [user.id]
         );
 
-        // Gerar token JWT
+        // Buscar informações completas da loja se houver
+        let store = null;
+        if (user.store_id) {
+            store = await db.get('SELECT * FROM stores WHERE id = ?', [user.store_id]);
+        }
+
+        // Gerar token JWT (incluir store_id)
         const token = jwt.sign(
-            { id: user.id, username: user.username, role: user.role },
+            { id: user.id, username: user.username, role: user.role, store_id: user.store_id },
             config.security.jwtSecret,
             { expiresIn: config.security.jwtExpiresIn }
         );
@@ -54,7 +63,10 @@ router.post('/login', async (req, res) => {
         res.json({
             success: true,
             token,
-            user
+            user: {
+                ...user,
+                store: store
+            }
         });
     } catch (error) {
         console.error('Erro no login:', error);
@@ -72,7 +84,13 @@ router.get('/verify', async (req, res) => {
         }
 
         const decoded = jwt.verify(token, config.security.jwtSecret);
-        const user = await db.get('SELECT id, username, name, role FROM users WHERE id = ?', [decoded.id]);
+        const user = await db.get(
+            `SELECT u.id, u.username, u.name, u.role, u.store_id, s.name as store_name
+             FROM users u
+             LEFT JOIN stores s ON u.store_id = s.id
+             WHERE u.id = ?`,
+            [decoded.id]
+        );
 
         if (!user) {
             return res.status(401).json({ error: 'Usuário não encontrado' });
@@ -85,6 +103,11 @@ router.get('/verify', async (req, res) => {
 });
 
 module.exports = router;
+
+
+
+
+
 
 
 

@@ -15,7 +15,11 @@ module.exports = async (req, res, next) => {
         }
 
         const decoded = jwt.verify(token, config.security.jwtSecret);
-        const user = await db.get('SELECT id, username, name, role, is_active FROM users WHERE id = ?', [decoded.id]);
+        const user = await db.get(
+            `SELECT id, username, name, role, is_active, store_id 
+             FROM users WHERE id = ?`,
+            [decoded.id]
+        );
 
         if (!user || !user.is_active) {
             return res.status(401).json({ error: 'Usuário não encontrado ou inativo' });
@@ -27,4 +31,9 @@ module.exports = async (req, res, next) => {
         res.status(401).json({ error: 'Token inválido' });
     }
 };
+
+
+
+
+
 
