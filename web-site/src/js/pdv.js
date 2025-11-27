@@ -29,28 +29,92 @@ class PDV {
             this.updateTotals();
         });
 
-        // Função para atualizar visibilidade do campo Valor Pago
-        const updatePaidAmountVisibility = () => {
+        // Função para atualizar visibilidade do campo Valor Pago e Parcelas
+        // Tornar global para poder ser chamada de outros lugares
+        window.updatePaymentFieldsVisibility = () => {
             const paidAmountGroup = document.getElementById('paidAmountGroup');
-            const paymentMethod = document.getElementById('paymentMethod')?.value;
+            const installmentsGroup = document.getElementById('installmentsGroup');
+            const creditInfo = document.getElementById('creditInfo');
+            const paymentMethodSelect = document.getElementById('paymentMethod');
+            
+            if (!paymentMethodSelect) {
+                console.error('❌ Campo paymentMethod não encontrado no DOM!');
+                return;
+            }
+            
+            const paymentMethod = paymentMethodSelect.value;
+            
+            console.log('🔄 Atualizando campos de pagamento. Método selecionado:', paymentMethod);
+            console.log('🔍 Elementos encontrados:', {
+                paidAmountGroup: !!paidAmountGroup,
+                installmentsGroup: !!installmentsGroup,
+                creditInfo: !!creditInfo
+            });
+            
+            // Campo Valor Pago (apenas para Dinheiro)
             if (paymentMethod === 'Dinheiro') {
-                if (paidAmountGroup) paidAmountGroup.style.display = 'block';
+                if (paidAmountGroup) {
+                    paidAmountGroup.style.display = 'block';
+                    console.log('✅ Campo Valor Pago exibido');
+                } else {
+                    console.warn('⚠️ paidAmountGroup não encontrado');
+                }
             } else {
-                if (paidAmountGroup) paidAmountGroup.style.display = 'none';
+                if (paidAmountGroup) {
+                    paidAmountGroup.style.display = 'none';
+                }
+            }
+            
+            // Campo Parcelas (apenas para Cartão de Crédito)
+            if (paymentMethod === 'Cartão de Crédito') {
+                if (installmentsGroup) {
+                    installmentsGroup.style.display = 'block';
+                    console.log('✅ Campo Parcelas exibido (display: block)');
+                } else {
+                    console.error('❌ installmentsGroup não encontrado no DOM!');
+                }
+                if (creditInfo) {
+                    creditInfo.style.display = 'block';
+                    console.log('✅ Informação de crédito exibida (display: block)');
+                } else {
+                    console.error('❌ creditInfo não encontrado no DOM!');
+                }
+            } else {
+                if (installmentsGroup) {
+                    installmentsGroup.style.display = 'none';
+                }
+                if (creditInfo) {
+                    creditInfo.style.display = 'none';
+                }
             }
         };
+        
+        const updatePaymentFieldsVisibility = window.updatePaymentFieldsVisibility;
 
-        // Verificar visibilidade inicial (se Dinheiro já está selecionado)
-        updatePaidAmountVisibility();
+        // Verificar visibilidade inicial
+        updatePaymentFieldsVisibility();
 
-        document.getElementById('paymentMethod')?.addEventListener('change', (e) => {
-            updatePaidAmountVisibility();
-            if (e.target.value === 'Dinheiro') {
-                document.getElementById('paidAmount')?.addEventListener('input', () => {
-                    this.calculateChange();
-                });
-            }
-        });
+        // Adicionar listener para mudança no método de pagamento
+        const paymentMethodSelect = document.getElementById('paymentMethod');
+        if (paymentMethodSelect) {
+            paymentMethodSelect.addEventListener('change', (e) => {
+                console.log('💳 Método de pagamento alterado para:', e.target.value);
+                updatePaymentFieldsVisibility();
+                if (e.target.value === 'Dinheiro') {
+                    const paidAmountInput = document.getElementById('paidAmount');
+                    if (paidAmountInput) {
+                        // Remover listeners anteriores para evitar duplicação
+                        const newInput = paidAmountInput.cloneNode(true);
+                        paidAmountInput.parentNode.replaceChild(newInput, paidAmountInput);
+                        newInput.addEventListener('input', () => {
+                            this.calculateChange();
+                        });
+                    }
+                }
+            });
+        } else {
+            console.error('❌ Campo paymentMethod não encontrado!');
+        }
 
         document.getElementById('finalizeSaleBtn')?.addEventListener('click', () => {
             this.finalizeSale();
@@ -69,6 +133,13 @@ class PDV {
 
         // Inicializar venda
         this.initSale();
+        
+        // Garantir que os campos de pagamento estejam visíveis corretamente após inicialização
+        setTimeout(() => {
+            if (window.updatePaymentFieldsVisibility) {
+                window.updatePaymentFieldsVisibility();
+            }
+        }, 100);
     }
 
     initSale() {
@@ -105,11 +176,43 @@ class PDV {
         document.getElementById('paidAmount').value = '';
         document.getElementById('changeDisplay').style.display = 'none';
         
-        // Garantir que o campo Valor Pago apareça se Dinheiro estiver selecionado
-        const paymentMethod = document.getElementById('paymentMethod')?.value;
-        const paidAmountGroup = document.getElementById('paidAmountGroup');
-        if (paymentMethod === 'Dinheiro' && paidAmountGroup) {
-            paidAmountGroup.style.display = 'block';
+        // Limpar campo de parcelas
+        const installmentsSelect = document.getElementById('installments');
+        if (installmentsSelect) {
+            installmentsSelect.value = '1';
+        }
+        
+        // Atualizar visibilidade dos campos de pagamento usando a função centralizada
+        if (window.updatePaymentFieldsVisibility) {
+            window.updatePaymentFieldsVisibility();
+        } else {
+            // Fallback: atualizar manualmente
+            const paymentMethod = document.getElementById('paymentMethod')?.value;
+            const paidAmountGroup = document.getElementById('paidAmountGroup');
+            const installmentsGroup = document.getElementById('installmentsGroup');
+            const creditInfo = document.getElementById('creditInfo');
+            
+            console.log('🔄 Atualizando campos de pagamento no initSale. Método:', paymentMethod);
+            
+            if (paymentMethod === 'Dinheiro' && paidAmountGroup) {
+                paidAmountGroup.style.display = 'block';
+            } else if (paidAmountGroup) {
+                paidAmountGroup.style.display = 'none';
+            }
+            
+            if (paymentMethod === 'Cartão de Crédito') {
+                if (installmentsGroup) {
+                    installmentsGroup.style.display = 'block';
+                    console.log('✅ Campo Parcelas exibido no initSale');
+                }
+                if (creditInfo) {
+                    creditInfo.style.display = 'block';
+                    console.log('✅ Info de crédito exibida no initSale');
+                }
+            } else {
+                if (installmentsGroup) installmentsGroup.style.display = 'none';
+                if (creditInfo) creditInfo.style.display = 'none';
+            }
         }
         
         this.updateCart();
@@ -347,6 +450,13 @@ class PDV {
         const customerId = document.getElementById('customerId')?.value || null;
         const paymentMethod = document.getElementById('paymentMethod')?.value;
         const observations = document.getElementById('observations')?.value || null;
+        
+        // Obter número de parcelas se for cartão de crédito
+        let installments = null;
+        if (paymentMethod === 'Cartão de Crédito') {
+            const installmentsSelect = document.getElementById('installments');
+            installments = installmentsSelect ? parseInt(installmentsSelect.value) : 1;
+        }
 
         const user = JSON.parse(localStorage.getItem('user'));
 
@@ -356,6 +466,7 @@ class PDV {
             items: this.cart,
             discount: this.discount,
             paymentMethod: paymentMethod,
+            installments: installments,
             observations: observations
         };
 

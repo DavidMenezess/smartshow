@@ -91,7 +91,7 @@ router.get('/:id', async (req, res) => {
 // Criar venda
 router.post('/', async (req, res) => {
     try {
-        const { customerId, sellerId, items, discount, paymentMethod, observations } = req.body;
+        const { customerId, sellerId, items, discount, paymentMethod, installments, observations } = req.body;
 
         if (!items || items.length === 0) {
             return res.status(400).json({ error: 'Venda deve ter pelo menos um item' });
@@ -108,12 +108,14 @@ router.post('/', async (req, res) => {
         // Gerar número da venda
         const saleNumber = `VENDA-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
 
-        // Criar venda
+        // Criar venda (installments só se for cartão de crédito)
+        const installmentsValue = (paymentMethod === 'Cartão de Crédito' && installments) ? installments : null;
+        
         const saleResult = await db.run(
             `INSERT INTO sales 
-             (sale_number, customer_id, seller_id, total, discount, payment_method, observations)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [saleNumber, customerId || null, sellerId, total, discount || 0, paymentMethod, observations || null]
+             (sale_number, customer_id, seller_id, total, discount, payment_method, installments, observations)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [saleNumber, customerId || null, sellerId, total, discount || 0, paymentMethod, installmentsValue, observations || null]
         );
 
         const saleId = saleResult.lastID;
@@ -158,6 +160,11 @@ router.post('/', async (req, res) => {
 });
 
 module.exports = router;
+
+
+
+
+
 
 
 

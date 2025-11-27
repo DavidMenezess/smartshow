@@ -256,6 +256,15 @@ class Database {
             });
         });
 
+        // Migrações: adicionar colunas se não existirem
+        setTimeout(async () => {
+            try {
+                await this.runMigrations();
+            } catch (error) {
+                console.error('❌ Erro ao executar migrações:', error);
+            }
+        }, 500);
+
         // Inserir dados iniciais
         // Inserir dados iniciais de forma segura
         setTimeout(() => {
@@ -265,6 +274,23 @@ class Database {
                 console.error('❌ Erro ao inserir dados iniciais:', error);
             }
         }, 1000);
+    }
+
+    async runMigrations() {
+        // Adicionar coluna installments na tabela sales se não existir
+        try {
+            const columnExists = await this.get(
+                `SELECT COUNT(*) as count FROM pragma_table_info('sales') WHERE name='installments'`
+            );
+            
+            if (columnExists && columnExists.count === 0) {
+                console.log('🔄 Adicionando coluna installments na tabela sales...');
+                await this.run(`ALTER TABLE sales ADD COLUMN installments INTEGER DEFAULT NULL`);
+                console.log('✅ Coluna installments adicionada com sucesso');
+            }
+        } catch (error) {
+            console.error('❌ Erro ao adicionar coluna installments:', error);
+        }
     }
 
     insertInitialData() {

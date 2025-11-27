@@ -39,36 +39,101 @@ class CaixaSystem {
 
     async loadCashControlFromServer() {
         try {
-            console.log('🔄 Buscando estado do caixa no servidor...');
-            const serverState = await api.getCashStatus();
-            console.log('📊 Estado do servidor:', serverState);
+            // PRIMEIRO: Sempre verificar estado local ANTES de buscar do servidor
+            const localStored = localStorage.getItem('smartshow_cash_control');
+            let hasValidLocalState = false;
             
-            if (serverState && serverState.isOpen) {
-                // Caixa está aberto no servidor
-                this.cashControl = {
-                    isOpen: true,
-                    initialCash: serverState.initialCash || 0,
-                    currentBalance: serverState.currentBalance || 0,
-                    todaySales: serverState.todaySales || 0,
-                    lastOpened: serverState.openedAt || new Date().toISOString(),
-                    lastClosed: null,
-                    observations: serverState.observations || ''
-                };
-                this.saveCashControl();
-                console.log('✅ Caixa aberto no servidor, estado sincronizado');
-            } else {
-                // Caixa está fechado no servidor
-                this.cashControl = {
-                    isOpen: false,
-                    initialCash: 0,
-                    currentBalance: 0,
-                    todaySales: 0,
-                    lastOpened: null,
-                    lastClosed: null,
-                    observations: ''
-                };
-                this.saveCashControl();
-                console.log('ℹ️ Caixa fechado no servidor');
+            if (localStored) {
+                try {
+                    const localState = JSON.parse(localStored);
+                    // Verificar se o caixa foi aberto hoje
+                    if (localState.isOpen && localState.lastOpened) {
+                        const lastOpenedDate = new Date(localState.lastOpened);
+                        const today = new Date();
+                        const lastOpenedDay = lastOpenedDate.toDateString();
+                        const todayDay = today.toDateString();
+                        
+                        if (lastOpenedDay === todayDay) {
+                            // Caixa está aberto hoje localmente - USAR ESTE ESTADO
+                            console.log('✅ Caixa aberto hoje localmente, usando estado local');
+                            this.cashControl = localState;
+                            this.saveCashControl();
+                            hasValidLocalState = true;
+                            
+                            // Atualizar vendas do servidor em background, mas manter isOpen = true
+                            try {
+                                const todaySalesData = await api.getTodaySales();
+                                if (todaySalesData && todaySalesData.total !== undefined) {
+                                    this.cashControl.todaySales = parseFloat(todaySalesData.total || 0);
+                                    this.cashControl.currentBalance = this.cashControl.initialCash + this.cashControl.todaySales;
+                                    this.saveCashControl();
+                                    console.log('✅ Vendas atualizadas do servidor');
+                                }
+                            } catch (e) {
+                                console.warn('⚠️ Erro ao atualizar vendas, mantendo valores locais:', e);
+                            }
+                            
+                            // Tentar sincronizar com servidor, mas não sobrescrever isOpen
+                            try {
+                                const serverState = await api.getCashStatus();
+                                if (serverState && serverState.isOpen) {
+                                    // Servidor confirma que está aberto - sincronizar valores
+                                    this.cashControl.initialCash = serverState.initialCash || this.cashControl.initialCash;
+                                    this.cashControl.todaySales = serverState.todaySales || this.cashControl.todaySales;
+                                    this.cashControl.currentBalance = serverState.currentBalance || this.cashControl.currentBalance;
+                                    this.cashControl.lastOpened = serverState.openedAt || this.cashControl.lastOpened;
+                                    this.cashControl.observations = serverState.observations || this.cashControl.observations;
+                                    this.saveCashControl();
+                                    console.log('✅ Estado sincronizado com servidor');
+                                } else {
+                                    console.log('⚠️ Servidor indica fechado, mas mantendo estado local (aberto hoje)');
+                                }
+                            } catch (e) {
+                                console.warn('⚠️ Erro ao verificar servidor, mantendo estado local:', e);
+                            }
+                            
+                            // Retornar aqui - não continuar com a lógica abaixo
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Erro ao parsear estado local:', e);
+                }
+            }
+            
+            // Se não há estado local válido, buscar do servidor
+            if (!hasValidLocalState) {
+                console.log('🔄 Buscando estado do caixa no servidor...');
+                const serverState = await api.getCashStatus();
+                console.log('📊 Estado do servidor:', serverState);
+                
+                if (serverState && serverState.isOpen) {
+                    // Caixa está aberto no servidor
+                    this.cashControl = {
+                        isOpen: true,
+                        initialCash: serverState.initialCash || 0,
+                        currentBalance: serverState.currentBalance || 0,
+                        todaySales: serverState.todaySales || 0,
+                        lastOpened: serverState.openedAt || new Date().toISOString(),
+                        lastClosed: null,
+                        observations: serverState.observations || ''
+                    };
+                    this.saveCashControl();
+                    console.log('✅ Caixa aberto no servidor, estado sincronizado');
+                } else {
+                    // Caixa está fechado
+                    this.cashControl = {
+                        isOpen: false,
+                        initialCash: 0,
+                        currentBalance: 0,
+                        todaySales: 0,
+                        lastOpened: null,
+                        lastClosed: null,
+                        observations: ''
+                    };
+                    this.saveCashControl();
+                    console.log('ℹ️ Caixa fechado');
+                }
             }
         } catch (error) {
             console.error('❌ Erro ao buscar estado do servidor, usando localStorage:', error);
