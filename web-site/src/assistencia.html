@@ -301,12 +301,24 @@
                     loadOrders();
                     alert(osId ? 'Ordem de serviço atualizada com sucesso!' : 'Ordem de serviço criada com sucesso!');
                 } else {
-                    const error = await response.json();
-                    alert('Erro: ' + (error.error || 'Erro ao salvar ordem de serviço'));
+                    let errorMessage = 'Erro ao salvar ordem de serviço';
+                    try {
+                        const error = await response.json();
+                        errorMessage = error.error || error.details || errorMessage;
+                    } catch (e) {
+                        errorMessage = `Erro ${response.status}: ${response.statusText}`;
+                    }
+                    console.error('❌ Erro ao salvar OS:', errorMessage);
+                    alert('Erro: ' + errorMessage);
                 }
             } catch (error) {
-                console.error('Erro ao salvar ordem de serviço:', error);
-                alert('Erro ao salvar ordem de serviço');
+                console.error('❌ Erro ao salvar ordem de serviço:', error);
+                const errorMessage = error.message || 'Erro desconhecido';
+                if (errorMessage === 'Failed to fetch') {
+                    alert('Erro de conexão. Verifique sua internet e tente novamente.');
+                } else {
+                    alert('Erro ao salvar ordem de serviço: ' + errorMessage);
+                }
             }
         });
 

@@ -66,12 +66,23 @@ class API {
             }
 
             if (!response.ok) {
-                throw new Error(data?.error || 'Erro na requisição');
+                const errorMessage = data?.error || data?.details || `Erro na requisição (${response.status})`;
+                console.error('❌ Erro na API:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorMessage,
+                    data: data
+                });
+                throw new Error(errorMessage);
             }
 
             return data;
         } catch (error) {
-            console.error('Erro na API:', error);
+            console.error('❌ Erro na API:', error);
+            // Se o erro já tem mensagem, manter; senão, adicionar uma genérica
+            if (!error.message || error.message === 'Failed to fetch') {
+                throw new Error('Erro de conexão. Verifique sua internet e tente novamente.');
+            }
             throw error;
         }
     }

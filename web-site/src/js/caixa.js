@@ -461,7 +461,13 @@ class CaixaSystem {
             alert('Caixa aberto com sucesso!');
         } catch (error) {
             console.error('❌ Erro ao abrir caixa:', error);
-            alert('Erro ao abrir caixa: ' + (error.message || 'Erro desconhecido'));
+            const errorMessage = error.message || 'Erro desconhecido';
+            // Se a mensagem for genérica, tentar obter mais detalhes
+            if (errorMessage === 'Erro ao abrir caixa' || errorMessage === 'Erro na requisição') {
+                alert('Erro ao abrir caixa. Verifique:\n- Se você está logado\n- Se o servidor está respondendo\n- Console do navegador para mais detalhes');
+            } else {
+                alert('Erro ao abrir caixa: ' + errorMessage);
+            }
         }
     }
 
