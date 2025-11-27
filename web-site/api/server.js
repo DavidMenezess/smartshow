@@ -27,14 +27,20 @@ app.get('/', (req, res) => {
 });
 
 // Rotas para arquivos HTML (evitar erro 404)
-app.get('/*.html', (req, res) => {
+app.get('*.html', (req, res) => {
     const fileName = req.path.split('/').pop();
     const filePath = path.join(__dirname, '../src', fileName);
     res.sendFile(filePath, (err) => {
         if (err) {
+            console.error('Erro ao servir arquivo HTML:', err);
             res.status(404).send('Página não encontrada');
         }
     });
+});
+
+// Rota específica para dashboard
+app.get('/dashboard.html', (req, res) => {
+    res.sendFile(path.join(__dirname, '../src/index.html'));
 });
 
 // Health check

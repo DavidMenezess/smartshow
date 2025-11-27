@@ -6,10 +6,17 @@ const API_BASE_URL = '/api';
 
 class API {
     constructor() {
+        this.updateToken();
+    }
+
+    updateToken() {
         this.token = localStorage.getItem('token');
     }
 
     async request(endpoint, methodOrOptions = 'GET', bodyOrOptions = null) {
+        // Atualizar token antes de cada requisição
+        this.updateToken();
+        
         const url = `${API_BASE_URL}${endpoint}`;
         
         // Suportar ambos os formatos: novo (method, body) e antigo (options)
@@ -71,7 +78,22 @@ class API {
 
     // Auth
     async login(username, password) {
-        const data = await this.request('/auth/login', 'POST', { username, password });
+        // Fazer login sem token primeiro
+        const url = `${API_BASE_URL}/auth/login`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, password })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao fazer login');
+        }
+        
+        const data = await response.json();
         if (data.token) {
             this.token = data.token;
             localStorage.setItem('token', data.token);
