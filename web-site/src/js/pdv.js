@@ -542,7 +542,13 @@ class PDV {
 
     async searchProductsByName(searchTerm) {
         try {
-            const response = await fetch(`/api/products?search=${encodeURIComponent(searchTerm)}`);
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/products?search=${encodeURIComponent(searchTerm)}`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` })
+                }
+            });
             const products = await response.json();
             
             const resultsDiv = document.getElementById('productSearchResults');
