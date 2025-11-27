@@ -284,6 +284,38 @@ class API {
     async deleteStore(id) {
         return await this.request(`/stores/${id}`, 'DELETE');
     }
+
+    // Categories
+    async getCategories(search) {
+        const params = new URLSearchParams();
+        if (search) params.append('search', search);
+        return await this.request(`/categories?${params}`);
+    }
+
+    async createCategory(category) {
+        return await this.request('/categories', 'POST', category);
+    }
+
+    // Service Orders
+    async getServiceOrders(status, customerId, technicianId) {
+        const params = new URLSearchParams();
+        if (status) params.append('status', status);
+        if (customerId) params.append('customerId', customerId);
+        if (technicianId) params.append('technicianId', technicianId);
+        return await this.request(`/service-orders?${params}`);
+    }
+
+    async getServiceOrder(id) {
+        return await this.request(`/service-orders/${id}`);
+    }
+
+    async createServiceOrder(order) {
+        return await this.request('/service-orders', 'POST', order);
+    }
+
+    async updateServiceOrder(id, order) {
+        return await this.request(`/service-orders/${id}`, 'PUT', order);
+    }
 }
 
 const api = new API();
