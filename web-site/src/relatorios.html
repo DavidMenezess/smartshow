@@ -235,28 +235,138 @@
                     `;
 
                 case 'customers':
+                    const totalCustomersRevenue = data.reduce((sum, item) => sum + (parseFloat(item.total_revenue) || 0), 0);
+                    const totalCustomersSales = data.reduce((sum, item) => sum + (parseInt(item.total_sales) || 0), 0);
                     return `
                         <div style="margin-top: 2rem;">
-                            <table class="data-table" style="width: 100%;">
-                                <thead>
-                                    <tr>
-                                        <th>Cliente</th>
-                                        <th>CPF/CNPJ</th>
-                                        <th>Total de Compras</th>
-                                        <th>Receita Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${data.map(item => `
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                                <div style="background: #f7fafc; padding: 1rem; border-radius: 8px;">
+                                    <div style="font-size: 0.875rem; color: #718096;">Total de Clientes</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #2d3748;">${data.length}</div>
+                                </div>
+                                <div style="background: #f7fafc; padding: 1rem; border-radius: 8px;">
+                                    <div style="font-size: 0.875rem; color: #718096;">Total de Compras</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #2d3748;">${totalCustomersSales}</div>
+                                </div>
+                                <div style="background: #f7fafc; padding: 1rem; border-radius: 8px;">
+                                    <div style="font-size: 0.875rem; color: #718096;">Receita Total</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #2d3748;">R$ ${totalCustomersRevenue.toFixed(2).replace('.', ',')}</div>
+                                </div>
+                            </div>
+                            <div style="overflow-x: auto;">
+                                <table class="data-table" style="width: 100%; min-width: 800px;">
+                                    <thead>
                                         <tr>
-                                            <td>${item.name || '-'}</td>
-                                            <td>${item.cpf_cnpj || '-'}</td>
-                                            <td>${item.total_sales || 0}</td>
-                                            <td>R$ ${parseFloat(item.total_revenue || 0).toFixed(2).replace('.', ',')}</td>
+                                            <th>Cliente</th>
+                                            <th>CPF/CNPJ</th>
+                                            <th>Contato</th>
+                                            <th>Total de Compras</th>
+                                            <th>Receita Total</th>
+                                            <th>Detalhes</th>
                                         </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        ${data.map(customer => {
+                                            const salesList = customer.sales && customer.sales.length > 0
+                                                ? customer.sales.map(sale => {
+                                                    const saleDate = new Date(sale.date_time);
+                                                    const dateStr = saleDate.toLocaleDateString('pt-BR');
+                                                    const timeStr = saleDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                                                    const productsList = sale.items && sale.items.length > 0
+                                                        ? sale.items.map(item => `${item.product_name} (x${item.quantity})`).join(', ')
+                                                        : 'Nenhum produto';
+                                                    return {
+                                                        date: dateStr,
+                                                        time: timeStr,
+                                                        sale_number: sale.sale_number,
+                                                        products: productsList,
+                                                        items: sale.items || [],
+                                                        payment_method: sale.payment_method,
+                                                        total: sale.total,
+                                                        discount: sale.discount || 0,
+                                                        seller: sale.seller_name || 'N/A'
+                                                    };
+                                                })
+                                                : [];
+                                            
+                                            return `
+                                                <tr>
+                                                    <td style="font-weight: 500;">${customer.name || '-'}</td>
+                                                    <td>${customer.cpf_cnpj || '-'}</td>
+                                                    <td>
+                                                        ${customer.phone ? `<div>📞 ${customer.phone}</div>` : ''}
+                                                        ${customer.email ? `<div style="font-size: 0.875rem; color: #718096;">✉️ ${customer.email}</div>` : ''}
+                                                        ${!customer.phone && !customer.email ? '-' : ''}
+                                                    </td>
+                                                    <td>${customer.total_sales || 0}</td>
+                                                    <td style="font-weight: bold; color: #2d3748;">R$ ${parseFloat(customer.total_revenue || 0).toFixed(2).replace('.', ',')}</td>
+                                                    <td>
+                                                        ${salesList.length > 0 ? `
+                                                            <details style="cursor: pointer;">
+                                                                <summary style="color: #4299e1; font-size: 0.875rem;">Ver compras (${salesList.length})</summary>
+                                                                <div style="margin-top: 1rem; padding: 1rem; background: #f7fafc; border-radius: 8px;">
+                                                                    ${salesList.map(sale => `
+                                                                        <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
+                                                                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                                                                <div>
+                                                                                    <strong style="color: #2d3748;">Venda #${sale.sale_number || 'N/A'}</strong>
+                                                                                    <div style="font-size: 0.875rem; color: #718096; margin-top: 0.25rem;">
+                                                                                        📅 ${sale.date} às ${sale.time} | Vendedor: ${sale.seller}
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div style="text-align: right;">
+                                                                                    <div style="font-weight: bold; color: #2d3748; font-size: 1.1rem;">
+                                                                                        R$ ${parseFloat(sale.total).toFixed(2).replace('.', ',')}
+                                                                                    </div>
+                                                                                    <div style="font-size: 0.75rem; color: #718096; margin-top: 0.25rem;">
+                                                                                        ${getPaymentMethodName(sale.payment_method)}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div style="margin-top: 0.75rem;">
+                                                                                <div style="font-size: 0.875rem; color: #4a5568; margin-bottom: 0.5rem;">
+                                                                                    <strong>Produtos:</strong> ${sale.products}
+                                                                                </div>
+                                                                                ${sale.items && sale.items.length > 0 ? `
+                                                                                    <details style="margin-top: 0.5rem;">
+                                                                                        <summary style="cursor: pointer; color: #4299e1; font-size: 0.75rem;">Ver detalhes dos produtos</summary>
+                                                                                        <div style="margin-top: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px;">
+                                                                                            ${sale.items.map(item => `
+                                                                                                <div style="font-size: 0.75rem; margin-bottom: 0.25rem; padding: 0.25rem; background: #edf2f7; border-radius: 4px;">
+                                                                                                    • ${item.product_name} - Qtd: ${item.quantity} - 
+                                                                                                    Unit: R$ ${parseFloat(item.unit_price).toFixed(2).replace('.', ',')} - 
+                                                                                                    Total: R$ ${parseFloat(item.item_total).toFixed(2).replace('.', ',')}
+                                                                                                </div>
+                                                                                            `).join('')}
+                                                                                        </div>
+                                                                                    </details>
+                                                                                ` : ''}
+                                                                                ${sale.discount > 0 ? `
+                                                                                    <div style="font-size: 0.75rem; color: #c53030; margin-top: 0.5rem;">
+                                                                                        Desconto: R$ ${parseFloat(sale.discount).toFixed(2).replace('.', ',')}
+                                                                                    </div>
+                                                                                ` : ''}
+                                                                            </div>
+                                                                        </div>
+                                                                    `).join('')}
+                                                                </div>
+                                                            </details>
+                                                        ` : '<span style="color: #718096;">Nenhuma compra no período</span>'}
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr style="background: #f7fafc; font-weight: bold;">
+                                            <td colspan="3" style="text-align: right; padding: 1rem;">TOTAL GERAL:</td>
+                                            <td style="padding: 1rem;">${totalCustomersSales}</td>
+                                            <td style="padding: 1rem;">R$ ${totalCustomersRevenue.toFixed(2).replace('.', ',')}</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
                         </div>
                     `;
 

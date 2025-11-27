@@ -195,20 +195,78 @@ router.get('/', async (req, res) => {
                 return res.json({ type: 'products', data: productsReport });
 
             case 'customers':
+                // Buscar clientes com suas vendas no período
                 const customersReport = await db.all(
-                    `SELECT c.id, c.name, c.cpf_cnpj,
-                           COUNT(s.id) as total_sales,
-                           SUM(s.total) as total_revenue
-                    FROM customers c
-                    LEFT JOIN sales s ON c.id = s.customer_id
-                    WHERE (s.id IS NULL OR (DATE(datetime(s.created_at, '-3 hours')) >= ? 
-                    AND DATE(datetime(s.created_at, '-3 hours')) <= ?))
-                    GROUP BY c.id
-                    ORDER BY total_revenue DESC
-                    LIMIT 50`,
+                    `SELECT DISTINCT
+                        c.id,
+                        c.name,
+                        c.cpf_cnpj,
+                        c.phone,
+                        c.email
+                     FROM customers c
+                     JOIN sales s ON c.id = s.customer_id
+                     WHERE DATE(datetime(s.created_at, '-3 hours')) >= ? 
+                     AND DATE(datetime(s.created_at, '-3 hours')) <= ?
+                     ORDER BY c.name`,
                     [startDate, endDate]
                 );
-                return res.json({ type: 'customers', data: customersReport });
+                
+                // Para cada cliente, buscar suas vendas detalhadas
+                const customersWithSales = await Promise.all(customersReport.map(async (customer) => {
+                    const sales = await db.all(
+                        `SELECT 
+                            s.id,
+                            s.sale_number,
+                            datetime(s.created_at, '-3 hours') as date_time,
+                            s.total,
+                            s.discount,
+                            s.payment_method,
+                            u.name as seller_name
+                         FROM sales s
+                         LEFT JOIN users u ON s.seller_id = u.id
+                         WHERE s.customer_id = ?
+                         AND DATE(datetime(s.created_at, '-3 hours')) >= ? 
+                         AND DATE(datetime(s.created_at, '-3 hours')) <= ?
+                         ORDER BY s.created_at DESC`,
+                        [customer.id, startDate, endDate]
+                    );
+                    
+                    // Para cada venda, buscar os produtos
+                    const salesWithItems = await Promise.all(sales.map(async (sale) => {
+                        const items = await db.all(
+                            `SELECT 
+                                si.quantity,
+                                si.unit_price,
+                                si.total as item_total,
+                                p.name as product_name,
+                                p.barcode
+                             FROM sale_items si
+                             JOIN products p ON si.product_id = p.id
+                             WHERE si.sale_id = ?
+                             ORDER BY si.id`,
+                            [sale.id]
+                        );
+                        return {
+                            ...sale,
+                            items: items
+                        };
+                    }));
+                    
+                    const totalRevenue = sales.reduce((sum, sale) => sum + (parseFloat(sale.total) || 0), 0);
+                    const totalSales = sales.length;
+                    
+                    return {
+                        ...customer,
+                        total_sales: totalSales,
+                        total_revenue: totalRevenue,
+                        sales: salesWithItems
+                    };
+                }));
+                
+                // Ordenar por receita total
+                customersWithSales.sort((a, b) => (b.total_revenue || 0) - (a.total_revenue || 0));
+                
+                return res.json({ type: 'customers', data: customersWithSales });
 
             case 'financial':
                 const financialReport = await db.all(
