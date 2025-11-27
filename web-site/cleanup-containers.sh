@@ -10,23 +10,29 @@ echo "📦 Parando containers via docker-compose..."
 docker-compose down -v --remove-orphans 2>/dev/null || true
 docker-compose rm -f 2>/dev/null || true
 
-# Parar e remover container específico (caso ainda exista de deploy anterior)
-echo "🛑 Parando container smartshow-api (se existir)..."
-docker stop smartshow-api 2>/dev/null || true
+# Parar e remover containers com nomes específicos (caso ainda existam de deploy anterior)
+echo "🛑 Parando containers do projeto..."
+docker stop smartshow-api web-site-smartshow-api-1 2>/dev/null || true
 
-# Remover container específico (múltiplas tentativas)
-echo "🗑️ Removendo container smartshow-api..."
-for i in {1..5}; do
-    docker rm -f smartshow-api 2>/dev/null && break || sleep 1
+# Remover containers com nomes específicos (múltiplas tentativas)
+echo "🗑️ Removendo containers específicos..."
+for container_name in smartshow-api web-site-smartshow-api-1; do
+    for i in {1..5}; do
+        docker rm -f "$container_name" 2>/dev/null && break || sleep 1
+    done
 done
 
-# Remover qualquer container relacionado ao projeto
+# Remover qualquer container relacionado ao projeto (por nome ou filtro)
 echo "🔍 Buscando containers do projeto..."
-CONTAINERS=$(docker ps -aq --filter name=smartshow-api --filter name=web-site 2>/dev/null || echo "")
+CONTAINERS=$(docker ps -aq --filter name=smartshow-api --filter name=web-site-smartshow-api 2>/dev/null || echo "")
 if [ -n "$CONTAINERS" ]; then
     echo "🗑️ Removendo containers encontrados: $CONTAINERS"
     echo "$CONTAINERS" | xargs -r docker rm -f 2>/dev/null || true
 fi
+
+# Remover containers parados que possam estar causando conflito
+echo "🧹 Removendo containers parados..."
+docker container prune -f 2>/dev/null || true
 
 # Remover redes
 echo "🌐 Removendo redes..."
