@@ -20,7 +20,8 @@ class API {
         // Verificar se há token (exceto para login)
         if (!this.token && !endpoint.includes('/auth/login')) {
             console.warn('⚠️ Token não encontrado para requisição:', endpoint);
-            throw new Error('Sessão expirada. Por favor, faça login novamente.');
+            // Não lançar erro aqui, apenas avisar - pode ser que o token esteja sendo carregado
+            // O servidor vai retornar 401 se não houver token válido
         }
         
         const url = `${API_BASE_URL}${endpoint}`;
@@ -67,23 +68,42 @@ class API {
             }
             
             // Tentar fazer parse do JSON apenas se houver conteúdo
-            let data;
+            let data = null;
             const contentType = response.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
                 const text = await response.text();
-                if (text) {
-                    data = JSON.parse(text);
+                if (text && text.trim()) {
+                    try {
+                        data = JSON.parse(text);
+                    } catch (parseError) {
+                        console.error('❌ Erro ao fazer parse do JSON:', parseError, 'Texto:', text);
+                        throw new Error('Resposta inválida do servidor');
+                    }
                 }
+            } else if (response.status === 200 && !contentType) {
+                // Se não há content-type mas status é 200, pode ser resposta vazia
+                data = null;
             }
 
             if (!response.ok) {
-                const errorMessage = data?.error || data?.details || `Erro na requisição (${response.status})`;
+                const errorMessage = data?.error || data?.details || data?.message || `Erro na requisição (${response.status})`;
                 console.error('❌ Erro na API:', {
                     status: response.status,
                     statusText: response.statusText,
                     error: errorMessage,
-                    data: data
+                    data: data,
+                    endpoint: url
                 });
+                
+                // Se for erro 401, pode ser token expirado
+                if (response.status === 401) {
+                    // Limpar token inválido
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    this.token = null;
+                    throw new Error('Sessão expirada. Por favor, faça login novamente.');
+                }
+                
                 throw new Error(errorMessage);
             }
 

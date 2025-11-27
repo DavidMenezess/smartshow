@@ -157,7 +157,9 @@
         // Carregar produtos
         async function loadProducts(searchTerm = '', categoryId = '') {
             try {
+                console.log('📥 Carregando produtos...', { searchTerm, categoryId });
                 products = await api.getProducts(searchTerm, categoryId);
+                console.log('✅ Produtos carregados:', products);
                 
                 // Salvar todos os produtos na primeira carga
                 if (!searchTerm && !categoryId) {
@@ -166,9 +168,10 @@
                 
                 renderProducts(products);
             } catch (error) {
-                console.error('Erro ao carregar produtos:', error);
-                document.getElementById('productsTableBody').innerHTML = 
-                    '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar produtos</td></tr>';
+                console.error('❌ Erro ao carregar produtos:', error);
+                const tbody = document.getElementById('productsTableBody');
+                const errorMsg = error.message || 'Erro desconhecido';
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar produtos: ${errorMsg}</td></tr>`;
             }
         }
 

@@ -123,10 +123,12 @@
         // Carregar clientes
         async function loadCustomers() {
             try {
+                console.log('📥 Carregando clientes...');
                 customers = await api.getCustomers();
+                console.log('✅ Clientes carregados:', customers);
                 
                 const tbody = document.getElementById('customersTableBody');
-                if (customers.length === 0) {
+                if (!customers || customers.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem;">Nenhum cliente cadastrado</td></tr>';
                 } else {
                     tbody.innerHTML = customers.map(customer => `
@@ -143,9 +145,10 @@
                     `).join('');
                 }
             } catch (error) {
-                console.error('Erro ao carregar clientes:', error);
-                document.getElementById('customersTableBody').innerHTML = 
-                    '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar clientes</td></tr>';
+                console.error('❌ Erro ao carregar clientes:', error);
+                const tbody = document.getElementById('customersTableBody');
+                const errorMsg = error.message || 'Erro desconhecido';
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar clientes: ${errorMsg}</td></tr>`;
             }
         }
 

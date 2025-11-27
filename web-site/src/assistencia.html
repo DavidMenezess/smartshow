@@ -170,10 +170,12 @@
         // Carregar ordens de serviço
         async function loadOrders() {
             try {
+                console.log('📥 Carregando ordens de serviço...');
                 orders = await api.getServiceOrders();
+                console.log('✅ Ordens carregadas:', orders);
                 
                 const tbody = document.getElementById('osTableBody');
-                if (orders.length === 0) {
+                if (!orders || orders.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">Nenhuma ordem de serviço cadastrada</td></tr>';
                 } else {
                     tbody.innerHTML = orders.map(order => `
@@ -192,9 +194,10 @@
                     `).join('');
                 }
             } catch (error) {
-                console.error('Erro ao carregar ordens de serviço:', error);
-                document.getElementById('osTableBody').innerHTML = 
-                    '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar ordens de serviço</td></tr>';
+                console.error('❌ Erro ao carregar ordens de serviço:', error);
+                const tbody = document.getElementById('osTableBody');
+                const errorMsg = error.message || 'Erro desconhecido';
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar ordens de serviço: ${errorMsg}</td></tr>`;
             }
         }
 
