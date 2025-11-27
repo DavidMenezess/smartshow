@@ -168,3 +168,9 @@ Após configurar SSM ou SSH:
 - ✅ Funciona mesmo sem IP público
 - ✅ Logs centralizados no AWS CloudWatch
 
+
+
+
+
+
+

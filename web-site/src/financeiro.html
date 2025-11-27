@@ -121,10 +121,21 @@
         let customers = [];
         let currentTab = 'receivable';
 
+        // Helper para obter headers com token
+        function getAuthHeaders() {
+            const token = localStorage.getItem('token');
+            return {
+                'Content-Type': 'application/json',
+                ...(token && { 'Authorization': `Bearer ${token}` })
+            };
+        }
+
         // Carregar clientes
         async function loadCustomers() {
             try {
-                const response = await fetch('/api/customers');
+                const response = await fetch('/api/customers', {
+                    headers: getAuthHeaders()
+                });
                 customers = await response.json();
             } catch (error) {
                 console.error('Erro ao carregar clientes:', error);
@@ -134,7 +145,9 @@
         // Carregar contas a receber
         async function loadReceivable() {
             try {
-                const response = await fetch('/api/financial/receivable');
+                const response = await fetch('/api/financial/receivable', {
+                    headers: getAuthHeaders()
+                });
                 const accounts = await response.json();
                 const tbody = document.getElementById('receivableTableBody');
                 
@@ -165,7 +178,9 @@
         // Carregar contas a pagar
         async function loadPayable() {
             try {
-                const response = await fetch('/api/financial/payable');
+                const response = await fetch('/api/financial/payable', {
+                    headers: getAuthHeaders()
+                });
                 const accounts = await response.json();
                 const tbody = document.getElementById('payableTableBody');
                 
@@ -284,9 +299,7 @@
 
                 const response = await fetch(url, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify(body)
                 });
 
@@ -315,9 +328,7 @@
             try {
                 const response = await fetch(`/api/financial/pay/${id}`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({
                         amount: parseFloat(amount),
                         paymentMethod: 'money',
@@ -342,7 +353,9 @@
         // Carregar todos os dados financeiros
         async function loadFinancialData() {
             try {
-                const response = await fetch('/api/financial');
+                const response = await fetch('/api/financial', {
+                    headers: getAuthHeaders()
+                });
                 const data = await response.json();
                 
                 // Atualizar totais

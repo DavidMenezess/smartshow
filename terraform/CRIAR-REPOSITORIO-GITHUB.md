@@ -89,3 +89,9 @@ Após criar o repositório e fazer push:
 2. ✅ Recriar instância EC2 com `terraform apply`
 3. ✅ A instância vai clonar automaticamente do novo repositório
 
+
+
+
+
+
+

@@ -252,3 +252,9 @@ Você precisaria:
 
 **Basta executar `terraform apply` e aguardar ~15 minutos!** 🚀
 
+
+
+
+
+
+

@@ -143,3 +143,9 @@ Se encontrar problemas:
 2. Verifique os logs dos containers na EC2
 3. Verifique se todos os secrets estão configurados corretamente
 
+
+
+
+
+
+

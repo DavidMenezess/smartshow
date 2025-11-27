@@ -74,3 +74,9 @@ Para atualizações da aplicação:
 - O workflow `deploy.yml` continua automático (seguro)
 - Ele só atualiza código, não cria recursos
 
+
+
+
+
+
+

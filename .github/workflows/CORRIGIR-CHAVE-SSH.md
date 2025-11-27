@@ -143,3 +143,9 @@ Se você não tem mais o arquivo `.pem` original:
 3. Associe a nova chave à instância EC2
 4. Atualize o secret no GitHub
 
+
+
+
+
+
+

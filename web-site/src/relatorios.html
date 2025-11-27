@@ -75,7 +75,13 @@
             content.innerHTML = '<p style="text-align: center; padding: 2rem;">Gerando relatório...</p>';
 
             try {
-                const response = await fetch(`/api/reports?type=${reportType}&start=${startDate}&end=${endDate}`);
+                const token = localStorage.getItem('token');
+                const response = await fetch(`/api/reports?type=${reportType}&start=${startDate}&end=${endDate}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token && { 'Authorization': `Bearer ${token}` })
+                    }
+                });
                 
                 if (!response.ok) {
                     const error = await response.json();

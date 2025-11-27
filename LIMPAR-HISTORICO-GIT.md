@@ -161,3 +161,9 @@ Para evitar isso no futuro:
 4. ✅ **Use variáveis de ambiente** ou GitHub Secrets
 5. ✅ **Revise antes de commitar:** `git diff` antes de `git add`
 
+
+
+
+
+
+

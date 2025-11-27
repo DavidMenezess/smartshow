@@ -149,3 +149,9 @@ Reduza o uso de minutos:
 
 **A melhor solução continua sendo tornar o repositório público!** 🚀
 
+
+
+
+
+
+

@@ -316,3 +316,9 @@ git check-ignore terraform/terraform.tfvars
 
 **Você pode usar `terraform apply` e fazer `git push` com segurança!** 🔒
 
+
+
+
+
+
+

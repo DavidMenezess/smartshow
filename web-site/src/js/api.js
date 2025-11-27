@@ -128,17 +128,11 @@ class API {
     }
 
     async createProduct(product) {
-        return await this.request('/products', {
-            method: 'POST',
-            body: JSON.stringify(product)
-        });
+        return await this.request('/products', 'POST', product);
     }
 
     async updateProduct(id, product) {
-        return await this.request(`/products/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(product)
-        });
+        return await this.request(`/products/${id}`, 'PUT', product);
     }
 
     // Sales
@@ -156,10 +150,7 @@ class API {
     }
 
     async createSale(sale) {
-        return await this.request('/sales', {
-            method: 'POST',
-            body: JSON.stringify(sale)
-        });
+        return await this.request('/sales', 'POST', sale);
     }
 
     // Customers
@@ -171,10 +162,7 @@ class API {
     }
 
     async createCustomer(customer) {
-        return await this.request('/customers', {
-            method: 'POST',
-            body: JSON.stringify(customer)
-        });
+        return await this.request('/customers', 'POST', customer);
     }
 
     // Reports
@@ -245,17 +233,11 @@ class API {
     }
 
     async createUser(user) {
-        return await this.request('/users', {
-            method: 'POST',
-            body: JSON.stringify(user)
-        });
+        return await this.request('/users', 'POST', user);
     }
 
     async updateUser(id, user) {
-        return await this.request(`/users/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(user)
-        });
+        return await this.request(`/users/${id}`, 'PUT', user);
     }
 
     async deleteUser(id) {

@@ -184,6 +184,15 @@
             document.getElementById('customerForm').reset();
         }
 
+        // Helper para obter headers com token
+        function getAuthHeaders() {
+            const token = localStorage.getItem('token');
+            return {
+                'Content-Type': 'application/json',
+                ...(token && { 'Authorization': `Bearer ${token}` })
+            };
+        }
+
         // Salvar cliente
         document.getElementById('customerForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -205,13 +214,13 @@
                 if (customerId) {
                     response = await fetch(`/api/customers/${customerId}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: getAuthHeaders(),
                         body: JSON.stringify(customerData)
                     });
                 } else {
                     response = await fetch('/api/customers', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: getAuthHeaders(),
                         body: JSON.stringify(customerData)
                     });
                 }
@@ -242,7 +251,7 @@
             try {
                 const response = await fetch(`/api/customers/${id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ is_active: 0 })
                 });
                 

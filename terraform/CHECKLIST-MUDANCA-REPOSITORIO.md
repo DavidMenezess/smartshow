@@ -112,3 +112,9 @@ Após fazer todas as alterações, verifique:
 - ⚠️ O `user-data.sh` usa as variáveis do Terraform automaticamente, então não precisa alterar manualmente
 - ⚠️ Se já tem instância rodando, precisa recriar ou atualizar manualmente
 
+
+
+
+
+
+

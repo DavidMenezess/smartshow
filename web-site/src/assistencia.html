@@ -256,6 +256,15 @@
             document.getElementById('osForm').reset();
         }
 
+        // Helper para obter headers com token
+        function getAuthHeaders() {
+            const token = localStorage.getItem('token');
+            return {
+                'Content-Type': 'application/json',
+                ...(token && { 'Authorization': `Bearer ${token}` })
+            };
+        }
+
         // Salvar OS
         document.getElementById('osForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -276,13 +285,13 @@
                 if (osId) {
                     response = await fetch(`/api/service-orders/${osId}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: getAuthHeaders(),
                         body: JSON.stringify(osData)
                     });
                 } else {
                     response = await fetch('/api/service-orders', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: getAuthHeaders(),
                         body: JSON.stringify(osData)
                     });
                 }
