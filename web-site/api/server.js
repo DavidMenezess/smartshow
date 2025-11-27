@@ -26,7 +26,12 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../src/index.html'));
 });
 
-// Rotas para arquivos HTML (evitar erro 404)
+// Rota específica para dashboard
+app.get('/dashboard.html', (req, res) => {
+    res.sendFile(path.join(__dirname, '../src/index.html'));
+});
+
+// Rotas para arquivos HTML (evitar erro 404) - deve vir depois das rotas específicas
 app.get('*.html', (req, res) => {
     const fileName = req.path.split('/').pop();
     const filePath = path.join(__dirname, '../src', fileName);
@@ -36,11 +41,6 @@ app.get('*.html', (req, res) => {
             res.status(404).send('Página não encontrada');
         }
     });
-});
-
-// Rota específica para dashboard
-app.get('/dashboard.html', (req, res) => {
-    res.sendFile(path.join(__dirname, '../src/index.html'));
 });
 
 // Health check
