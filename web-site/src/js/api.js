@@ -17,6 +17,12 @@ class API {
         // Atualizar token antes de cada requisição
         this.updateToken();
         
+        // Verificar se há token (exceto para login)
+        if (!this.token && !endpoint.includes('/auth/login')) {
+            console.warn('⚠️ Token não encontrado para requisição:', endpoint);
+            throw new Error('Sessão expirada. Por favor, faça login novamente.');
+        }
+        
         const url = `${API_BASE_URL}${endpoint}`;
         
         // Suportar ambos os formatos: novo (method, body) e antigo (options)
@@ -42,6 +48,11 @@ class API {
                 ...(this.token && { 'Authorization': `Bearer ${this.token}` })
             }
         };
+        
+        // Log para debug (apenas em desenvolvimento)
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('📤 Requisição:', method, url, { hasToken: !!this.token });
+        }
 
         if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
             config.body = JSON.stringify(body);
