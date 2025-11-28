@@ -455,17 +455,28 @@ async function loadStoresForUserSelect() {
     }
 }
 
-// Fechar modal ao clicar fora
-window.onclick = function(event) {
+// Fechar modal ao clicar fora, sem atrapalhar seleção de texto
+window.addEventListener('click', function(event) {
+    // Se o usuário está selecionando texto, não fechar modais
+    try {
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) {
+            return;
+        }
+    } catch (e) {
+        // Ignorar erros de seleção
+    }
+
     const userModal = document.getElementById('userModal');
     const storeModal = document.getElementById('storeModal');
+
     if (event.target === userModal) {
         closeUserModal();
     }
     if (event.target === storeModal) {
         closeStoreModal();
     }
-};
+});
 
 // Carregar configurações ao iniciar
 document.addEventListener('DOMContentLoaded', function() {

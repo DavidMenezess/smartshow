@@ -733,13 +733,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             compareBtn.addEventListener('click', openCompareModal);
         }
         
-        // Fechar modal ao clicar fora
-        window.onclick = function(event) {
+        // Fechar modal de comparação ao clicar fora, sem atrapalhar seleção de texto
+        window.addEventListener('click', function(event) {
+            // Se o usuário estiver selecionando texto, não fechar o modal
+            try {
+                const selection = window.getSelection();
+                if (selection && selection.toString().length > 0) {
+                    return;
+                }
+            } catch (e) {
+                // Ignorar erros
+            }
+
             const modal = document.getElementById('compareModal');
             if (event.target === modal) {
                 closeCompareModal();
             }
-        }
+        });
         
         // Carregar dashboard após inicialização
         await loadDashboard();
