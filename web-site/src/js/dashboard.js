@@ -25,11 +25,11 @@ async function loadStores() {
                 selector.remove(1);
             }
             
-            // Adicionar lojas
+            // Adicionar lojas com ícone
             stores.forEach(store => {
                 const option = document.createElement('option');
                 option.value = store.id;
-                option.textContent = store.name;
+                option.textContent = `🏪 ${store.name}`;
                 selector.appendChild(option);
             });
             
@@ -344,24 +344,58 @@ function openCompareModal() {
     // Limpar checkboxes
     checkboxes.innerHTML = '';
     
-    // Criar checkbox para cada loja
+    // Criar checkbox para cada loja com design moderno
     stores.forEach(store => {
         const label = document.createElement('label');
-        label.style.display = 'flex';
-        label.style.alignItems = 'center';
-        label.style.gap = '0.5rem';
-        label.style.cursor = 'pointer';
+        label.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 1rem; background: white; border: 2px solid #e2e8f0; border-radius: 12px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05);';
+        label.onmouseover = function() {
+            this.style.borderColor = '#FFD700';
+            this.style.boxShadow = '0 4px 12px rgba(255, 215, 0, 0.2)';
+            this.style.transform = 'translateY(-2px)';
+        };
+        label.onmouseout = function() {
+            if (!label.querySelector('input').checked) {
+                this.style.borderColor = '#e2e8f0';
+                this.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+                this.style.transform = 'translateY(0)';
+            }
+        };
         
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.value = store.id;
         checkbox.checked = compareStoreIds.includes(store.id);
-        checkbox.style.cursor = 'pointer';
+        checkbox.style.cssText = 'width: 20px; height: 20px; cursor: pointer; accent-color: #FFD700;';
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                label.style.borderColor = '#FFD700';
+                label.style.background = '#fffef5';
+                label.style.boxShadow = '0 4px 12px rgba(255, 215, 0, 0.2)';
+            } else {
+                label.style.borderColor = '#e2e8f0';
+                label.style.background = 'white';
+                label.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+            }
+        });
+        
+        // Aplicar estilo inicial se já estiver selecionado
+        if (checkbox.checked) {
+            label.style.borderColor = '#FFD700';
+            label.style.background = '#fffef5';
+            label.style.boxShadow = '0 4px 12px rgba(255, 215, 0, 0.2)';
+        }
+        
+        const icon = document.createElement('span');
+        icon.textContent = '🏪';
+        icon.style.fontSize = '1.2rem';
         
         const span = document.createElement('span');
         span.textContent = store.name;
+        span.style.fontWeight = '600';
+        span.style.color = '#2d3748';
         
         label.appendChild(checkbox);
+        label.appendChild(icon);
         label.appendChild(span);
         checkboxes.appendChild(label);
     });
@@ -391,7 +425,7 @@ function applyComparison() {
     const compareBtn = document.getElementById('compareStoresBtn');
     if (compareBtn) {
         if (compareStoreIds.length > 0) {
-            compareBtn.textContent = `Comparando ${compareStoreIds.length} loja(s)`;
+            compareBtn.innerHTML = `🔀 Comparando ${compareStoreIds.length} loja(s)`;
             compareBtn.style.display = 'inline-block';
         } else {
             compareBtn.style.display = 'none';

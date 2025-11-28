@@ -31,34 +31,37 @@
 
         <!-- Main Content -->
         <main class="main">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
                 <h2 style="margin: 0;">Dashboard</h2>
-                <div id="storeSelectorContainer" style="display: none;">
-                    <label style="margin-right: 0.5rem; font-weight: 600;">Loja:</label>
-                    <select id="storeSelector" style="padding: 0.5rem 1rem; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 1rem; min-width: 200px;">
-                        <option value="">Todas as Lojas</option>
+                <div id="storeSelectorContainer" style="display: none; display: flex; align-items: center; gap: 0.75rem; background: #f7fafc; padding: 0.75rem 1.25rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 1.2rem;">🏪</span>
+                        <label style="font-weight: 600; color: #2d3748; font-size: 0.95rem;">Loja:</label>
+                    </div>
+                    <select id="storeSelector" style="padding: 0.625rem 1.25rem; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 0.95rem; min-width: 220px; background: white; color: #2d3748; font-weight: 500; cursor: pointer; transition: all 0.2s; outline: none;" onfocus="this.style.borderColor='#FFD700'; this.style.boxShadow='0 0 0 3px rgba(255, 215, 0, 0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                        <option value="">📊 Todas as Lojas</option>
                     </select>
-                    <button id="compareStoresBtn" class="btn btn-secondary" style="margin-left: 0.5rem; display: none;">Comparar Lojas</button>
+                    <button id="compareStoresBtn" class="btn btn-secondary" style="margin-left: 0; padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 600; display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(102, 126, 234, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'">🔀 Comparar Lojas</button>
                 </div>
             </div>
             
             <!-- Modal de Comparação -->
             <div id="compareModal" class="modal" style="display: none;">
-                <div class="modal-content" style="max-width: 900px;">
-                    <div class="modal-header">
-                        <h3>Comparação de Lojas</h3>
-                        <span class="close" onclick="closeCompareModal()">&times;</span>
+                <div class="modal-content" style="max-width: 900px; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem 2rem;">
+                        <h3 style="margin: 0; font-size: 1.5rem; font-weight: 700;">🔀 Comparação de Lojas</h3>
+                        <span class="close" onclick="closeCompareModal()" style="color: white; font-size: 2rem; opacity: 0.9; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.9'">&times;</span>
                     </div>
-                    <div style="padding: 1.5rem;">
-                        <div style="margin-bottom: 1rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Selecione as lojas para comparar:</label>
-                            <div id="compareStoresCheckboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem;">
+                    <div style="padding: 2rem; background: #f7fafc;">
+                        <div style="margin-bottom: 1.5rem;">
+                            <label style="display: block; margin-bottom: 1rem; font-weight: 600; color: #2d3748; font-size: 1.1rem;">Selecione as lojas para comparar:</label>
+                            <div id="compareStoresCheckboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
                                 <!-- Checkboxes serão adicionados dinamicamente -->
                             </div>
                         </div>
-                        <div style="text-align: right; margin-top: 1.5rem;">
-                            <button class="btn btn-secondary" onclick="closeCompareModal()">Cancelar</button>
-                            <button class="btn btn-primary" onclick="applyComparison()">Comparar</button>
+                        <div style="text-align: right; margin-top: 2rem; padding-top: 1.5rem; border-top: 2px solid #e2e8f0;">
+                            <button class="btn btn-secondary" onclick="closeCompareModal()" style="margin-right: 0.75rem; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; background: #e2e8f0; color: #4a5568; border: none; transition: all 0.2s;" onmouseover="this.style.background='#cbd5e0'" onmouseout="this.style.background='#e2e8f0'">Cancelar</button>
+                            <button class="btn btn-primary" onclick="applyComparison()" style="padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(102, 126, 234, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'">✅ Comparar</button>
                         </div>
                     </div>
                 </div>
