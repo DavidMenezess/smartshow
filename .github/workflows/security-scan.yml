@@ -19,10 +19,8 @@ jobs:
 
       - name: Scan de Segurança - Node.js
         if: hashFiles('web-site/api/package.json') != ''
-        defaults:
-          run:
-            working-directory: ./web-site/api
         run: |
+          cd ./web-site/api
           npm audit --audit-level=high || true
 
       - name: Verificar Secrets Expostos
