@@ -105,7 +105,7 @@ class CaixaSystem {
             if (!hasValidLocalState) {
                 console.log('🔄 Buscando estado do caixa no servidor...');
                 const serverState = await api.getCashStatus();
-                console.log('📊 Estado do servidor:', serverState);
+                console.log('Estado do servidor:', serverState);
                 
                 if (serverState && serverState.isOpen) {
                     // Caixa está aberto no servidor
@@ -309,11 +309,11 @@ class CaixaSystem {
         try {
             console.log('🔄 Atualizando vendas do caixa...');
             const todaySalesData = await api.getTodaySales();
-            console.log('📊 Dados recebidos da API:', todaySalesData);
+            console.log('Dados recebidos da API:', todaySalesData);
             
             if (todaySalesData && (todaySalesData.total !== undefined || todaySalesData.total !== null)) {
                 const newTotal = parseFloat(todaySalesData.total || 0);
-                console.log(`💰 Total de vendas do banco: R$ ${newTotal.toFixed(2)}`);
+                console.log(`Total de vendas do banco: R$ ${newTotal.toFixed(2)}`);
                 
                 // Atualizar valores
                 const oldSales = this.cashControl.todaySales;
@@ -423,7 +423,7 @@ class CaixaSystem {
 
         try {
             // Abrir caixa no servidor
-            console.log('💰 Abrindo caixa no servidor...');
+            console.log('Abrindo caixa no servidor...');
             await api.openCash(initialCash, observations);
             
             // Atualizar estado local

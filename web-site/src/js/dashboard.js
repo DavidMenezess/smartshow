@@ -27,9 +27,9 @@ async function loadStores() {
             
             // Adicionar lojas com ícone
             stores.forEach(store => {
-                const option = document.createElement('option');
-                option.value = store.id;
-                option.textContent = `🏪 ${store.name}`;
+            const option = document.createElement('option');
+            option.value = store.id;
+            option.textContent = store.name;
                 selector.appendChild(option);
             });
             
@@ -160,7 +160,7 @@ function renderComparisonCards(comparisonData) {
         const color = colors[index % colors.length];
         return `
             <div style="background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-left: 4px solid ${color};">
-                <h3 style="color: ${color}; font-size: 1.1rem; margin-bottom: 1rem; font-weight: 700;">🏪 ${store.storeName}</h3>
+                <h3 style="color: ${color}; font-size: 1.1rem; margin-bottom: 1rem; font-weight: 700;">${store.storeName}</h3>
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
                     <div>
                         <div style="font-size: 0.85rem; color: #718096; margin-bottom: 0.25rem;">Vendas Hoje</div>
@@ -631,7 +631,7 @@ function openCompareModal() {
         }
         
         const icon = document.createElement('span');
-        icon.textContent = '🏪';
+        icon.textContent = '';
         icon.style.fontSize = '1.2rem';
         
         const span = document.createElement('span');
@@ -707,7 +707,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const compareBtn = document.getElementById('compareStoresBtn');
                 if (compareBtn) {
                     if (compareStoreIds.length > 0) {
-                        compareBtn.innerHTML = `Comparando ${compareStoreIds.length} loja(s)`;
+                        compareBtn.textContent = `Comparando ${compareStoreIds.length} loja(s)`;
                         compareBtn.style.display = 'inline-block';
                     } else {
                         compareBtn.style.display = 'none';
@@ -722,7 +722,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 compareStoreIds = stores.map(s => s.id);
                 const compareBtn = document.getElementById('compareStoresBtn');
                 if (compareBtn && compareStoreIds.length > 0) {
-                    compareBtn.innerHTML = `Comparando ${compareStoreIds.length} loja(s)`;
+                    compareBtn.textContent = `Comparando ${compareStoreIds.length} loja(s)`;
                     compareBtn.style.display = 'inline-block';
                 }
             }

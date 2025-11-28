@@ -609,7 +609,7 @@ class PDV {
                 }, 2000);
             } else {
                 // Estado padrão: aguardando
-                statusIcon.textContent = '📡';
+                statusIcon.textContent = '';
                 statusText.textContent = 'Aguardando leitor';
                 statusIcon.parentElement.style.color = '#718096';
             }
@@ -633,7 +633,7 @@ function toggleSearchMode() {
         // Mudar para busca por nome
         barcodeContainer.style.display = 'none';
         nameContainer.style.display = 'block';
-        searchBtn.textContent = '📊 Buscar por Código';
+        searchBtn.textContent = 'Buscar por Código';
         document.getElementById('productNameInput').focus();
     }
 }

@@ -232,7 +232,7 @@ class API {
         
         console.log(`📅 Buscando vendas do dia: ${today}`);
         const result = await this.request(`/reports/today-sales?date=${today}`);
-        console.log(`📊 Resultado da API:`, result);
+        console.log(`Resultado da API:`, result);
         return result;
     }
 
