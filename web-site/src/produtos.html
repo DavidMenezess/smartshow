@@ -86,11 +86,14 @@
                 <div class="form-group">
                     <label for="productBarcode">Código de Barras</label>
                     <div style="display: flex; gap: 0.5rem;">
-                        <input type="text" id="productBarcode" class="form-control" style="flex: 1;">
-                        <button type="button" id="generateBarcodeBtn" class="btn btn-secondary" onclick="generateUniqueBarcode()" title="Gerar código único">
-                            🔄 Gerar
+                        <input type="text" id="productBarcode" class="form-control" style="flex: 1;" placeholder="Escaneie com o leitor ou digite manualmente">
+                        <button type="button" id="generateBarcodeBtn" class="btn btn-secondary" onclick="generateUniqueBarcode()" title="Gerar código automático">
+                            Gerar
                         </button>
                     </div>
+                    <small style="color:#718096; display:block; margin-top:0.25rem;">
+                        Dica: para reaproveitar etiquetas antigas, basta posicionar o cursor neste campo e usar o leitor de código de barras.
+                    </small>
                 </div>
                 <div class="form-group">
                     <label for="productDescription">Descrição</label>
