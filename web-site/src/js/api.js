@@ -206,8 +206,14 @@ class API {
     }
 
     // Reports
-    async getDashboard() {
-        return await this.request('/reports/dashboard');
+    async getDashboard(storeId = null, compareStores = null) {
+        const params = new URLSearchParams();
+        if (storeId) params.append('store_id', storeId);
+        if (compareStores && compareStores.length > 0) {
+            params.append('compare_stores', compareStores.join(','));
+        }
+        const query = params.toString() ? `?${params}` : '';
+        return await this.request(`/reports/dashboard${query}`);
     }
 
     async getSalesReport(startDate, endDate) {

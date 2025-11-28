@@ -31,7 +31,38 @@
 
         <!-- Main Content -->
         <main class="main">
-            <h2>Dashboard</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2 style="margin: 0;">Dashboard</h2>
+                <div id="storeSelectorContainer" style="display: none;">
+                    <label style="margin-right: 0.5rem; font-weight: 600;">Loja:</label>
+                    <select id="storeSelector" style="padding: 0.5rem 1rem; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 1rem; min-width: 200px;">
+                        <option value="">Todas as Lojas</option>
+                    </select>
+                    <button id="compareStoresBtn" class="btn btn-secondary" style="margin-left: 0.5rem; display: none;">Comparar Lojas</button>
+                </div>
+            </div>
+            
+            <!-- Modal de Comparação -->
+            <div id="compareModal" class="modal" style="display: none;">
+                <div class="modal-content" style="max-width: 900px;">
+                    <div class="modal-header">
+                        <h3>Comparação de Lojas</h3>
+                        <span class="close" onclick="closeCompareModal()">&times;</span>
+                    </div>
+                    <div style="padding: 1.5rem;">
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Selecione as lojas para comparar:</label>
+                            <div id="compareStoresCheckboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem;">
+                                <!-- Checkboxes serão adicionados dinamicamente -->
+                            </div>
+                        </div>
+                        <div style="text-align: right; margin-top: 1.5rem;">
+                            <button class="btn btn-secondary" onclick="closeCompareModal()">Cancelar</button>
+                            <button class="btn btn-primary" onclick="applyComparison()">Comparar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Cards de Resumo -->
             <div class="dashboard-grid">

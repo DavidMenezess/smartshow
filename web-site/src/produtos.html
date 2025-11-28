@@ -286,8 +286,14 @@
                             attempts++;
                         }
                     } catch (error) {
-                        // Erro na verificação, assumir que pode usar
-                        isUnique = true;
+                        // Erro na verificação (404 é esperado quando não existe)
+                        // Se for 404, código não existe e pode usar
+                        if (error.message && error.message.includes('404')) {
+                            isUnique = true;
+                        } else {
+                            // Outro erro, tentar novamente
+                            attempts++;
+                        }
                     }
                 }
                 

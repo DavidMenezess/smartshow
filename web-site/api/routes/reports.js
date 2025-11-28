@@ -12,6 +12,8 @@ const router = express.Router();
 router.get('/dashboard', auth, async (req, res) => {
     try {
         const user = req.user;
+        const { store_id, compare_stores } = req.query;
+        
         // Usar data atual no timezone do Brasil (UTC-3)
         const now = new Date();
         const brazilOffset = -3 * 60; // UTC-3 em minutos
@@ -23,7 +25,22 @@ router.get('/dashboard', auth, async (req, res) => {
         // Construir filtro de loja
         let storeFilter = '';
         const storeParams = [];
-        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+        
+        // Se for admin/gerente e foi passado store_id, usar esse
+        if ((user.role === 'admin' || user.role === 'gerente') && store_id) {
+            storeFilter = ' AND store_id = ?';
+            storeParams.push(parseInt(store_id));
+        } 
+        // Se for admin/gerente e foi passado compare_stores, filtrar por múltiplas lojas
+        else if ((user.role === 'admin' || user.role === 'gerente') && compare_stores) {
+            const storeIds = compare_stores.split(',').map(id => parseInt(id)).filter(id => !isNaN(id));
+            if (storeIds.length > 0) {
+                storeFilter = ` AND store_id IN (${storeIds.map(() => '?').join(',')})`;
+                storeParams.push(...storeIds);
+            }
+        }
+        // Se não for admin/gerente, usar loja do usuário
+        else if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
             storeFilter = ' AND store_id = ?';
             storeParams.push(user.store_id);
         }

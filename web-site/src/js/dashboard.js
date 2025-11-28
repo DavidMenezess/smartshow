@@ -4,10 +4,60 @@
 
 let salesChart = null;
 let paymentChart = null;
+let stores = [];
+let selectedStoreId = '';
+let compareStoreIds = [];
+
+async function loadStores() {
+    try {
+        stores = await api.getStores();
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        
+        // Mostrar seletor apenas para admin/gerente
+        const container = document.getElementById('storeSelectorContainer');
+        const selector = document.getElementById('storeSelector');
+        
+        if ((user.role === 'admin' || user.role === 'gerente') && container && selector) {
+            container.style.display = 'block';
+            
+            // Limpar opções existentes (exceto "Todas as Lojas")
+            while (selector.options.length > 1) {
+                selector.remove(1);
+            }
+            
+            // Adicionar lojas
+            stores.forEach(store => {
+                const option = document.createElement('option');
+                option.value = store.id;
+                option.textContent = store.name;
+                selector.appendChild(option);
+            });
+            
+            // Restaurar seleção salva
+            const savedStoreId = localStorage.getItem('dashboard_selected_store');
+            if (savedStoreId) {
+                selector.value = savedStoreId;
+                selectedStoreId = savedStoreId;
+            }
+        } else if (container) {
+            container.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Erro ao carregar lojas:', error);
+    }
+}
 
 async function loadDashboard() {
     try {
-        const data = await api.getDashboard();
+        const params = new URLSearchParams();
+        if (selectedStoreId) {
+            params.append('store_id', selectedStoreId);
+        } else if (compareStoreIds.length > 0) {
+            params.append('compare_stores', compareStoreIds.join(','));
+        }
+        
+        const endpoint = params.toString() ? `/dashboard?${params}` : '/dashboard';
+        const data = await api.request(endpoint);
 
         // Atualizar cards de vendas
         document.getElementById('todaySales').textContent = 
@@ -290,9 +340,110 @@ async function loadRecentSales() {
     }
 }
 
+function openCompareModal() {
+    const modal = document.getElementById('compareModal');
+    const checkboxes = document.getElementById('compareStoresCheckboxes');
+    
+    if (!modal || !checkboxes) return;
+    
+    // Limpar checkboxes
+    checkboxes.innerHTML = '';
+    
+    // Criar checkbox para cada loja
+    stores.forEach(store => {
+        const label = document.createElement('label');
+        label.style.display = 'flex';
+        label.style.alignItems = 'center';
+        label.style.gap = '0.5rem';
+        label.style.cursor = 'pointer';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = store.id;
+        checkbox.checked = compareStoreIds.includes(store.id);
+        checkbox.style.cursor = 'pointer';
+        
+        const span = document.createElement('span');
+        span.textContent = store.name;
+        
+        label.appendChild(checkbox);
+        label.appendChild(span);
+        checkboxes.appendChild(label);
+    });
+    
+    modal.style.display = 'block';
+}
+
+function closeCompareModal() {
+    const modal = document.getElementById('compareModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function applyComparison() {
+    const checkboxes = document.querySelectorAll('#compareStoresCheckboxes input[type="checkbox"]:checked');
+    compareStoreIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+    selectedStoreId = '';
+    
+    // Atualizar seletor
+    const selector = document.getElementById('storeSelector');
+    if (selector) {
+        selector.value = '';
+    }
+    
+    // Atualizar botão de comparar
+    const compareBtn = document.getElementById('compareStoresBtn');
+    if (compareBtn) {
+        if (compareStoreIds.length > 0) {
+            compareBtn.textContent = `Comparando ${compareStoreIds.length} loja(s)`;
+            compareBtn.style.display = 'inline-block';
+        } else {
+            compareBtn.style.display = 'none';
+        }
+    }
+    
+    closeCompareModal();
+    loadDashboard();
+}
+
 // Carregar dashboard ao carregar a página
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     if (document.getElementById('todaySales')) {
+        // Carregar lojas primeiro
+        await loadStores();
+        
+        // Event listeners
+        const selector = document.getElementById('storeSelector');
+        if (selector) {
+            selector.addEventListener('change', (e) => {
+                selectedStoreId = e.target.value;
+                compareStoreIds = [];
+                localStorage.setItem('dashboard_selected_store', selectedStoreId);
+                
+                // Atualizar botão de comparar
+                const compareBtn = document.getElementById('compareStoresBtn');
+                if (compareBtn) {
+                    compareBtn.style.display = 'none';
+                }
+                
+                loadDashboard();
+            });
+        }
+        
+        const compareBtn = document.getElementById('compareStoresBtn');
+        if (compareBtn) {
+            compareBtn.addEventListener('click', openCompareModal);
+        }
+        
+        // Fechar modal ao clicar fora
+        window.onclick = function(event) {
+            const modal = document.getElementById('compareModal');
+            if (event.target === modal) {
+                closeCompareModal();
+            }
+        }
+        
         loadDashboard();
         // Atualizar a cada 30 segundos
         setInterval(loadDashboard, 30000);
