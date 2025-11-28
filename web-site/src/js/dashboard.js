@@ -728,6 +728,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             compareBtn.addEventListener('click', openCompareModal);
         }
         
+        // Carregar dashboard após inicialização
+        await loadDashboard();
+        
         // Fechar modal ao clicar fora
         window.onclick = function(event) {
             const modal = document.getElementById('compareModal');
