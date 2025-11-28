@@ -728,9 +728,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             compareBtn.addEventListener('click', openCompareModal);
         }
         
-        // Carregar dashboard após inicialização
-        await loadDashboard();
-        
         // Fechar modal ao clicar fora
         window.onclick = function(event) {
             const modal = document.getElementById('compareModal');
@@ -739,8 +736,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         
-        loadDashboard();
+        // Carregar dashboard após inicialização
+        await loadDashboard();
+        
         // Atualizar a cada 30 segundos
-        setInterval(loadDashboard, 30000);
+        setInterval(() => {
+            loadDashboard().catch(err => console.error('Erro ao atualizar dashboard:', err));
+        }, 30000);
     }
 });
