@@ -56,49 +56,278 @@ async function loadDashboard() {
         );
         console.log('✅ Dashboard carregado:', data);
 
-        // Atualizar cards de vendas
-        document.getElementById('todaySales').textContent = 
-            `R$ ${data.sales.today.total.toFixed(2).replace('.', ',')}`;
-        document.getElementById('todaySalesCount').textContent = 
-            `${data.sales.today.count} vendas`;
-
-        document.getElementById('monthSales').textContent = 
-            `R$ ${data.sales.month.total.toFixed(2).replace('.', ',')}`;
-        document.getElementById('monthSalesCount').textContent = 
-            `${data.sales.month.count} vendas`;
-
-        // Atualizar card de estoque baixo
-        document.getElementById('lowStock').textContent = data.stock.lowStock;
-
-        // Atualizar cards financeiros
-        document.getElementById('receivable').textContent = 
-            `R$ ${data.financial.receivable.total.toFixed(2).replace('.', ',')}`;
-        document.getElementById('receivableCount').textContent = 
-            `${data.financial.receivable.count} contas`;
-
-        document.getElementById('payable').textContent = 
-            `R$ ${data.financial.payable.total.toFixed(2).replace('.', ',')}`;
-        document.getElementById('payableCount').textContent = 
-            `${data.financial.payable.count} contas`;
-
-        // Atualizar cards de OS por status
-        document.getElementById('osPronta').textContent = data.serviceOrders.pronta || 0;
-        document.getElementById('osAguardandoAutorizacao').textContent = data.serviceOrders.aguardando_autorizacao || 0;
-        document.getElementById('osSemConcerto').textContent = data.serviceOrders.sem_concerto || 0;
-        document.getElementById('osEntregue').textContent = data.serviceOrders.entregue || 0;
-        document.getElementById('osEmManutencao').textContent = data.serviceOrders.em_manutencao || 0;
-        document.getElementById('osAguardandoPeca').textContent = data.serviceOrders.aguardando_peca || 0;
-
-        // Carregar gráficos
-        loadCharts(data.sales);
-
-        // Carregar produtos com estoque baixo
-        loadLowStockProducts(data.stock.products || []);
-
-        // Carregar vendas recentes
-        await loadRecentSales();
+        // Verificar se há dados de comparação
+        const isComparing = data.comparison && data.comparison.length > 0;
+        
+        if (isComparing) {
+            // Modo comparação: mostrar dados comparativos
+            renderComparison(data.comparison, data.sales);
+        } else {
+            // Modo normal: mostrar dados agregados
+            renderNormalDashboard(data);
+        }
     } catch (error) {
         console.error('Erro ao carregar dashboard:', error);
+    }
+}
+
+function renderNormalDashboard(data) {
+    // Ocultar área de comparação
+    const comparisonArea = document.getElementById('comparisonArea');
+    if (comparisonArea) comparisonArea.style.display = 'none';
+    
+    // Mostrar área normal
+    const normalArea = document.getElementById('normalDashboardArea');
+    if (normalArea) normalArea.style.display = 'block';
+
+    // Atualizar cards de vendas
+    document.getElementById('todaySales').textContent = 
+        `R$ ${data.sales.today.total.toFixed(2).replace('.', ',')}`;
+    document.getElementById('todaySalesCount').textContent = 
+        `${data.sales.today.count} vendas`;
+
+    document.getElementById('monthSales').textContent = 
+        `R$ ${data.sales.month.total.toFixed(2).replace('.', ',')}`;
+    document.getElementById('monthSalesCount').textContent = 
+        `${data.sales.month.count} vendas`;
+
+    // Atualizar card de estoque baixo
+    document.getElementById('lowStock').textContent = data.stock.lowStock;
+
+    // Atualizar cards financeiros
+    document.getElementById('receivable').textContent = 
+        `R$ ${data.financial.receivable.total.toFixed(2).replace('.', ',')}`;
+    document.getElementById('receivableCount').textContent = 
+        `${data.financial.receivable.count} contas`;
+
+    document.getElementById('payable').textContent = 
+        `R$ ${data.financial.payable.total.toFixed(2).replace('.', ',')}`;
+    document.getElementById('payableCount').textContent = 
+        `${data.financial.payable.count} contas`;
+
+    // Atualizar cards de OS por status
+    document.getElementById('osPronta').textContent = data.serviceOrders.pronta || 0;
+    document.getElementById('osAguardandoAutorizacao').textContent = data.serviceOrders.aguardando_autorizacao || 0;
+    document.getElementById('osSemConcerto').textContent = data.serviceOrders.sem_concerto || 0;
+    document.getElementById('osEntregue').textContent = data.serviceOrders.entregue || 0;
+    document.getElementById('osEmManutencao').textContent = data.serviceOrders.em_manutencao || 0;
+    document.getElementById('osAguardandoPeca').textContent = data.serviceOrders.aguardando_peca || 0;
+
+    // Carregar gráficos
+    loadCharts(data.sales);
+
+    // Carregar produtos com estoque baixo
+    loadLowStockProducts(data.stock.products || []);
+
+    // Carregar vendas recentes
+    loadRecentSales();
+}
+
+function renderComparison(comparisonData, aggregatedSales) {
+    // Ocultar área normal
+    const normalArea = document.getElementById('normalDashboardArea');
+    if (normalArea) normalArea.style.display = 'none';
+    
+    // Mostrar área de comparação
+    const comparisonArea = document.getElementById('comparisonArea');
+    if (comparisonArea) comparisonArea.style.display = 'block';
+    
+    // Renderizar cards comparativos
+    renderComparisonCards(comparisonData);
+    
+    // Renderizar gráficos comparativos
+    renderComparisonCharts(comparisonData);
+}
+
+function renderComparisonCards(comparisonData) {
+    const container = document.getElementById('comparisonCards');
+    if (!container) return;
+    
+    const colors = ['#fbbf24', '#3b82f6', '#10b981', '#8b5cf6', '#f97316', '#ef4444'];
+    
+    container.innerHTML = comparisonData.map((store, index) => {
+        const color = colors[index % colors.length];
+        return `
+            <div style="background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-left: 4px solid ${color};">
+                <h3 style="color: ${color}; font-size: 1.1rem; margin-bottom: 1rem; font-weight: 700;">🏪 ${store.storeName}</h3>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                    <div>
+                        <div style="font-size: 0.85rem; color: #718096; margin-bottom: 0.25rem;">Vendas Hoje</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #2d3748;">R$ ${parseFloat(store.sales.today.total || 0).toFixed(2).replace('.', ',')}</div>
+                        <div style="font-size: 0.85rem; color: #718096;">${store.sales.today.count || 0} vendas</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: #718096; margin-bottom: 0.25rem;">Vendas do Mês</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #2d3748;">R$ ${parseFloat(store.sales.month.total || 0).toFixed(2).replace('.', ',')}</div>
+                        <div style="font-size: 0.85rem; color: #718096;">${store.sales.month.count || 0} vendas</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderComparisonCharts(comparisonData) {
+    const colors = ['#fbbf24', '#3b82f6', '#10b981', '#8b5cf6', '#f97316', '#ef4444'];
+    
+    // Gráfico comparativo de vendas por dia
+    const salesCtx = document.getElementById('comparisonSalesChart');
+    if (salesCtx) {
+        if (salesChart) {
+            salesChart.destroy();
+        }
+        
+        // Preparar dados para todas as lojas
+        const allDates = new Set();
+        comparisonData.forEach(store => {
+            store.sales.byDay?.forEach(day => allDates.add(day.date));
+        });
+        const sortedDates = Array.from(allDates).sort();
+        
+        const labels = sortedDates.map(date => {
+            const d = new Date(date);
+            return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        });
+        
+        const datasets = comparisonData.map((store, index) => {
+            const color = colors[index % colors.length];
+            const data = sortedDates.map(date => {
+                const dayData = store.sales.byDay?.find(d => d.date === date);
+                return parseFloat(dayData?.total || 0);
+            });
+            
+            return {
+                label: store.storeName,
+                data: data,
+                borderColor: color,
+                backgroundColor: color + '20',
+                tension: 0.4,
+                fill: false
+            };
+        });
+        
+        salesChart = new Chart(salesCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: R$ ${context.parsed.y.toFixed(2).replace('.', ',')}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Valor (R$)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return 'R$ ' + value.toFixed(0);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Gráfico comparativo de vendas por forma de pagamento
+    const paymentCtx = document.getElementById('comparisonPaymentChart');
+    if (paymentCtx) {
+        if (paymentChart) {
+            paymentChart.destroy();
+        }
+        
+        // Preparar dados agregados por forma de pagamento
+        const paymentMethods = new Set();
+        comparisonData.forEach(store => {
+            store.sales.byPayment?.forEach(p => paymentMethods.add(p.payment_method));
+        });
+        
+        const methods = Array.from(paymentMethods);
+        const methodLabels = {
+            'cash': 'Dinheiro',
+            'credit': 'Crédito',
+            'debit': 'Débito',
+            'pix': 'PIX',
+            'ticket': 'Boleto'
+        };
+        
+        const labels = methods.map(m => methodLabels[m] || m);
+        
+        const datasets = comparisonData.map((store, index) => {
+            const color = colors[index % colors.length];
+            const data = methods.map(method => {
+                const methodData = store.sales.byPayment?.find(p => p.payment_method === method);
+                return parseFloat(methodData?.total || 0);
+            });
+            
+            return {
+                label: store.storeName,
+                data: data,
+                backgroundColor: color + '80',
+                borderColor: color,
+                borderWidth: 2
+            };
+        });
+        
+        paymentChart = new Chart(paymentCtx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: R$ ${context.parsed.y.toFixed(2).replace('.', ',')}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Valor (R$)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return 'R$ ' + value.toFixed(0);
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
 }
 
@@ -290,6 +519,8 @@ async function loadRecentSales() {
         const brazilOffset = -3 * 60; // UTC-3 em minutos
         const brazilTime = new Date(now.getTime() + (brazilOffset - now.getTimezoneOffset()) * 60 * 1000);
         const today = brazilTime.toISOString().split('T')[0];
+        
+        // Se estiver comparando, não filtrar por loja (mostrar todas)
         const sales = await api.getSales(today, today);
 
         const tbody = document.getElementById('recentSalesBody');
@@ -433,6 +664,9 @@ function applyComparison() {
             compareBtn.style.display = 'none';
         }
     }
+    
+    // Limpar seleção salva
+    localStorage.removeItem('dashboard_selected_store');
     
     closeCompareModal();
     loadDashboard();

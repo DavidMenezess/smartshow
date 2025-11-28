@@ -32,12 +32,22 @@ router.get('/dashboard', auth, async (req, res) => {
             storeParams.push(parseInt(store_id));
         } 
         // Se for admin/gerente e foi passado compare_stores, filtrar por múltiplas lojas
-        else if ((user.role === 'admin' || user.role === 'gerente') && compare_stores) {
-            const storeIds = compare_stores.split(',').map(id => parseInt(id)).filter(id => !isNaN(id));
-            if (storeIds.length > 0) {
-                storeFilter = ` AND store_id IN (${storeIds.map(() => '?').join(',')})`;
-                storeParams.push(...storeIds);
+        // OU se não foi passado store_id (Todas as Lojas), buscar dados por loja para comparação
+        let isComparing = false;
+        let storeIdsForComparison = [];
+        
+        if ((user.role === 'admin' || user.role === 'gerente') && compare_stores) {
+            storeIdsForComparison = compare_stores.split(',').map(id => parseInt(id)).filter(id => !isNaN(id));
+            if (storeIdsForComparison.length > 0) {
+                storeFilter = ` AND store_id IN (${storeIdsForComparison.map(() => '?').join(',')})`;
+                storeParams.push(...storeIdsForComparison);
+                isComparing = true;
             }
+        } else if ((user.role === 'admin' || user.role === 'gerente') && !store_id) {
+            // Se "Todas as Lojas" foi selecionado, buscar todas as lojas ativas para comparação
+            const allStores = await db.all('SELECT id, name FROM stores WHERE is_active = 1 ORDER BY name');
+            storeIdsForComparison = allStores.map(s => s.id);
+            isComparing = storeIdsForComparison.length > 1; // Só comparar se houver mais de uma loja
         }
         // Se não for admin/gerente, usar loja do usuário
         else if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
@@ -126,6 +136,81 @@ router.get('/dashboard', auth, async (req, res) => {
             storeParams
         );
 
+        // Se estiver comparando lojas, buscar dados separados por loja
+        let comparisonData = null;
+        if (isComparing && storeIdsForComparison.length > 0) {
+            const storesInfo = await db.all(
+                `SELECT id, name FROM stores WHERE id IN (${storeIdsForComparison.map(() => '?').join(',')}) ORDER BY name`,
+                storeIdsForComparison
+            );
+            
+            comparisonData = await Promise.all(storesInfo.map(async (store) => {
+                const storeId = store.id;
+                
+                // Vendas do dia por loja
+                const storeTodaySales = await db.get(
+                    `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
+                     FROM sales 
+                     WHERE DATE(datetime(created_at, '-3 hours')) = ? AND store_id = ?`,
+                    [today, storeId]
+                );
+                
+                // Vendas do mês por loja
+                const storeMonthSales = await db.get(
+                    `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
+                     FROM sales 
+                     WHERE DATE(datetime(created_at, '-3 hours')) >= ? AND store_id = ?`,
+                    [monthStart, storeId]
+                );
+                
+                // Vendas por dia dos últimos 7 dias por loja
+                const storeSalesByDay = await db.all(
+                    `SELECT DATE(datetime(created_at, '-3 hours')) as date, 
+                            COUNT(*) as count, 
+                            COALESCE(SUM(total), 0) as total
+                     FROM sales 
+                     WHERE DATE(datetime(created_at, '-3 hours')) >= date('now', '-7 days') AND store_id = ?
+                     GROUP BY DATE(datetime(created_at, '-3 hours'))
+                     ORDER BY date ASC`,
+                    [storeId]
+                );
+                
+                // Vendas por forma de pagamento por loja
+                const storeSalesByPayment = await db.all(
+                    `SELECT payment_method, 
+                            COUNT(*) as count, 
+                            COALESCE(SUM(total), 0) as total
+                     FROM sales 
+                     WHERE DATE(datetime(created_at, '-3 hours')) >= date('now', '-30 days') AND store_id = ?
+                     GROUP BY payment_method
+                     ORDER BY total DESC`,
+                    [storeId]
+                );
+                
+                // OS por status por loja
+                const storeOSByStatus = {};
+                for (const status of osStatuses) {
+                    const result = await db.get(
+                        `SELECT COUNT(*) as count FROM service_orders WHERE status = ? AND store_id = ?`,
+                        [status, storeId]
+                    );
+                    storeOSByStatus[status] = result.count;
+                }
+                
+                return {
+                    storeId: store.id,
+                    storeName: store.name,
+                    sales: {
+                        today: storeTodaySales,
+                        month: storeMonthSales,
+                        byDay: storeSalesByDay,
+                        byPayment: storeSalesByPayment
+                    },
+                    serviceOrders: storeOSByStatus
+                };
+            }));
+        }
+
         res.json({
             sales: {
                 today: todaySales,
@@ -141,7 +226,8 @@ router.get('/dashboard', auth, async (req, res) => {
                 receivable,
                 payable
             },
-            serviceOrders: osByStatus
+            serviceOrders: osByStatus,
+            comparison: comparisonData // Dados separados por loja para comparação
         });
     } catch (error) {
         console.error('Erro ao gerar dashboard:', error);

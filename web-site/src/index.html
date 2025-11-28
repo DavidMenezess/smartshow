@@ -67,6 +67,8 @@
                 </div>
             </div>
 
+            <!-- Área Normal (quando não está comparando) -->
+            <div id="normalDashboardArea">
             <!-- Cards de Resumo -->
             <div class="dashboard-grid">
                 <div class="card">
@@ -164,6 +166,29 @@
                                 <tr><td colspan="6">Carregando...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <!-- Área de Comparação (quando está comparando lojas) -->
+            <div id="comparisonArea" style="display: none;">
+                <h3 style="margin-bottom: 1.5rem; color: #2d3748; font-size: 1.5rem;">📊 Comparativo entre Lojas</h3>
+                
+                <!-- Cards Comparativos -->
+                <div id="comparisonCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                    <!-- Cards serão gerados dinamicamente -->
+                </div>
+                
+                <!-- Gráficos Comparativos -->
+                <div class="dashboard-charts" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+                    <div class="chart-card">
+                        <h3>Vendas dos Últimos 7 Dias - Comparativo</h3>
+                        <canvas id="comparisonSalesChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Vendas por Forma de Pagamento - Comparativo</h3>
+                        <canvas id="comparisonPaymentChart"></canvas>
                     </div>
                 </div>
             </div>
