@@ -200,6 +200,17 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'Nenhum arquivo foi enviado' });
         }
 
+        // Obter loja de destino (se especificada)
+        const targetStoreId = req.body.target_store_id ? parseInt(req.body.target_store_id) : null;
+        
+        // Validar loja de destino se fornecida
+        if (targetStoreId) {
+            const targetStore = await db.get('SELECT id FROM stores WHERE id = ?', [targetStoreId]);
+            if (!targetStore) {
+                return res.status(400).json({ error: 'Loja de destino não encontrada' });
+            }
+        }
+
         // Ler arquivo JSON
         const filePath = req.file.path;
         const fileContent = fs.readFileSync(filePath, 'utf8');
@@ -240,50 +251,61 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
         };
 
         // 1. Importar lojas primeiro (necessário para relacionamentos)
-        if (importData.stores && Array.isArray(importData.stores)) {
-            for (const store of importData.stores) {
-                try {
-                    // Verificar se loja já existe pelo nome
-                    const existing = await db.get('SELECT id FROM stores WHERE name = ?', [store.name]);
-                    
-                    if (existing) {
-                        // Atualizar loja existente
-                        await db.run(
-                            `UPDATE stores SET 
-                                address = ?, city = ?, state = ?, phone = ?, email = ?, is_active = ?
-                             WHERE id = ?`,
-                            [
-                                store.address || null,
-                                store.city || null,
-                                store.state || null,
-                                store.phone || null,
-                                store.email || null,
-                                store.is_active !== undefined ? store.is_active : 1,
-                                existing.id
-                            ]
-                        );
-                        idMapping.stores[store.id] = existing.id;
-                        results.stores.updated++;
-                    } else {
-                        // Criar nova loja
-                        const result = await db.run(
-                            `INSERT INTO stores (name, address, city, state, phone, email, is_active)
-                             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                            [
-                                store.name,
-                                store.address || null,
-                                store.city || null,
-                                store.state || null,
-                                store.phone || null,
-                                store.email || null,
-                                store.is_active !== undefined ? store.is_active : 1
-                            ]
-                        );
-                        idMapping.stores[store.id] = result.lastID;
-                        results.stores.created++;
+        // Se targetStoreId foi fornecido, mapear todas as lojas do arquivo para essa loja
+        if (targetStoreId) {
+            if (importData.stores && Array.isArray(importData.stores)) {
+                for (const store of importData.stores) {
+                    // Mapear todas as lojas do arquivo para a loja de destino
+                    idMapping.stores[store.id] = targetStoreId;
+                }
+            }
+        } else {
+            // Importar lojas normalmente quando não há loja de destino especificada
+            if (importData.stores && Array.isArray(importData.stores)) {
+                for (const store of importData.stores) {
+                    try {
+                        // Verificar se loja já existe pelo nome
+                        const existing = await db.get('SELECT id FROM stores WHERE name = ?', [store.name]);
+                        
+                        if (existing) {
+                            // Atualizar loja existente
+                            await db.run(
+                                `UPDATE stores SET 
+                                    address = ?, city = ?, state = ?, phone = ?, email = ?, is_active = ?
+                                 WHERE id = ?`,
+                                [
+                                    store.address || null,
+                                    store.city || null,
+                                    store.state || null,
+                                    store.phone || null,
+                                    store.email || null,
+                                    store.is_active !== undefined ? store.is_active : 1,
+                                    existing.id
+                                ]
+                            );
+                            idMapping.stores[store.id] = existing.id;
+                            results.stores.updated++;
+                        } else {
+                            // Criar nova loja
+                            const result = await db.run(
+                                `INSERT INTO stores (name, address, city, state, phone, email, is_active)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                                [
+                                    store.name,
+                                    store.address || null,
+                                    store.city || null,
+                                    store.state || null,
+                                    store.phone || null,
+                                    store.email || null,
+                                    store.is_active !== undefined ? store.is_active : 1
+                                ]
+                            );
+                            idMapping.stores[store.id] = result.lastID;
+                            results.stores.created++;
+                        }
+                    } catch (error) {
+                        results.stores.errors.push({ store: store.name, error: error.message });
                     }
-                } catch (error) {
-                    results.stores.errors.push({ store: store.name, error: error.message });
                 }
             }
         }
@@ -345,8 +367,8 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
         if (importData.products && Array.isArray(importData.products)) {
             for (const product of importData.products) {
                 try {
-                    // Mapear store_id
-                    const newStoreId = product.store_id ? idMapping.stores[product.store_id] || product.store_id : null;
+                    // Mapear store_id (usar targetStoreId se fornecido, senão usar do arquivo)
+                    const newStoreId = targetStoreId || (product.store_id ? idMapping.stores[product.store_id] || product.store_id : null);
                     const newCategoryId = product.category_id ? idMapping.categories[product.category_id] || product.category_id : null;
                     const newSupplierId = product.supplier_id ? idMapping.suppliers[product.supplier_id] || product.supplier_id : null;
 
@@ -421,7 +443,8 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
         if (importData.customers && Array.isArray(importData.customers)) {
             for (const customer of importData.customers) {
                 try {
-                    const newStoreId = customer.store_id ? idMapping.stores[customer.store_id] || customer.store_id : null;
+                    // Mapear store_id (usar targetStoreId se fornecido, senão usar do arquivo)
+                    const newStoreId = targetStoreId || (customer.store_id ? idMapping.stores[customer.store_id] || customer.store_id : null);
 
                     // Verificar se cliente já existe pelo CPF/CNPJ ou nome
                     let existing = null;
@@ -486,7 +509,8 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
         if (importData.sales && Array.isArray(importData.sales)) {
             for (const sale of importData.sales) {
                 try {
-                    const newStoreId = sale.store_id ? idMapping.stores[sale.store_id] || sale.store_id : null;
+                    // Mapear store_id (usar targetStoreId se fornecido, senão usar do arquivo)
+                    const newStoreId = targetStoreId || (sale.store_id ? idMapping.stores[sale.store_id] || sale.store_id : null);
                     const newCustomerId = sale.customer_id ? idMapping.customers[sale.customer_id] || sale.customer_id : null;
 
                     // Verificar se venda já existe pelo número
@@ -545,7 +569,8 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
         if (importData.service_orders && Array.isArray(importData.service_orders)) {
             for (const order of importData.service_orders) {
                 try {
-                    const newStoreId = order.store_id ? idMapping.stores[order.store_id] || order.store_id : null;
+                    // Mapear store_id (usar targetStoreId se fornecido, senão usar do arquivo)
+                    const newStoreId = targetStoreId || (order.store_id ? idMapping.stores[order.store_id] || order.store_id : null);
                     const newCustomerId = idMapping.customers[order.customer_id] || order.customer_id;
 
                     // Verificar se OS já existe pelo número

@@ -497,24 +497,36 @@ document.addEventListener('DOMContentLoaded', function() {
 // IMPORTAÇÃO E EXPORTAÇÃO DE DADOS
 // ========================================
 
-// Carregar lojas para o select de exportação
+// Carregar lojas para o select de exportação e importação
 async function loadStoresForExport() {
     try {
         const stores = await api.getStores();
-        const select = document.getElementById('exportStoreSelect');
+        const exportSelect = document.getElementById('exportStoreSelect');
+        const importSelect = document.getElementById('importStoreSelect');
         
-        // Limpar opções existentes (exceto "Todas as Lojas")
-        select.innerHTML = '<option value="">Todas as Lojas (Exportação Completa)</option>';
+        // Limpar e preencher select de exportação
+        if (exportSelect) {
+            exportSelect.innerHTML = '<option value="">Todas as Lojas (Exportação Completa)</option>';
+            stores.forEach(store => {
+                const option = document.createElement('option');
+                option.value = store.id;
+                option.textContent = store.name;
+                exportSelect.appendChild(option);
+            });
+        }
         
-        // Adicionar lojas
-        stores.forEach(store => {
-            const option = document.createElement('option');
-            option.value = store.id;
-            option.textContent = store.name;
-            select.appendChild(option);
-        });
+        // Limpar e preencher select de importação
+        if (importSelect) {
+            importSelect.innerHTML = '<option value="">Usar lojas do arquivo (manter estrutura original)</option>';
+            stores.forEach(store => {
+                const option = document.createElement('option');
+                option.value = store.id;
+                option.textContent = store.name;
+                importSelect.appendChild(option);
+            });
+        }
     } catch (error) {
-        console.error('Erro ao carregar lojas para exportação:', error);
+        console.error('Erro ao carregar lojas para exportação/importação:', error);
     }
 }
 
@@ -598,10 +610,16 @@ async function importData() {
             return;
         }
 
+        // Obter nome da loja selecionada
+        const importStoreSelect = document.getElementById('importStoreSelect');
+        const selectedStoreOption = importStoreSelect.options[importStoreSelect.selectedIndex];
+        const selectedStoreName = selectedStoreOption ? selectedStoreOption.textContent : 'Usar lojas do arquivo';
+
         // Confirmar importação
-        const confirmMessage = 'Esta operação irá importar dados do arquivo selecionado.\n\n' +
-            'O sistema fará o tratamento automático dos dados, mapeando campos e criando relacionamentos.\n\n' +
-            'Deseja continuar?';
+        let confirmMessage = 'Esta operação irá importar dados do arquivo selecionado.\n\n';
+        confirmMessage += `Loja de destino: ${selectedStoreName}\n\n`;
+        confirmMessage += 'O sistema fará o tratamento automático dos dados, mapeando campos e criando relacionamentos.\n\n';
+        confirmMessage += 'Deseja continuar?';
         
         if (!confirm(confirmMessage)) {
             return;
@@ -613,9 +631,15 @@ async function importData() {
         progressDiv.style.display = 'block';
         statusDiv.textContent = 'Enviando arquivo...';
 
+        // Obter loja de destino selecionada
+        const targetStoreId = document.getElementById('importStoreSelect').value;
+
         // Criar FormData
         const formData = new FormData();
         formData.append('file', file);
+        if (targetStoreId) {
+            formData.append('target_store_id', targetStoreId);
+        }
 
         // Fazer requisição
         const response = await fetch('/api/data/import', {

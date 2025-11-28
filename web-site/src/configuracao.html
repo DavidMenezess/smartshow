@@ -219,6 +219,16 @@
                     </p>
                     
                     <div class="form-group">
+                        <label for="importStoreSelect">Vincular dados à Loja/Filial:</label>
+                        <select id="importStoreSelect" class="form-control" style="margin-bottom: 1rem;">
+                            <option value="">Usar lojas do arquivo (manter estrutura original)</option>
+                        </select>
+                        <small style="color: #718096; display: block; margin-top: 0.25rem;">
+                            Selecione uma loja para vincular todos os dados importados a ela, ou deixe em branco para manter as lojas do arquivo original.
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
                         <label for="importFileInput">Selecionar Arquivo JSON:</label>
                         <input type="file" id="importFileInput" accept=".json" class="form-control" style="margin-bottom: 1rem;">
                         <small style="color: #718096; display: block; margin-top: 0.25rem;">
