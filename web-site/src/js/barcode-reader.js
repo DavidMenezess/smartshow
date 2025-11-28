@@ -3,11 +3,17 @@
 // ========================================
 
 class BarcodeReader {
-    constructor(inputElement, onBarcodeRead) {
+    constructor(inputElement, onBarcodeRead, options = {}) {
         this.input = inputElement;
         this.buffer = '';
         this.timeout = null;
         this.onBarcodeRead = onBarcodeRead;
+        // lookupProduct: quando true, tenta buscar produto na API (modo PDV)
+        // quando false, só preenche o campo com o código lido (modo cadastro)
+        this.options = {
+            lookupProduct: true,
+            ...options
+        };
         this.config = {
             autoDetect: true,
             readerMode: false
@@ -74,7 +80,10 @@ class BarcodeReader {
                 this.buffer = '';
                 isBarcodeReader = false;
                 keyTimes = [];
-                this.input.value = '';
+                // No modo cadastro, mantemos o código no input
+                if (this.options.lookupProduct) {
+                    this.input.value = '';
+                }
             } else {
                 // Timeout: se não receber mais caracteres, verificar se deve processar
                 this.timeout = setTimeout(() => {
@@ -97,7 +106,9 @@ class BarcodeReader {
                         this.buffer = '';
                         isBarcodeReader = false;
                         keyTimes = [];
-                        this.input.value = '';
+                        if (this.options.lookupProduct) {
+                            this.input.value = '';
+                        }
                     }
                     // Se não atender nenhuma condição, NÃO processar - deixar usuário terminar de digitar
                     // O usuário deve pressionar Enter ou clicar no botão Buscar
@@ -142,6 +153,17 @@ class BarcodeReader {
 
     async processBarcode(barcode, isFromReader = false) {
         if (!barcode || barcode.length < 1) return;
+
+        // Modo simples: apenas usar o código lido, sem buscar produto na API
+        if (!this.options.lookupProduct) {
+            this.input.value = barcode;
+            this.input.focus();
+            if (this.onBarcodeRead) {
+                // Passa o código bruto; segundo parâmetro reservado para compatibilidade
+                this.onBarcodeRead(barcode, null);
+            }
+            return;
+        }
 
         // Se veio do leitor, mostrar feedback visual
         if (isFromReader && window.pdv) {
