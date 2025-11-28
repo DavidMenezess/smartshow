@@ -205,8 +205,56 @@
                             <option value="">Todas as Lojas (Exportação Completa)</option>
                         </select>
                     </div>
+
+                    <div class="form-group">
+                        <label style="margin-bottom: 0.5rem; display: block; font-weight: 600;">Selecionar Dados para Exportar:</label>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="exportStores" checked style="margin-right: 0.5rem;">
+                                Lojas/Filiais
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="exportProducts" checked style="margin-right: 0.5rem;">
+                                Produtos
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="exportCustomers" checked style="margin-right: 0.5rem;">
+                                Clientes
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="exportSales" checked style="margin-right: 0.5rem;">
+                                Vendas
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="exportServiceOrders" checked style="margin-right: 0.5rem;">
+                                Ordens de Serviço (Assistência)
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="exportCategories" checked style="margin-right: 0.5rem;">
+                                Categorias
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="exportSuppliers" checked style="margin-right: 0.5rem;">
+                                Fornecedores
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="exportAccountsReceivable" checked style="margin-right: 0.5rem;">
+                                Contas a Receber
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="exportAccountsPayable" checked style="margin-right: 0.5rem;">
+                                Contas a Pagar
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="exportStockMovements" checked style="margin-right: 0.5rem;">
+                                Movimentações de Estoque
+                            </label>
+                        </div>
+                        <button type="button" onclick="selectAllExport()" class="btn btn-secondary" style="margin-top: 0.5rem; margin-right: 0.5rem; padding: 0.25rem 0.75rem; font-size: 0.875rem;">Marcar Todos</button>
+                        <button type="button" onclick="deselectAllExport()" class="btn btn-secondary" style="margin-top: 0.5rem; padding: 0.25rem 0.75rem; font-size: 0.875rem;">Desmarcar Todos</button>
+                    </div>
                     
-                    <button type="button" class="btn btn-primary" onclick="exportData()">
+                    <button type="button" class="btn btn-primary" onclick="exportData()" style="margin-top: 1rem;">
                         Exportar Dados
                     </button>
                 </div>
@@ -226,6 +274,54 @@
                         <small style="color: #718096; display: block; margin-top: 0.25rem;">
                             Selecione uma loja para vincular todos os dados importados a ela, ou deixe em branco para manter as lojas do arquivo original.
                         </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="margin-bottom: 0.5rem; display: block; font-weight: 600;">Selecionar Dados para Importar:</label>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="importStores" checked style="margin-right: 0.5rem;">
+                                Lojas/Filiais
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="importProducts" checked style="margin-right: 0.5rem;">
+                                Produtos
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="importCustomers" checked style="margin-right: 0.5rem;">
+                                Clientes
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="importSales" checked style="margin-right: 0.5rem;">
+                                Vendas
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="importServiceOrders" checked style="margin-right: 0.5rem;">
+                                Ordens de Serviço (Assistência)
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="importCategories" checked style="margin-right: 0.5rem;">
+                                Categorias
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="importSuppliers" checked style="margin-right: 0.5rem;">
+                                Fornecedores
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="importAccountsReceivable" checked style="margin-right: 0.5rem;">
+                                Contas a Receber
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="importAccountsPayable" checked style="margin-right: 0.5rem;">
+                                Contas a Pagar
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="importStockMovements" checked style="margin-right: 0.5rem;">
+                                Movimentações de Estoque
+                            </label>
+                        </div>
+                        <button type="button" onclick="selectAllImport()" class="btn btn-secondary" style="margin-top: 0.5rem; margin-right: 0.5rem; padding: 0.25rem 0.75rem; font-size: 0.875rem;">Marcar Todos</button>
+                        <button type="button" onclick="deselectAllImport()" class="btn btn-secondary" style="margin-top: 0.5rem; padding: 0.25rem 0.75rem; font-size: 0.875rem;">Desmarcar Todos</button>
                     </div>
                     
                     <div class="form-group">

@@ -36,13 +36,19 @@ const upload = multer({
 
 router.get('/export', auth, async (req, res) => {
     try {
-        const { store_id } = req.query;
+        const { store_id, types } = req.query;
         const user = req.user;
 
         // Verificar permissão (apenas admin pode exportar todos os dados)
         if (!store_id && user.role !== 'admin') {
             return res.status(403).json({ error: 'Apenas administradores podem exportar todos os dados' });
         }
+
+        // Parsear tipos de dados solicitados
+        const requestedTypes = types ? types.split(',') : [
+            'stores', 'products', 'customers', 'sales', 'service_orders',
+            'categories', 'suppliers', 'accounts_receivable', 'accounts_payable', 'stock_movements'
+        ];
 
         const exportData = {
             version: '1.0',
@@ -62,112 +68,132 @@ router.get('/export', auth, async (req, res) => {
         };
 
         // Exportar lojas
-        if (store_id) {
-            const store = await db.get('SELECT * FROM stores WHERE id = ?', [store_id]);
-            if (store) {
-                exportData.stores.push(store);
+        if (requestedTypes.includes('stores')) {
+            if (store_id) {
+                const store = await db.get('SELECT * FROM stores WHERE id = ?', [store_id]);
+                if (store) {
+                    exportData.stores.push(store);
+                }
+            } else {
+                const stores = await db.all('SELECT * FROM stores');
+                exportData.stores = stores;
             }
-        } else {
-            const stores = await db.all('SELECT * FROM stores');
-            exportData.stores = stores;
         }
 
         // Exportar categorias
-        const categories = await db.all('SELECT * FROM categories');
-        exportData.categories = categories;
+        if (requestedTypes.includes('categories')) {
+            const categories = await db.all('SELECT * FROM categories');
+            exportData.categories = categories;
+        }
 
         // Exportar fornecedores
-        const suppliers = await db.all('SELECT * FROM suppliers');
-        exportData.suppliers = suppliers;
+        if (requestedTypes.includes('suppliers')) {
+            const suppliers = await db.all('SELECT * FROM suppliers');
+            exportData.suppliers = suppliers;
+        }
 
         // Exportar produtos
-        if (store_id) {
-            const products = await db.all('SELECT * FROM products WHERE store_id = ?', [store_id]);
-            exportData.products = products;
-        } else {
-            const products = await db.all('SELECT * FROM products');
-            exportData.products = products;
+        if (requestedTypes.includes('products')) {
+            if (store_id) {
+                const products = await db.all('SELECT * FROM products WHERE store_id = ?', [store_id]);
+                exportData.products = products;
+            } else {
+                const products = await db.all('SELECT * FROM products');
+                exportData.products = products;
+            }
         }
 
         // Exportar clientes
-        if (store_id) {
-            const customers = await db.all('SELECT * FROM customers WHERE store_id = ?', [store_id]);
-            exportData.customers = customers;
-        } else {
-            const customers = await db.all('SELECT * FROM customers');
-            exportData.customers = customers;
+        if (requestedTypes.includes('customers')) {
+            if (store_id) {
+                const customers = await db.all('SELECT * FROM customers WHERE store_id = ?', [store_id]);
+                exportData.customers = customers;
+            } else {
+                const customers = await db.all('SELECT * FROM customers');
+                exportData.customers = customers;
+            }
         }
 
         // Exportar vendas
-        if (store_id) {
-            const sales = await db.all('SELECT * FROM sales WHERE store_id = ?', [store_id]);
-            exportData.sales = sales;
+        if (requestedTypes.includes('sales')) {
+            if (store_id) {
+                const sales = await db.all('SELECT * FROM sales WHERE store_id = ?', [store_id]);
+                exportData.sales = sales;
 
-            // Exportar itens de venda
-            if (sales.length > 0) {
-                const saleIds = sales.map(s => s.id);
-                const placeholders = saleIds.map(() => '?').join(',');
-                const saleItems = await db.all(
-                    `SELECT * FROM sale_items WHERE sale_id IN (${placeholders})`,
-                    saleIds
-                );
-                exportData.sale_items = saleItems;
-            }
-        } else {
-            const sales = await db.all('SELECT * FROM sales');
-            exportData.sales = sales;
+                // Exportar itens de venda
+                if (sales.length > 0) {
+                    const saleIds = sales.map(s => s.id);
+                    const placeholders = saleIds.map(() => '?').join(',');
+                    const saleItems = await db.all(
+                        `SELECT * FROM sale_items WHERE sale_id IN (${placeholders})`,
+                        saleIds
+                    );
+                    exportData.sale_items = saleItems;
+                }
+            } else {
+                const sales = await db.all('SELECT * FROM sales');
+                exportData.sales = sales;
 
-            if (sales.length > 0) {
-                const saleIds = sales.map(s => s.id);
-                const placeholders = saleIds.map(() => '?').join(',');
-                const saleItems = await db.all(
-                    `SELECT * FROM sale_items WHERE sale_id IN (${placeholders})`,
-                    saleIds
-                );
-                exportData.sale_items = saleItems;
+                if (sales.length > 0) {
+                    const saleIds = sales.map(s => s.id);
+                    const placeholders = saleIds.map(() => '?').join(',');
+                    const saleItems = await db.all(
+                        `SELECT * FROM sale_items WHERE sale_id IN (${placeholders})`,
+                        saleIds
+                    );
+                    exportData.sale_items = saleItems;
+                }
             }
         }
 
         // Exportar ordens de serviço
-        if (store_id) {
-            const serviceOrders = await db.all('SELECT * FROM service_orders WHERE store_id = ?', [store_id]);
-            exportData.service_orders = serviceOrders;
-        } else {
-            const serviceOrders = await db.all('SELECT * FROM service_orders');
-            exportData.service_orders = serviceOrders;
+        if (requestedTypes.includes('service_orders')) {
+            if (store_id) {
+                const serviceOrders = await db.all('SELECT * FROM service_orders WHERE store_id = ?', [store_id]);
+                exportData.service_orders = serviceOrders;
+            } else {
+                const serviceOrders = await db.all('SELECT * FROM service_orders');
+                exportData.service_orders = serviceOrders;
+            }
         }
 
         // Exportar contas a receber
-        if (store_id) {
-            const receivables = await db.all(
-                `SELECT ar.* FROM accounts_receivable ar
-                 LEFT JOIN sales s ON ar.sale_id = s.id
-                 LEFT JOIN service_orders so ON ar.service_order_id = so.id
-                 WHERE s.store_id = ? OR so.store_id = ?`,
-                [store_id, store_id]
-            );
-            exportData.accounts_receivable = receivables;
-        } else {
-            const receivables = await db.all('SELECT * FROM accounts_receivable');
-            exportData.accounts_receivable = receivables;
+        if (requestedTypes.includes('accounts_receivable')) {
+            if (store_id) {
+                const receivables = await db.all(
+                    `SELECT ar.* FROM accounts_receivable ar
+                     LEFT JOIN sales s ON ar.sale_id = s.id
+                     LEFT JOIN service_orders so ON ar.service_order_id = so.id
+                     WHERE s.store_id = ? OR so.store_id = ?`,
+                    [store_id, store_id]
+                );
+                exportData.accounts_receivable = receivables;
+            } else {
+                const receivables = await db.all('SELECT * FROM accounts_receivable');
+                exportData.accounts_receivable = receivables;
+            }
         }
 
         // Exportar contas a pagar
-        const payables = await db.all('SELECT * FROM accounts_payable');
-        exportData.accounts_payable = payables;
+        if (requestedTypes.includes('accounts_payable')) {
+            const payables = await db.all('SELECT * FROM accounts_payable');
+            exportData.accounts_payable = payables;
+        }
 
         // Exportar movimentações de estoque
-        if (store_id) {
-            const stockMovements = await db.all(
-                `SELECT sm.* FROM stock_movements sm
-                 INNER JOIN products p ON sm.product_id = p.id
-                 WHERE p.store_id = ?`,
-                [store_id]
-            );
-            exportData.stock_movements = stockMovements;
-        } else {
-            const stockMovements = await db.all('SELECT * FROM stock_movements');
-            exportData.stock_movements = stockMovements;
+        if (requestedTypes.includes('stock_movements')) {
+            if (store_id) {
+                const stockMovements = await db.all(
+                    `SELECT sm.* FROM stock_movements sm
+                     INNER JOIN products p ON sm.product_id = p.id
+                     WHERE p.store_id = ?`,
+                    [store_id]
+                );
+                exportData.stock_movements = stockMovements;
+            } else {
+                const stockMovements = await db.all('SELECT * FROM stock_movements');
+                exportData.stock_movements = stockMovements;
+            }
         }
 
         // Definir nome do arquivo
@@ -202,6 +228,12 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
 
         // Obter loja de destino (se especificada)
         const targetStoreId = req.body.target_store_id ? parseInt(req.body.target_store_id) : null;
+        
+        // Obter tipos de dados solicitados
+        const requestedTypes = req.body.types ? req.body.types.split(',') : [
+            'stores', 'products', 'customers', 'sales', 'service_orders',
+            'categories', 'suppliers', 'accounts_receivable', 'accounts_payable', 'stock_movements'
+        ];
         
         // Validar loja de destino se fornecida
         if (targetStoreId) {
@@ -252,59 +284,61 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
 
         // 1. Importar lojas primeiro (necessário para relacionamentos)
         // Se targetStoreId foi fornecido, mapear todas as lojas do arquivo para essa loja
-        if (targetStoreId) {
-            if (importData.stores && Array.isArray(importData.stores)) {
-                for (const store of importData.stores) {
-                    // Mapear todas as lojas do arquivo para a loja de destino
-                    idMapping.stores[store.id] = targetStoreId;
+        if (requestedTypes.includes('stores')) {
+            if (targetStoreId) {
+                if (importData.stores && Array.isArray(importData.stores)) {
+                    for (const store of importData.stores) {
+                        // Mapear todas as lojas do arquivo para a loja de destino
+                        idMapping.stores[store.id] = targetStoreId;
+                    }
                 }
-            }
-        } else {
-            // Importar lojas normalmente quando não há loja de destino especificada
-            if (importData.stores && Array.isArray(importData.stores)) {
-                for (const store of importData.stores) {
-                    try {
-                        // Verificar se loja já existe pelo nome
-                        const existing = await db.get('SELECT id FROM stores WHERE name = ?', [store.name]);
-                        
-                        if (existing) {
-                            // Atualizar loja existente
-                            await db.run(
-                                `UPDATE stores SET 
-                                    address = ?, city = ?, state = ?, phone = ?, email = ?, is_active = ?
-                                 WHERE id = ?`,
-                                [
-                                    store.address || null,
-                                    store.city || null,
-                                    store.state || null,
-                                    store.phone || null,
-                                    store.email || null,
-                                    store.is_active !== undefined ? store.is_active : 1,
-                                    existing.id
-                                ]
-                            );
-                            idMapping.stores[store.id] = existing.id;
-                            results.stores.updated++;
-                        } else {
-                            // Criar nova loja
-                            const result = await db.run(
-                                `INSERT INTO stores (name, address, city, state, phone, email, is_active)
-                                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                                [
-                                    store.name,
-                                    store.address || null,
-                                    store.city || null,
-                                    store.state || null,
-                                    store.phone || null,
-                                    store.email || null,
-                                    store.is_active !== undefined ? store.is_active : 1
-                                ]
-                            );
-                            idMapping.stores[store.id] = result.lastID;
-                            results.stores.created++;
+            } else {
+                // Importar lojas normalmente quando não há loja de destino especificada
+                if (importData.stores && Array.isArray(importData.stores)) {
+                    for (const store of importData.stores) {
+                        try {
+                            // Verificar se loja já existe pelo nome
+                            const existing = await db.get('SELECT id FROM stores WHERE name = ?', [store.name]);
+                            
+                            if (existing) {
+                                // Atualizar loja existente
+                                await db.run(
+                                    `UPDATE stores SET 
+                                        address = ?, city = ?, state = ?, phone = ?, email = ?, is_active = ?
+                                     WHERE id = ?`,
+                                    [
+                                        store.address || null,
+                                        store.city || null,
+                                        store.state || null,
+                                        store.phone || null,
+                                        store.email || null,
+                                        store.is_active !== undefined ? store.is_active : 1,
+                                        existing.id
+                                    ]
+                                );
+                                idMapping.stores[store.id] = existing.id;
+                                results.stores.updated++;
+                            } else {
+                                // Criar nova loja
+                                const result = await db.run(
+                                    `INSERT INTO stores (name, address, city, state, phone, email, is_active)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                                    [
+                                        store.name,
+                                        store.address || null,
+                                        store.city || null,
+                                        store.state || null,
+                                        store.phone || null,
+                                        store.email || null,
+                                        store.is_active !== undefined ? store.is_active : 1
+                                    ]
+                                );
+                                idMapping.stores[store.id] = result.lastID;
+                                results.stores.created++;
+                            }
+                        } catch (error) {
+                            results.stores.errors.push({ store: store.name, error: error.message });
                         }
-                    } catch (error) {
-                        results.stores.errors.push({ store: store.name, error: error.message });
                     }
                 }
             }
@@ -334,7 +368,7 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
         }
 
         // 3. Importar fornecedores
-        if (importData.suppliers && Array.isArray(importData.suppliers)) {
+        if (requestedTypes.includes('suppliers') && importData.suppliers && Array.isArray(importData.suppliers)) {
             for (const supplier of importData.suppliers) {
                 try {
                     const existing = await db.get('SELECT id FROM suppliers WHERE name = ?', [supplier.name]);
@@ -364,7 +398,7 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
         }
 
         // 4. Importar produtos
-        if (importData.products && Array.isArray(importData.products)) {
+        if (requestedTypes.includes('products') && importData.products && Array.isArray(importData.products)) {
             for (const product of importData.products) {
                 try {
                     // Mapear store_id (usar targetStoreId se fornecido, senão usar do arquivo)
@@ -440,7 +474,7 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
         }
 
         // 5. Importar clientes
-        if (importData.customers && Array.isArray(importData.customers)) {
+        if (requestedTypes.includes('customers') && importData.customers && Array.isArray(importData.customers)) {
             for (const customer of importData.customers) {
                 try {
                     // Mapear store_id (usar targetStoreId se fornecido, senão usar do arquivo)
@@ -506,7 +540,7 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
         }
 
         // 6. Importar vendas (opcional - pode ser muito grande)
-        if (importData.sales && Array.isArray(importData.sales)) {
+        if (requestedTypes.includes('sales') && importData.sales && Array.isArray(importData.sales)) {
             for (const sale of importData.sales) {
                 try {
                     // Mapear store_id (usar targetStoreId se fornecido, senão usar do arquivo)
@@ -566,7 +600,7 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
         }
 
         // 7. Importar ordens de serviço
-        if (importData.service_orders && Array.isArray(importData.service_orders)) {
+        if (requestedTypes.includes('service_orders') && importData.service_orders && Array.isArray(importData.service_orders)) {
             for (const order of importData.service_orders) {
                 try {
                     // Mapear store_id (usar targetStoreId se fornecido, senão usar do arquivo)
@@ -613,7 +647,7 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
         }
 
         // 8. Importar contas a receber
-        if (importData.accounts_receivable && Array.isArray(importData.accounts_receivable)) {
+        if (requestedTypes.includes('accounts_receivable') && importData.accounts_receivable && Array.isArray(importData.accounts_receivable)) {
             for (const account of importData.accounts_receivable) {
                 try {
                     const newCustomerId = idMapping.customers[account.customer_id] || account.customer_id;
@@ -645,7 +679,7 @@ router.post('/import', auth, upload.single('file'), async (req, res) => {
         }
 
         // 9. Importar contas a pagar
-        if (importData.accounts_payable && Array.isArray(importData.accounts_payable)) {
+        if (requestedTypes.includes('accounts_payable') && importData.accounts_payable && Array.isArray(importData.accounts_payable)) {
             for (const account of importData.accounts_payable) {
                 try {
                     const newSupplierId = account.supplier_id ? idMapping.suppliers[account.supplier_id] || account.supplier_id : null;

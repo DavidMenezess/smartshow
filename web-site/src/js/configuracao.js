@@ -530,6 +530,59 @@ async function loadStoresForExport() {
     }
 }
 
+// Funções auxiliares para checkboxes
+function selectAllExport() {
+    document.getElementById('exportStores').checked = true;
+    document.getElementById('exportProducts').checked = true;
+    document.getElementById('exportCustomers').checked = true;
+    document.getElementById('exportSales').checked = true;
+    document.getElementById('exportServiceOrders').checked = true;
+    document.getElementById('exportCategories').checked = true;
+    document.getElementById('exportSuppliers').checked = true;
+    document.getElementById('exportAccountsReceivable').checked = true;
+    document.getElementById('exportAccountsPayable').checked = true;
+    document.getElementById('exportStockMovements').checked = true;
+}
+
+function deselectAllExport() {
+    document.getElementById('exportStores').checked = false;
+    document.getElementById('exportProducts').checked = false;
+    document.getElementById('exportCustomers').checked = false;
+    document.getElementById('exportSales').checked = false;
+    document.getElementById('exportServiceOrders').checked = false;
+    document.getElementById('exportCategories').checked = false;
+    document.getElementById('exportSuppliers').checked = false;
+    document.getElementById('exportAccountsReceivable').checked = false;
+    document.getElementById('exportAccountsPayable').checked = false;
+    document.getElementById('exportStockMovements').checked = false;
+}
+
+function selectAllImport() {
+    document.getElementById('importStores').checked = true;
+    document.getElementById('importProducts').checked = true;
+    document.getElementById('importCustomers').checked = true;
+    document.getElementById('importSales').checked = true;
+    document.getElementById('importServiceOrders').checked = true;
+    document.getElementById('importCategories').checked = true;
+    document.getElementById('importSuppliers').checked = true;
+    document.getElementById('importAccountsReceivable').checked = true;
+    document.getElementById('importAccountsPayable').checked = true;
+    document.getElementById('importStockMovements').checked = true;
+}
+
+function deselectAllImport() {
+    document.getElementById('importStores').checked = false;
+    document.getElementById('importProducts').checked = false;
+    document.getElementById('importCustomers').checked = false;
+    document.getElementById('importSales').checked = false;
+    document.getElementById('importServiceOrders').checked = false;
+    document.getElementById('importCategories').checked = false;
+    document.getElementById('importSuppliers').checked = false;
+    document.getElementById('importAccountsReceivable').checked = false;
+    document.getElementById('importAccountsPayable').checked = false;
+    document.getElementById('importStockMovements').checked = false;
+}
+
 // Exportar dados
 async function exportData() {
     try {
@@ -541,11 +594,32 @@ async function exportData() {
             return;
         }
 
-        // Construir URL com parâmetro de loja se selecionado
-        let url = '/api/data/export';
-        if (storeId) {
-            url += `?store_id=${storeId}`;
+        // Obter tipos de dados selecionados
+        const dataTypes = [];
+        if (document.getElementById('exportStores').checked) dataTypes.push('stores');
+        if (document.getElementById('exportProducts').checked) dataTypes.push('products');
+        if (document.getElementById('exportCustomers').checked) dataTypes.push('customers');
+        if (document.getElementById('exportSales').checked) dataTypes.push('sales');
+        if (document.getElementById('exportServiceOrders').checked) dataTypes.push('service_orders');
+        if (document.getElementById('exportCategories').checked) dataTypes.push('categories');
+        if (document.getElementById('exportSuppliers').checked) dataTypes.push('suppliers');
+        if (document.getElementById('exportAccountsReceivable').checked) dataTypes.push('accounts_receivable');
+        if (document.getElementById('exportAccountsPayable').checked) dataTypes.push('accounts_payable');
+        if (document.getElementById('exportStockMovements').checked) dataTypes.push('stock_movements');
+
+        if (dataTypes.length === 0) {
+            alert('Por favor, selecione pelo menos um tipo de dado para exportar.');
+            return;
         }
+
+        // Construir URL com parâmetros
+        let url = '/api/data/export?';
+        const params = [];
+        if (storeId) {
+            params.push(`store_id=${storeId}`);
+        }
+        params.push(`types=${dataTypes.join(',')}`);
+        url += params.join('&');
 
         // Fazer requisição e baixar arquivo
         const response = await fetch(url, {
@@ -634,12 +708,31 @@ async function importData() {
         // Obter loja de destino selecionada
         const targetStoreId = document.getElementById('importStoreSelect').value;
 
+        // Obter tipos de dados selecionados
+        const dataTypes = [];
+        if (document.getElementById('importStores').checked) dataTypes.push('stores');
+        if (document.getElementById('importProducts').checked) dataTypes.push('products');
+        if (document.getElementById('importCustomers').checked) dataTypes.push('customers');
+        if (document.getElementById('importSales').checked) dataTypes.push('sales');
+        if (document.getElementById('importServiceOrders').checked) dataTypes.push('service_orders');
+        if (document.getElementById('importCategories').checked) dataTypes.push('categories');
+        if (document.getElementById('importSuppliers').checked) dataTypes.push('suppliers');
+        if (document.getElementById('importAccountsReceivable').checked) dataTypes.push('accounts_receivable');
+        if (document.getElementById('importAccountsPayable').checked) dataTypes.push('accounts_payable');
+        if (document.getElementById('importStockMovements').checked) dataTypes.push('stock_movements');
+
+        if (dataTypes.length === 0) {
+            alert('Por favor, selecione pelo menos um tipo de dado para importar.');
+            return;
+        }
+
         // Criar FormData
         const formData = new FormData();
         formData.append('file', file);
         if (targetStoreId) {
             formData.append('target_store_id', targetStoreId);
         }
+        formData.append('types', dataTypes.join(','));
 
         // Fazer requisição
         const response = await fetch('/api/data/import', {
