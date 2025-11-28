@@ -135,9 +135,12 @@ router.post('/', auth, async (req, res) => {
             }
         }
         
-        const storeId = seller.store_id || userStoreId;
+        let storeId = seller.store_id || userStoreId;
+        
+        // Se store_id for null, usar loja padrão (id=1) ou buscar a primeira loja ativa
         if (!storeId) {
-            return res.status(400).json({ error: 'Vendedor deve estar vinculado a uma loja' });
+            const defaultStore = await db.get('SELECT id FROM stores WHERE is_active = 1 ORDER BY id LIMIT 1');
+            storeId = defaultStore ? defaultStore.id : 1;
         }
 
         // Calcular total
