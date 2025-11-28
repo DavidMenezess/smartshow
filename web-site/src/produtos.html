@@ -611,6 +611,86 @@
             const categoryId = document.getElementById('filterCategory').value;
             loadProducts(searchTerm, categoryId, supplierId);
         });
+
+        // ========================================
+        // MODAIS RÁPIDOS DE CATEGORIA E FORNECEDOR
+        // ========================================
+
+        // Abrir modal rápido de categoria
+        function openQuickCategoryModal() {
+            document.getElementById('quickCategoryModal').style.display = 'block';
+            document.getElementById('quickCategoryForm').reset();
+        }
+
+        // Fechar modal rápido de categoria
+        function closeQuickCategoryModal() {
+            document.getElementById('quickCategoryModal').style.display = 'none';
+            document.getElementById('quickCategoryForm').reset();
+        }
+
+        // Salvar categoria rápida
+        document.getElementById('quickCategoryForm')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const categoryData = {
+                name: document.getElementById('quickCategoryName').value,
+                description: document.getElementById('quickCategoryDescription').value || null
+            };
+            
+            try {
+                const newCategory = await api.createCategory(categoryData);
+                if (newCategory) {
+                    // Recarregar categorias e atualizar select
+                    await loadCategories();
+                    // Selecionar a categoria recém-criada
+                    document.getElementById('productCategory').value = newCategory.id;
+                    closeQuickCategoryModal();
+                    alert('Categoria criada com sucesso!');
+                }
+            } catch (error) {
+                console.error('Erro ao criar categoria:', error);
+                alert('Erro ao criar categoria: ' + (error.message || 'Erro desconhecido'));
+            }
+        });
+
+        // Abrir modal rápido de fornecedor
+        function openQuickSupplierModal() {
+            document.getElementById('quickSupplierModal').style.display = 'block';
+            document.getElementById('quickSupplierForm').reset();
+        }
+
+        // Fechar modal rápido de fornecedor
+        function closeQuickSupplierModal() {
+            document.getElementById('quickSupplierModal').style.display = 'none';
+            document.getElementById('quickSupplierForm').reset();
+        }
+
+        // Salvar fornecedor rápido
+        document.getElementById('quickSupplierForm')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const supplierData = {
+                name: document.getElementById('quickSupplierName').value,
+                cnpj: document.getElementById('quickSupplierCnpj').value || null,
+                phone: document.getElementById('quickSupplierPhone').value || null,
+                email: document.getElementById('quickSupplierEmail').value || null
+            };
+            
+            try {
+                const newSupplier = await api.createSupplier(supplierData);
+                if (newSupplier) {
+                    // Recarregar fornecedores e atualizar select
+                    await loadSuppliers();
+                    // Selecionar o fornecedor recém-criado
+                    document.getElementById('productSupplier').value = newSupplier.id;
+                    closeQuickSupplierModal();
+                    alert('Fornecedor criado com sucesso!');
+                }
+            } catch (error) {
+                console.error('Erro ao criar fornecedor:', error);
+                alert('Erro ao criar fornecedor: ' + (error.message || 'Erro desconhecido'));
+            }
+        });
         
         // Fechar modais ao clicar fora, sem atrapalhar seleção de texto
         window.addEventListener('click', function(event) {
