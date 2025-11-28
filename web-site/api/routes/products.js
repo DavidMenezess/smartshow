@@ -11,7 +11,7 @@ const router = express.Router();
 // Listar todos os produtos
 router.get('/', auth, async (req, res) => {
     try {
-        const { search, category, active } = req.query;
+        const { search, category, supplier, active } = req.query;
         const user = req.user;
         
         let sql = `
@@ -38,6 +38,11 @@ router.get('/', auth, async (req, res) => {
         if (category) {
             sql += ` AND p.category_id = ?`;
             params.push(category);
+        }
+
+        if (supplier) {
+            sql += ` AND p.supplier_id = ?`;
+            params.push(supplier);
         }
 
         if (active !== undefined) {

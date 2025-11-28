@@ -147,10 +147,11 @@ class API {
     }
 
     // Products
-    async getProducts(search, category, active) {
+    async getProducts(search, category, supplier, active) {
         const params = new URLSearchParams();
         if (search) params.append('search', search);
         if (category) params.append('category', category);
+        if (supplier) params.append('supplier', supplier);
         if (active !== undefined) params.append('active', active);
         return await this.request(`/products?${params}`);
     }
@@ -322,6 +323,17 @@ class API {
 
     async createCategory(category) {
         return await this.request('/categories', 'POST', category);
+    }
+
+    // Suppliers
+    async getSuppliers(search) {
+        const params = new URLSearchParams();
+        if (search) params.append('search', search);
+        return await this.request(`/suppliers?${params}`);
+    }
+
+    async createSupplier(supplier) {
+        return await this.request('/suppliers', 'POST', supplier);
     }
 
     // Service Orders

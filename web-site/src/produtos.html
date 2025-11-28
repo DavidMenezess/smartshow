@@ -37,10 +37,13 @@
             </div>
 
             <!-- Filtros -->
-            <div class="filters" style="margin-bottom: 2rem;">
+            <div class="filters" style="margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap;">
                 <input type="text" id="searchProduct" class="form-control" placeholder="Buscar produto..." style="max-width: 300px;">
                 <select id="filterCategory" class="form-control" style="max-width: 200px;">
                     <option value="">Todas as categorias</option>
+                </select>
+                <select id="filterSupplier" class="form-control" style="max-width: 200px;">
+                    <option value="">Todos os fornecedores</option>
                 </select>
             </div>
 
@@ -101,7 +104,21 @@
                 </div>
                 <div class="form-group">
                     <label for="productCategory">Categoria</label>
-                    <input type="text" id="productCategory" class="form-control">
+                    <select id="productCategory" class="form-control">
+                        <option value="">Selecione uma categoria</option>
+                    </select>
+                    <small style="color: #718096; display: block; margin-top: 0.25rem;">
+                        Se a categoria não existir, você pode criá-la na página de Configuração
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label for="productSupplier">Fornecedor</label>
+                    <select id="productSupplier" class="form-control">
+                        <option value="">Selecione um fornecedor</option>
+                    </select>
+                    <small style="color: #718096; display: block; margin-top: 0.25rem;">
+                        Se o fornecedor não existir, você pode criá-lo na página de Configuração
+                    </small>
                 </div>
                 <div class="form-group">
                     <label for="productPrice">Preço de Venda *</label>
@@ -135,6 +152,7 @@
         let products = [];
         let allProducts = []; // Todos os produtos (sem filtro)
         let categories = [];
+        let suppliers = [];
         let productBarcodeReader = null;
 
         // Carregar categorias
@@ -142,32 +160,82 @@
             try {
                 categories = await api.getCategories();
                 
-                const select = document.getElementById('filterCategory');
-                // Limpar opções existentes (exceto a primeira)
-                while (select.options.length > 1) {
-                    select.remove(1);
+                const filterSelect = document.getElementById('filterCategory');
+                const productSelect = document.getElementById('productCategory');
+                
+                // Limpar e preencher select de filtro
+                while (filterSelect.options.length > 1) {
+                    filterSelect.remove(1);
+                }
+                
+                // Limpar e preencher select do formulário
+                while (productSelect.options.length > 1) {
+                    productSelect.remove(1);
                 }
                 
                 categories.forEach(category => {
-                    const option = document.createElement('option');
-                    option.value = category.id;
-                    option.textContent = category.name;
-                    select.appendChild(option);
+                    // Adicionar ao filtro
+                    const filterOption = document.createElement('option');
+                    filterOption.value = category.id;
+                    filterOption.textContent = category.name;
+                    filterSelect.appendChild(filterOption);
+                    
+                    // Adicionar ao formulário
+                    const productOption = document.createElement('option');
+                    productOption.value = category.id;
+                    productOption.textContent = category.name;
+                    productSelect.appendChild(productOption);
                 });
             } catch (error) {
                 console.error('Erro ao carregar categorias:', error);
             }
         }
 
-        // Carregar produtos
-        async function loadProducts(searchTerm = '', categoryId = '') {
+        // Carregar fornecedores
+        async function loadSuppliers() {
             try {
-                console.log('📥 Carregando produtos...', { searchTerm, categoryId });
-                products = await api.getProducts(searchTerm, categoryId);
+                suppliers = await api.getSuppliers();
+                
+                const filterSelect = document.getElementById('filterSupplier');
+                const productSelect = document.getElementById('productSupplier');
+                
+                // Limpar e preencher select de filtro
+                while (filterSelect.options.length > 1) {
+                    filterSelect.remove(1);
+                }
+                
+                // Limpar e preencher select do formulário
+                while (productSelect.options.length > 1) {
+                    productSelect.remove(1);
+                }
+                
+                suppliers.forEach(supplier => {
+                    // Adicionar ao filtro
+                    const filterOption = document.createElement('option');
+                    filterOption.value = supplier.id;
+                    filterOption.textContent = supplier.name;
+                    filterSelect.appendChild(filterOption);
+                    
+                    // Adicionar ao formulário
+                    const productOption = document.createElement('option');
+                    productOption.value = supplier.id;
+                    productOption.textContent = supplier.name;
+                    productSelect.appendChild(productOption);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar fornecedores:', error);
+            }
+        }
+
+        // Carregar produtos
+        async function loadProducts(searchTerm = '', categoryId = '', supplierId = '') {
+            try {
+                console.log('📥 Carregando produtos...', { searchTerm, categoryId, supplierId });
+                products = await api.getProducts(searchTerm, categoryId, supplierId);
                 console.log('✅ Produtos carregados:', products);
                 
                 // Salvar todos os produtos na primeira carga
-                if (!searchTerm && !categoryId) {
+                if (!searchTerm && !categoryId && !supplierId) {
                     allProducts = products;
                 }
                 
@@ -230,7 +298,8 @@
                     document.getElementById('productName').value = product.name || '';
                     document.getElementById('productBarcode').value = product.barcode || '';
                     document.getElementById('productDescription').value = product.description || '';
-                    document.getElementById('productCategory').value = product.category_name || '';
+                    document.getElementById('productCategory').value = product.category_id || '';
+                    document.getElementById('productSupplier').value = product.supplier_id || '';
                     document.getElementById('productPrice').value = product.sale_price || product.price || '';
                     document.getElementById('productCost').value = product.cost_price || '';
                     document.getElementById('productStock').value = product.stock || 0;
@@ -374,16 +443,15 @@
             e.preventDefault();
             
             const productId = document.getElementById('productId').value;
-            const categoryName = document.getElementById('productCategory').value;
-            
-            // Obter ID da categoria
-            const categoryId = await getOrCreateCategory(categoryName);
+            const categoryId = document.getElementById('productCategory').value || null;
+            const supplierId = document.getElementById('productSupplier').value || null;
             
             const productData = {
                 name: document.getElementById('productName').value,
                 barcode: document.getElementById('productBarcode').value || null,
                 description: document.getElementById('productDescription').value || null,
-                category_id: categoryId,
+                category_id: categoryId ? parseInt(categoryId) : null,
+                supplier_id: supplierId ? parseInt(supplierId) : null,
                 sale_price: parseFloat(document.getElementById('productPrice').value),
                 cost_price: parseFloat(document.getElementById('productCost').value) || 0,
                 stock: parseInt(document.getElementById('productStock').value) || 0,
@@ -408,12 +476,11 @@
 
                 if (response.ok) {
                     closeProductModal();
-                    // Recarregar categorias (pode ter criado uma nova)
-                    await loadCategories();
                     // Recarregar produtos com filtros atuais
                     const searchTerm = document.getElementById('searchProduct').value.trim();
                     const categoryId = document.getElementById('filterCategory').value;
-                    await loadProducts(searchTerm, categoryId);
+                    const supplierId = document.getElementById('filterSupplier').value;
+                    await loadProducts(searchTerm, categoryId, supplierId);
                     alert(productId ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!');
                 } else {
                     const error = await response.json();
@@ -443,7 +510,8 @@
                 if (response.ok) {
                     const searchTerm = document.getElementById('searchProduct').value.trim();
                     const categoryId = document.getElementById('filterCategory').value;
-                    await loadProducts(searchTerm, categoryId);
+                    const supplierId = document.getElementById('filterSupplier').value;
+                    await loadProducts(searchTerm, categoryId, supplierId);
                     alert('Produto excluído com sucesso!');
                 } else {
                     alert('Erro ao excluir produto');
@@ -463,9 +531,10 @@
             clearTimeout(searchTimeout);
             const searchTerm = e.target.value.trim();
             const categoryId = document.getElementById('filterCategory').value;
+            const supplierId = document.getElementById('filterSupplier').value;
             
             searchTimeout = setTimeout(() => {
-                loadProducts(searchTerm, categoryId);
+                loadProducts(searchTerm, categoryId, supplierId);
             }, 300); // Aguardar 300ms após parar de digitar
         });
 
@@ -473,7 +542,16 @@
         document.getElementById('filterCategory').addEventListener('change', function(e) {
             const categoryId = e.target.value;
             const searchTerm = document.getElementById('searchProduct').value.trim();
-            loadProducts(searchTerm, categoryId);
+            const supplierId = document.getElementById('filterSupplier').value;
+            loadProducts(searchTerm, categoryId, supplierId);
+        });
+
+        // Filtro por fornecedor
+        document.getElementById('filterSupplier').addEventListener('change', function(e) {
+            const supplierId = e.target.value;
+            const searchTerm = document.getElementById('searchProduct').value.trim();
+            const categoryId = document.getElementById('filterCategory').value;
+            loadProducts(searchTerm, categoryId, supplierId);
         });
         
         // Fechar modal ao clicar fora, sem atrapalhar seleção de texto
@@ -497,6 +575,7 @@
         // Carregar dados ao iniciar
         document.addEventListener('DOMContentLoaded', async function() {
             await loadCategories();
+            await loadSuppliers();
             await loadProducts();
         });
     </script>
