@@ -612,9 +612,9 @@
             loadProducts(searchTerm, categoryId, supplierId);
         });
         
-        // Fechar modal ao clicar fora, sem atrapalhar seleção de texto
+        // Fechar modais ao clicar fora, sem atrapalhar seleção de texto
         window.addEventListener('click', function(event) {
-            // Se o usuário estiver selecionando texto, não fechar o modal
+            // Se o usuário estiver selecionando texto, não fechar os modais
             try {
                 const selection = window.getSelection();
                 if (selection && selection.toString().length > 0) {
@@ -624,9 +624,18 @@
                 // Ignorar erros de seleção
             }
 
-            const modal = document.getElementById('productModal');
-            if (event.target === modal) {
+            const productModal = document.getElementById('productModal');
+            const quickCategoryModal = document.getElementById('quickCategoryModal');
+            const quickSupplierModal = document.getElementById('quickSupplierModal');
+
+            if (event.target === productModal) {
                 closeProductModal();
+            }
+            if (event.target === quickCategoryModal) {
+                closeQuickCategoryModal();
+            }
+            if (event.target === quickSupplierModal) {
+                closeQuickSupplierModal();
             }
         });
 
