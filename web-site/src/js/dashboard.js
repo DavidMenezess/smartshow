@@ -120,7 +120,7 @@ function renderNormalDashboard(data) {
     loadLowStockProducts(data.stock.products || []);
 
     // Carregar vendas recentes
-    loadRecentSales();
+    await loadRecentSales();
 }
 
 function renderComparison(comparisonData, aggregatedSales) {
