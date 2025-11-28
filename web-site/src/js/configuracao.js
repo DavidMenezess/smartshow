@@ -46,6 +46,10 @@ function loadConfigurations() {
         toggleA4PrinterConfig();
     }
 
+    // Carregar categorias e fornecedores (todos podem ver)
+    loadCategories();
+    loadSuppliers();
+
     // Verificar se é admin para mostrar gerenciamento de lojas e usuários
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (user.role === 'admin') {
@@ -469,9 +473,17 @@ window.addEventListener('click', function(event) {
         // Ignorar erros de seleção
     }
 
+    const categoryModal = document.getElementById('categoryModal');
+    const supplierModal = document.getElementById('supplierModal');
     const userModal = document.getElementById('userModal');
     const storeModal = document.getElementById('storeModal');
 
+    if (event.target === categoryModal) {
+        closeCategoryModal();
+    }
+    if (event.target === supplierModal) {
+        closeSupplierModal();
+    }
     if (event.target === userModal) {
         closeUserModal();
     }
@@ -791,5 +803,301 @@ async function importData() {
         alert('Erro ao importar dados: ' + error.message);
     }
 }
+
+// ========================================
+// GERENCIAMENTO DE CATEGORIAS
+// ========================================
+
+// Carregar categorias
+async function loadCategories() {
+    try {
+        const categories = await api.getCategories();
+        const tbody = document.getElementById('categoriesTableBody');
+        
+        if (categories.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem;">Nenhuma categoria cadastrada</td></tr>';
+        } else {
+            tbody.innerHTML = categories.map(category => `
+                <tr>
+                    <td>${category.id}</td>
+                    <td>${category.name}</td>
+                    <td>${category.description || '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary" onclick="editCategory(${category.id})">Editar</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteCategory(${category.id})">Excluir</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar categorias:', error);
+        const tbody = document.getElementById('categoriesTableBody');
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar categorias</td></tr>';
+    }
+}
+
+// Abrir modal de categoria
+function openCategoryModal(categoryId = null) {
+    const modal = document.getElementById('categoryModal');
+    const form = document.getElementById('categoryForm');
+    const title = document.getElementById('categoryModalTitle');
+    
+    if (categoryId) {
+        api.getCategories().then(categories => {
+            const category = categories.find(c => c.id === categoryId);
+            if (category) {
+                title.textContent = 'Editar Categoria';
+                document.getElementById('categoryId').value = category.id;
+                document.getElementById('categoryNameInput').value = category.name;
+                document.getElementById('categoryDescriptionInput').value = category.description || '';
+            }
+        });
+    } else {
+        title.textContent = 'Nova Categoria';
+        form.reset();
+        document.getElementById('categoryId').value = '';
+    }
+    
+    modal.style.display = 'block';
+}
+
+// Fechar modal de categoria
+function closeCategoryModal() {
+    document.getElementById('categoryModal').style.display = 'none';
+    document.getElementById('categoryForm').reset();
+}
+
+// Editar categoria
+function editCategory(id) {
+    openCategoryModal(id);
+}
+
+// Deletar categoria
+async function deleteCategory(id) {
+    if (!confirm('Tem certeza que deseja excluir esta categoria?')) return;
+    
+    try {
+        const response = await fetch(`/api/categories/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (response.ok) {
+            await loadCategories();
+            alert('Categoria excluída com sucesso!');
+        } else {
+            const error = await response.json();
+            alert('Erro: ' + (error.error || 'Erro ao excluir categoria'));
+        }
+    } catch (error) {
+        console.error('Erro ao excluir categoria:', error);
+        alert('Erro ao excluir categoria');
+    }
+}
+
+// Salvar categoria
+document.getElementById('categoryForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const categoryId = document.getElementById('categoryId').value;
+    const categoryData = {
+        name: document.getElementById('categoryNameInput').value,
+        description: document.getElementById('categoryDescriptionInput').value || null
+    };
+    
+    try {
+        let response;
+        if (categoryId) {
+            response = await api.updateCategory(categoryId, categoryData);
+        } else {
+            response = await api.createCategory(categoryData);
+        }
+        
+        if (response) {
+            closeCategoryModal();
+            await loadCategories();
+            alert(categoryId ? 'Categoria atualizada com sucesso!' : 'Categoria criada com sucesso!');
+        }
+    } catch (error) {
+        console.error('Erro ao salvar categoria:', error);
+        alert('Erro ao salvar categoria: ' + (error.message || 'Erro desconhecido'));
+    }
+});
+
+// ========================================
+// GERENCIAMENTO DE FORNECEDORES
+// ========================================
+
+// Carregar fornecedores
+async function loadSuppliers() {
+    try {
+        const suppliers = await api.getSuppliers();
+        const tbody = document.getElementById('suppliersTableBody');
+        
+        if (suppliers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">Nenhum fornecedor cadastrado</td></tr>';
+        } else {
+            tbody.innerHTML = suppliers.map(supplier => `
+                <tr>
+                    <td>${supplier.id}</td>
+                    <td>${supplier.name}</td>
+                    <td>${supplier.cnpj || '-'}</td>
+                    <td>${supplier.phone || '-'}</td>
+                    <td>${supplier.email || '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary" onclick="editSupplier(${supplier.id})">Editar</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteSupplier(${supplier.id})">Excluir</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar fornecedores:', error);
+        const tbody = document.getElementById('suppliersTableBody');
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar fornecedores</td></tr>';
+    }
+}
+
+// Abrir modal de fornecedor
+function openSupplierModal(supplierId = null) {
+    const modal = document.getElementById('supplierModal');
+    const form = document.getElementById('supplierForm');
+    const title = document.getElementById('supplierModalTitle');
+    
+    if (supplierId) {
+        api.getSuppliers().then(suppliers => {
+            const supplier = suppliers.find(s => s.id === supplierId);
+            if (supplier) {
+                title.textContent = 'Editar Fornecedor';
+                document.getElementById('supplierId').value = supplier.id;
+                document.getElementById('supplierNameInput').value = supplier.name;
+                document.getElementById('supplierCnpjInput').value = supplier.cnpj || '';
+                document.getElementById('supplierPhoneInput').value = supplier.phone || '';
+                document.getElementById('supplierEmailInput').value = supplier.email || '';
+                document.getElementById('supplierAddressInput').value = supplier.address || '';
+            }
+        });
+    } else {
+        title.textContent = 'Novo Fornecedor';
+        form.reset();
+        document.getElementById('supplierId').value = '';
+    }
+    
+    modal.style.display = 'block';
+}
+
+// Fechar modal de fornecedor
+function closeSupplierModal() {
+    document.getElementById('supplierModal').style.display = 'none';
+    document.getElementById('supplierForm').reset();
+}
+
+// Editar fornecedor
+function editSupplier(id) {
+    openSupplierModal(id);
+}
+
+// Deletar fornecedor
+async function deleteSupplier(id) {
+    if (!confirm('Tem certeza que deseja excluir este fornecedor?')) return;
+    
+    try {
+        const response = await fetch(`/api/suppliers/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (response.ok) {
+            await loadSuppliers();
+            alert('Fornecedor excluído com sucesso!');
+        } else {
+            const error = await response.json();
+            alert('Erro: ' + (error.error || 'Erro ao excluir fornecedor'));
+        }
+    } catch (error) {
+        console.error('Erro ao excluir fornecedor:', error);
+        alert('Erro ao excluir fornecedor');
+    }
+}
+
+// Salvar fornecedor
+document.getElementById('supplierForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const supplierId = document.getElementById('supplierId').value;
+    const supplierData = {
+        name: document.getElementById('supplierNameInput').value,
+        cnpj: document.getElementById('supplierCnpjInput').value || null,
+        phone: document.getElementById('supplierPhoneInput').value || null,
+        email: document.getElementById('supplierEmailInput').value || null,
+        address: document.getElementById('supplierAddressInput').value || null
+    };
+    
+    try {
+        let response;
+        if (supplierId) {
+            // Atualizar fornecedor
+            response = await fetch(`/api/suppliers/${supplierId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(supplierData)
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erro ao atualizar fornecedor');
+            }
+        } else {
+            response = await api.createSupplier(supplierData);
+        }
+        
+        if (response) {
+            closeSupplierModal();
+            await loadSuppliers();
+            alert(supplierId ? 'Fornecedor atualizado com sucesso!' : 'Fornecedor criado com sucesso!');
+        }
+    } catch (error) {
+        console.error('Erro ao salvar fornecedor:', error);
+        alert('Erro ao salvar fornecedor: ' + (error.message || 'Erro desconhecido'));
+    }
+});
+
+// Fechar modais ao clicar fora
+window.addEventListener('click', function(event) {
+    // Se o usuário está selecionando texto, não fechar modais
+    try {
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) {
+            return;
+        }
+    } catch (e) {
+        // Ignorar erros de seleção
+    }
+
+    const categoryModal = document.getElementById('categoryModal');
+    const supplierModal = document.getElementById('supplierModal');
+    const userModal = document.getElementById('userModal');
+    const storeModal = document.getElementById('storeModal');
+
+    if (event.target === categoryModal) {
+        closeCategoryModal();
+    }
+    if (event.target === supplierModal) {
+        closeSupplierModal();
+    }
+    if (event.target === userModal) {
+        closeUserModal();
+    }
+    if (event.target === storeModal) {
+        closeStoreModal();
+    }
+});
 
 

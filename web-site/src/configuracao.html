@@ -161,6 +161,58 @@
                 </div>
             </div>
 
+            <!-- Gerenciamento de Categorias -->
+            <div class="card">
+                <h3>Gerenciamento de Categorias</h3>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <button type="button" class="btn btn-primary" onclick="openCategoryModal()">➕ Nova Categoria</button>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nome</th>
+                                <th>Descrição</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="categoriesTableBody">
+                            <tr><td colspan="4">Carregando categorias...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Gerenciamento de Fornecedores -->
+            <div class="card">
+                <h3>Gerenciamento de Fornecedores</h3>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <button type="button" class="btn btn-primary" onclick="openSupplierModal()">➕ Novo Fornecedor</button>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nome</th>
+                                <th>CNPJ</th>
+                                <th>Telefone</th>
+                                <th>Email</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="suppliersTableBody">
+                            <tr><td colspan="6">Carregando fornecedores...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Gerenciamento de Usuários (Apenas Admin) -->
             <div class="card" id="usersManagementCard" style="display: none;">
                 <h3>Gerenciamento de Usuários</h3>
@@ -400,6 +452,73 @@
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Salvar</button>
                     <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Categoria -->
+    <div id="categoryModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeCategoryModal()">&times;</span>
+            <h2 id="categoryModalTitle">Nova Categoria</h2>
+            <form id="categoryForm">
+                <input type="hidden" id="categoryId">
+                
+                <div class="form-group">
+                    <label for="categoryNameInput">Nome da Categoria *</label>
+                    <input type="text" id="categoryNameInput" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="categoryDescriptionInput">Descrição</label>
+                    <textarea id="categoryDescriptionInput" class="form-control" rows="3"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeCategoryModal()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Fornecedor -->
+    <div id="supplierModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeSupplierModal()">&times;</span>
+            <h2 id="supplierModalTitle">Novo Fornecedor</h2>
+            <form id="supplierForm">
+                <input type="hidden" id="supplierId">
+                
+                <div class="form-group">
+                    <label for="supplierNameInput">Nome do Fornecedor *</label>
+                    <input type="text" id="supplierNameInput" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="supplierCnpjInput">CNPJ</label>
+                    <input type="text" id="supplierCnpjInput" class="form-control" placeholder="00.000.000/0000-00">
+                </div>
+
+                <div class="form-group">
+                    <label for="supplierPhoneInput">Telefone</label>
+                    <input type="text" id="supplierPhoneInput" class="form-control" placeholder="(00) 00000-0000">
+                </div>
+
+                <div class="form-group">
+                    <label for="supplierEmailInput">Email</label>
+                    <input type="email" id="supplierEmailInput" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="supplierAddressInput">Endereço</label>
+                    <textarea id="supplierAddressInput" class="form-control" rows="2"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeSupplierModal()">Cancelar</button>
                 </div>
             </form>
         </div>

@@ -325,6 +325,10 @@ class API {
         return await this.request('/categories', 'POST', category);
     }
 
+    async updateCategory(id, category) {
+        return await this.request(`/categories/${id}`, 'PUT', category);
+    }
+
     // Suppliers
     async getSuppliers(search) {
         const params = new URLSearchParams();
