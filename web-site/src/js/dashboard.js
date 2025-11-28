@@ -69,8 +69,12 @@ async function loadDashboard() {
         if (isComparing) {
             // Modo comparação: mostrar dados comparativos
             renderComparison(data.comparison, data.sales);
+
+            // Em modo de comparação, também mostrar produtos com estoque baixo
+            // considerando todas as lojas envolvidas
+            loadLowStockProducts(data.stock.products || []);
         } else {
-            // Modo normal: mostrar dados agregados
+            // Modo normal: mostrar dados agregados (inclui estoque baixo e vendas recentes)
             await renderNormalDashboard(data);
         }
     } catch (error) {
@@ -500,7 +504,7 @@ function loadLowStockProducts(products) {
     if (!tbody) return;
 
     if (products.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem;">Nenhum produto com estoque baixo</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">Nenhum produto com estoque baixo</td></tr>';
     } else {
         tbody.innerHTML = products.map(product => {
             const stockClass = product.stock === 0 ? 'style="color: #ef4444; font-weight: bold;"' : 
@@ -508,6 +512,7 @@ function loadLowStockProducts(products) {
             
             return `
                 <tr>
+                    <td>${product.store_name || 'N/A'}</td>
                     <td>${product.name || '-'}</td>
                     <td>${product.barcode || '-'}</td>
                     <td ${stockClass}>${product.stock}</td>

@@ -71,18 +71,43 @@ router.get('/dashboard', auth, async (req, res) => {
             [monthStart, ...storeParams]
         );
 
-        // Produtos em estoque baixo (com lista)
+        // Produtos em estoque baixo (com lista) - respeitando filtro de loja e comparação
         let lowStockSql = `
-            SELECT id, name, barcode, stock, min_stock, sale_price
-            FROM products 
-            WHERE (stock <= min_stock OR stock = 0) AND is_active = 1
+            SELECT 
+                p.id, 
+                p.name, 
+                p.barcode, 
+                p.stock, 
+                p.min_stock, 
+                p.sale_price,
+                p.store_id,
+                s.name AS store_name
+            FROM products p
+            LEFT JOIN stores s ON s.id = p.store_id
+            WHERE (p.stock <= p.min_stock OR p.stock = 0) 
+              AND p.is_active = 1
         `;
         const lowStockParams = [];
-        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
-            lowStockSql += ` AND store_id = ?`;
+
+        if (user.role === 'admin' || user.role === 'gerente') {
+            if (isComparing && storeIdsForComparison.length > 0) {
+                // Quando estiver comparando, trazer produtos apenas das lojas comparadas
+                lowStockSql += ` AND p.store_id IN (${storeIdsForComparison.map(() => '?').join(',')})`;
+                lowStockParams.push(...storeIdsForComparison);
+            } else if (store_id) {
+                // Quando uma loja específica foi selecionada
+                lowStockSql += ` AND p.store_id = ?`;
+                lowStockParams.push(parseInt(store_id));
+            }
+            // Caso admin/gerente com "Todas as Lojas" sem comparação explícita,
+            // mantemos sem filtro de loja para mostrar visão geral da rede.
+        } else if (user.store_id) {
+            // Usuários comuns veem apenas a própria loja
+            lowStockSql += ` AND p.store_id = ?`;
             lowStockParams.push(user.store_id);
         }
-        lowStockSql += ` ORDER BY stock ASC, name ASC LIMIT 20`;
+
+        lowStockSql += ` ORDER BY p.stock ASC, p.name ASC LIMIT 50`;
         const lowStockProducts = await db.all(lowStockSql, lowStockParams);
 
         // Contas a receber
