@@ -670,7 +670,7 @@ function applyComparison() {
     const compareBtn = document.getElementById('compareStoresBtn');
     if (compareBtn) {
         if (compareStoreIds.length > 0) {
-            compareBtn.innerHTML = `🔀 Comparando ${compareStoreIds.length} loja(s)`;
+            compareBtn.textContent = `Comparando ${compareStoreIds.length} loja(s)`;
             compareBtn.style.display = 'inline-block';
         } else {
             compareBtn.style.display = 'none';
