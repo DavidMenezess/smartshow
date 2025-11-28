@@ -49,15 +49,10 @@ async function loadStores() {
 
 async function loadDashboard() {
     try {
-        const params = new URLSearchParams();
-        if (selectedStoreId) {
-            params.append('store_id', selectedStoreId);
-        } else if (compareStoreIds.length > 0) {
-            params.append('compare_stores', compareStoreIds.join(','));
-        }
-        
-        const endpoint = params.toString() ? `/dashboard?${params}` : '/dashboard';
-        const data = await api.request(endpoint);
+        const data = await api.getDashboard(
+            selectedStoreId || null,
+            compareStoreIds.length > 0 ? compareStoreIds : null
+        );
 
         // Atualizar cards de vendas
         document.getElementById('todaySales').textContent = 
