@@ -55,6 +55,7 @@
                             <th>Código de Barras</th>
                             <th>Nome</th>
                             <th>Categoria</th>
+                            <th>Fornecedor</th>
                             <th>Estoque</th>
                             <th>Preço Custo</th>
                             <th>Preço Venda</th>
@@ -244,7 +245,7 @@
                 console.error('❌ Erro ao carregar produtos:', error);
                 const tbody = document.getElementById('productsTableBody');
                 const errorMsg = error.message || 'Erro desconhecido';
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar produtos: ${errorMsg}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: red;">Erro ao carregar produtos: ${errorMsg}</td></tr>`;
             }
         }
 
@@ -252,7 +253,7 @@
         function renderProducts(productsToRender) {
             const tbody = document.getElementById('productsTableBody');
             if (productsToRender.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem;">Nenhum produto encontrado</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 2rem;">Nenhum produto encontrado</td></tr>';
             } else {
                 tbody.innerHTML = productsToRender.map(product => {
                     const costPrice = parseFloat(product.cost_price || 0);
@@ -265,6 +266,7 @@
                         <td>${product.barcode || '-'}</td>
                         <td>${product.name}</td>
                         <td>${product.category_name || '-'}</td>
+                        <td>${product.supplier_name || '-'}</td>
                         <td>${product.stock || 0}</td>
                         <td>R$ ${costPrice.toFixed(2).replace('.', ',')}</td>
                         <td>R$ ${salePrice.toFixed(2).replace('.', ',')}</td>
