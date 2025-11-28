@@ -49,12 +49,12 @@ async function loadStores() {
 
 async function loadDashboard() {
     try {
-        console.log('📊 Carregando dashboard...', { selectedStoreId, compareStoreIds, storesCount: stores.length });
+        console.log('Carregando dashboard...', { selectedStoreId, compareStoreIds, storesCount: stores.length });
         
         // Se não há loja selecionada e há múltiplas lojas, ativar comparação automática
         if (!selectedStoreId && stores.length > 1 && compareStoreIds.length === 0) {
             compareStoreIds = stores.map(s => s.id);
-            console.log('🔄 Comparação automática ativada:', compareStoreIds);
+            console.log('Comparação automática ativada:', compareStoreIds);
         }
         
         const data = await api.getDashboard(
@@ -707,7 +707,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const compareBtn = document.getElementById('compareStoresBtn');
                 if (compareBtn) {
                     if (compareStoreIds.length > 0) {
-                        compareBtn.innerHTML = `🔀 Comparando ${compareStoreIds.length} loja(s)`;
+                        compareBtn.innerHTML = `Comparando ${compareStoreIds.length} loja(s)`;
                         compareBtn.style.display = 'inline-block';
                     } else {
                         compareBtn.style.display = 'none';
@@ -722,7 +722,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 compareStoreIds = stores.map(s => s.id);
                 const compareBtn = document.getElementById('compareStoresBtn');
                 if (compareBtn && compareStoreIds.length > 0) {
-                    compareBtn.innerHTML = `🔀 Comparando ${compareStoreIds.length} loja(s)`;
+                    compareBtn.innerHTML = `Comparando ${compareStoreIds.length} loja(s)`;
                     compareBtn.style.display = 'inline-block';
                 }
             }

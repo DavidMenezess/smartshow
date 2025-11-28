@@ -10,7 +10,7 @@
     <div class="container">
         <!-- Header -->
         <header class="header">
-            <h1>📱 Smart Show</h1>
+            <h1>Smart Show</h1>
             <div class="user-info">
                 <span id="userName">Usuário</span>
                 <button id="logoutBtn" class="btn btn-secondary">Sair</button>
@@ -35,13 +35,12 @@
                 <h2 style="margin: 0;">Dashboard</h2>
                 <div id="storeSelectorContainer" style="display: none; display: flex; align-items: center; gap: 0.75rem; background: #f7fafc; padding: 0.75rem 1.25rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <span style="font-size: 1.2rem;">🏪</span>
                         <label style="font-weight: 600; color: #2d3748; font-size: 0.95rem;">Loja:</label>
                     </div>
                     <select id="storeSelector" style="padding: 0.625rem 1.25rem; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 0.95rem; min-width: 220px; background: white; color: #2d3748; font-weight: 500; cursor: pointer; transition: all 0.2s; outline: none;" onfocus="this.style.borderColor='#FFD700'; this.style.boxShadow='0 0 0 3px rgba(255, 215, 0, 0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
-                        <option value="">📊 Todas as Lojas</option>
+                        <option value="">Todas as Lojas</option>
                     </select>
-                    <button id="compareStoresBtn" class="btn btn-secondary" style="margin-left: 0; padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 600; display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(102, 126, 234, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'">🔀 Comparar Lojas</button>
+                    <button id="compareStoresBtn" class="btn btn-secondary" style="margin-left: 0; padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 600; display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(102, 126, 234, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'">Comparar Lojas</button>
                 </div>
             </div>
             
@@ -49,7 +48,7 @@
             <div id="compareModal" class="modal" style="display: none;">
                 <div class="modal-content" style="max-width: 900px; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
                     <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem 2rem;">
-                        <h3 style="margin: 0; font-size: 1.5rem; font-weight: 700;">🔀 Comparação de Lojas</h3>
+                        <h3 style="margin: 0; font-size: 1.5rem; font-weight: 700;">Comparação de Lojas</h3>
                         <span class="close" onclick="closeCompareModal()" style="color: white; font-size: 2rem; opacity: 0.9; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.9'">&times;</span>
                     </div>
                     <div style="padding: 2rem; background: #f7fafc;">
@@ -173,7 +172,7 @@
 
             <!-- Área de Comparação (quando está comparando lojas) -->
             <div id="comparisonArea" style="display: none;">
-                <h3 style="margin-bottom: 1.5rem; color: #2d3748; font-size: 1.5rem;">📊 Comparativo entre Lojas</h3>
+                <h3 style="margin-bottom: 1.5rem; color: #2d3748; font-size: 1.5rem;">Comparativo entre Lojas</h3>
                 
                 <!-- Cards Comparativos -->
                 <div id="comparisonCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
