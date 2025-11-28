@@ -683,17 +683,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (selector) {
             selector.addEventListener('change', (e) => {
                 selectedStoreId = e.target.value;
-                compareStoreIds = [];
+                // Se selecionou "Todas as Lojas", ativar comparação automática
+                if (!selectedStoreId && stores.length > 1) {
+                    compareStoreIds = stores.map(s => s.id);
+                } else {
+                    compareStoreIds = [];
+                }
                 localStorage.setItem('dashboard_selected_store', selectedStoreId);
                 
                 // Atualizar botão de comparar
                 const compareBtn = document.getElementById('compareStoresBtn');
                 if (compareBtn) {
-                    compareBtn.style.display = 'none';
+                    if (compareStoreIds.length > 0) {
+                        compareBtn.innerHTML = `🔀 Comparando ${compareStoreIds.length} loja(s)`;
+                        compareBtn.style.display = 'inline-block';
+                    } else {
+                        compareBtn.style.display = 'none';
+                    }
                 }
                 
                 loadDashboard();
             });
+            
+            // Se não há loja selecionada e há múltiplas lojas, ativar comparação na inicialização
+            if (!selectedStoreId && stores.length > 1) {
+                compareStoreIds = stores.map(s => s.id);
+                const compareBtn = document.getElementById('compareStoresBtn');
+                if (compareBtn && compareStoreIds.length > 0) {
+                    compareBtn.innerHTML = `🔀 Comparando ${compareStoreIds.length} loja(s)`;
+                    compareBtn.style.display = 'inline-block';
+                }
+            }
         }
         
         const compareBtn = document.getElementById('compareStoresBtn');
