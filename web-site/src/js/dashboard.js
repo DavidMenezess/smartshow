@@ -49,12 +49,19 @@ async function loadStores() {
 
 async function loadDashboard() {
     try {
-        console.log('📊 Carregando dashboard...', { selectedStoreId, compareStoreIds });
+        console.log('📊 Carregando dashboard...', { selectedStoreId, compareStoreIds, storesCount: stores.length });
+        
+        // Se não há loja selecionada e há múltiplas lojas, ativar comparação automática
+        if (!selectedStoreId && stores.length > 1 && compareStoreIds.length === 0) {
+            compareStoreIds = stores.map(s => s.id);
+            console.log('🔄 Comparação automática ativada:', compareStoreIds);
+        }
+        
         const data = await api.getDashboard(
             selectedStoreId || null,
             compareStoreIds.length > 0 ? compareStoreIds : null
         );
-        console.log('✅ Dashboard carregado:', data);
+        console.log('✅ Dashboard carregado:', data, 'Tem comparação?', !!data.comparison);
 
         // Verificar se há dados de comparação
         const isComparing = data.comparison && data.comparison.length > 0;
