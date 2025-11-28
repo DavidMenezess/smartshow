@@ -30,6 +30,27 @@ if [ -n "$CONTAINERS" ]; then
     echo "$CONTAINERS" | xargs -r docker rm -f 2>/dev/null || true
 fi
 
+# Remover containers por ID também (caso o nome tenha mudado)
+echo "🔍 Buscando containers por ID do erro específico..."
+ERROR_CONTAINER_ID="e7a050b80e89aac40358fbef1a77aaecde616e1c6ddd8a0f0a1743875a3d7c0f"
+if docker ps -a --format '{{.ID}}' | grep -q "$ERROR_CONTAINER_ID" 2>/dev/null; then
+    echo "🗑️ Removendo container pelo ID: $ERROR_CONTAINER_ID"
+    docker rm -f "$ERROR_CONTAINER_ID" 2>/dev/null || true
+fi
+
+# Remover TODOS os containers que contenham "smartshow" ou "web-site" no nome
+echo "🔍 Buscando todos os containers relacionados..."
+ALL_CONTAINERS=$(docker ps -a --format '{{.Names}} {{.ID}}' | grep -E "(smartshow|web-site)" | awk '{print $2}' || echo "")
+if [ -n "$ALL_CONTAINERS" ]; then
+    echo "🗑️ Removendo todos os containers relacionados:"
+    echo "$ALL_CONTAINERS" | while read container_id; do
+        if [ -n "$container_id" ]; then
+            echo "  - Removendo container: $container_id"
+            docker rm -f "$container_id" 2>/dev/null || true
+        fi
+    done
+fi
+
 # Remover containers parados que possam estar causando conflito
 echo "🧹 Removendo containers parados..."
 docker container prune -f 2>/dev/null || true
@@ -44,7 +65,15 @@ echo "🧹 Limpando redes órfãs..."
 docker network prune -f 2>/dev/null || true
 
 # Aguardar um pouco para garantir que tudo foi limpo
-sleep 3
+sleep 5
+
+# Verificar se ainda há containers com o nome problemático
+echo "🔍 Verificando se ainda há containers com nome problemático..."
+if docker ps -a --format '{{.Names}}' | grep -q "web-site-smartshow-api-1"; then
+    echo "⚠️ Ainda há containers com nome problemático, forçando remoção..."
+    docker ps -a --format '{{.Names}} {{.ID}}' | grep "web-site-smartshow-api-1" | awk '{print $2}' | xargs -r docker rm -f 2>/dev/null || true
+    sleep 2
+fi
 
 echo "✅ Limpeza concluída!"
 
