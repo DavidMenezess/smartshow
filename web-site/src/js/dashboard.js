@@ -49,10 +49,12 @@ async function loadStores() {
 
 async function loadDashboard() {
     try {
+        console.log('📊 Carregando dashboard...', { selectedStoreId, compareStoreIds });
         const data = await api.getDashboard(
             selectedStoreId || null,
             compareStoreIds.length > 0 ? compareStoreIds : null
         );
+        console.log('✅ Dashboard carregado:', data);
 
         // Atualizar cards de vendas
         document.getElementById('todaySales').textContent = 
