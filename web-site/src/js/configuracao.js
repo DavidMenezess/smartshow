@@ -51,8 +51,10 @@ function loadConfigurations() {
     if (user.role === 'admin') {
         document.getElementById('storesManagementCard').style.display = 'block';
         document.getElementById('usersManagementCard').style.display = 'block';
+        document.getElementById('dataManagementCard').style.display = 'block';
         loadStores();
         loadUsers();
+        loadStoresForExport();
     }
 }
 
@@ -491,8 +493,186 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('userName').textContent = user.name || 'Usuário';
 });
 
+// ========================================
+// IMPORTAÇÃO E EXPORTAÇÃO DE DADOS
+// ========================================
 
+// Carregar lojas para o select de exportação
+async function loadStoresForExport() {
+    try {
+        const stores = await api.getStores();
+        const select = document.getElementById('exportStoreSelect');
+        
+        // Limpar opções existentes (exceto "Todas as Lojas")
+        select.innerHTML = '<option value="">Todas as Lojas (Exportação Completa)</option>';
+        
+        // Adicionar lojas
+        stores.forEach(store => {
+            const option = document.createElement('option');
+            option.value = store.id;
+            option.textContent = store.name;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Erro ao carregar lojas para exportação:', error);
+    }
+}
 
+// Exportar dados
+async function exportData() {
+    try {
+        const storeId = document.getElementById('exportStoreSelect').value;
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+            alert('Você precisa estar logado para exportar dados.');
+            return;
+        }
 
+        // Construir URL com parâmetro de loja se selecionado
+        let url = '/api/data/export';
+        if (storeId) {
+            url += `?store_id=${storeId}`;
+        }
+
+        // Fazer requisição e baixar arquivo
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao exportar dados');
+        }
+
+        // Obter nome do arquivo do header ou usar padrão
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = 'smartshow_export.json';
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+            if (filenameMatch) {
+                filename = filenameMatch[1];
+            }
+        }
+
+        // Criar blob e fazer download
+        const blob = await response.blob();
+        const urlBlob = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = urlBlob;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(urlBlob);
+
+        alert('Dados exportados com sucesso!');
+    } catch (error) {
+        console.error('Erro ao exportar dados:', error);
+        alert('Erro ao exportar dados: ' + error.message);
+    }
+}
+
+// Importar dados
+async function importData() {
+    try {
+        const fileInput = document.getElementById('importFileInput');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            alert('Por favor, selecione um arquivo JSON para importar.');
+            return;
+        }
+
+        if (!file.name.endsWith('.json')) {
+            alert('Por favor, selecione um arquivo JSON válido.');
+            return;
+        }
+
+        const token = localStorage.getItem('token');
+        if (!token) {
+            alert('Você precisa estar logado para importar dados.');
+            return;
+        }
+
+        // Confirmar importação
+        const confirmMessage = 'Esta operação irá importar dados do arquivo selecionado.\n\n' +
+            'O sistema fará o tratamento automático dos dados, mapeando campos e criando relacionamentos.\n\n' +
+            'Deseja continuar?';
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        // Mostrar progresso
+        const progressDiv = document.getElementById('importProgress');
+        const statusDiv = document.getElementById('importStatus');
+        progressDiv.style.display = 'block';
+        statusDiv.textContent = 'Enviando arquivo...';
+
+        // Criar FormData
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Fazer requisição
+        const response = await fetch('/api/data/import', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Erro ao importar dados');
+        }
+
+        // Mostrar resultados
+        let resultMessage = 'Importação concluída com sucesso!\n\n';
+        resultMessage += 'Resumo:\n';
+        
+        if (data.results) {
+            Object.keys(data.results).forEach(key => {
+                const result = data.results[key];
+                if (result.created > 0 || result.updated > 0) {
+                    resultMessage += `\n${key}:\n`;
+                    if (result.created > 0) resultMessage += `  - Criados: ${result.created}\n`;
+                    if (result.updated > 0) resultMessage += `  - Atualizados: ${result.updated}\n`;
+                    if (result.errors && result.errors.length > 0) {
+                        resultMessage += `  - Erros: ${result.errors.length}\n`;
+                    }
+                }
+            });
+        }
+
+        statusDiv.textContent = resultMessage.replace(/\n/g, '<br>');
+        statusDiv.style.color = '#48bb78';
+        
+        // Limpar input
+        fileInput.value = '';
+
+        // Recarregar dados se necessário
+        if (data.results && (data.results.stores.created > 0 || data.results.stores.updated > 0)) {
+            loadStores();
+            loadStoresForExport();
+        }
+        if (data.results && (data.results.users && (data.results.users.created > 0 || data.results.users.updated > 0))) {
+            loadUsers();
+        }
+
+        alert('Importação concluída! Verifique os detalhes abaixo.');
+    } catch (error) {
+        console.error('Erro ao importar dados:', error);
+        const statusDiv = document.getElementById('importStatus');
+        statusDiv.textContent = 'Erro: ' + error.message;
+        statusDiv.style.color = '#f56565';
+        alert('Erro ao importar dados: ' + error.message);
+    }
+}
 
 

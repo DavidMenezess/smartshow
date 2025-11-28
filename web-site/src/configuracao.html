@@ -188,6 +188,56 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Importação e Exportação de Dados (Apenas Admin) -->
+            <div class="card" id="dataManagementCard" style="display: none;">
+                <h3>Importação e Exportação de Dados</h3>
+                
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="margin-bottom: 1rem;">Exportar Dados</h4>
+                    <p style="color: #718096; margin-bottom: 1rem;">
+                        Exporte todos os dados do sistema ou de uma loja específica para backup ou migração.
+                    </p>
+                    
+                    <div class="form-group">
+                        <label for="exportStoreSelect">Selecionar Loja/Filial:</label>
+                        <select id="exportStoreSelect" class="form-control" style="margin-bottom: 1rem;">
+                            <option value="">Todas as Lojas (Exportação Completa)</option>
+                        </select>
+                    </div>
+                    
+                    <button type="button" class="btn btn-primary" onclick="exportData()">
+                        Exportar Dados
+                    </button>
+                </div>
+
+                <div style="border-top: 1px solid #e2e8f0; padding-top: 2rem;">
+                    <h4 style="margin-bottom: 1rem;">Importar Dados</h4>
+                    <p style="color: #718096; margin-bottom: 1rem;">
+                        Importe dados de outro sistema ou banco de dados. O sistema fará o tratamento automático dos dados,
+                        mapeando campos e criando relacionamentos necessários.
+                    </p>
+                    
+                    <div class="form-group">
+                        <label for="importFileInput">Selecionar Arquivo JSON:</label>
+                        <input type="file" id="importFileInput" accept=".json" class="form-control" style="margin-bottom: 1rem;">
+                        <small style="color: #718096; display: block; margin-top: 0.25rem;">
+                            Apenas arquivos JSON são aceitos. O sistema detectará automaticamente a estrutura e fará a migração.
+                        </small>
+                    </div>
+                    
+                    <button type="button" class="btn btn-primary" onclick="importData()">
+                        Importar Dados
+                    </button>
+                    
+                    <div id="importProgress" style="display: none; margin-top: 1rem;">
+                        <div style="background: #f7fafc; padding: 1rem; border-radius: 4px;">
+                            <p style="margin: 0; font-weight: 600;">Importando dados...</p>
+                            <div id="importStatus" style="margin-top: 0.5rem; color: #718096;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
