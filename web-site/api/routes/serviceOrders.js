@@ -119,7 +119,13 @@ router.post('/', auth, async (req, res) => {
         const defaultStatus = status || 'aguardando_autorizacao';
 
         // Definir store_id automaticamente (exceto admin)
-        const storeId = (user.role === 'admin' && req.body.store_id) ? req.body.store_id : user.store_id;
+        let storeId = (user.role === 'admin' && req.body.store_id) ? req.body.store_id : user.store_id;
+        
+        // Se store_id for null, usar loja padrão (id=1) ou buscar a primeira loja ativa
+        if (!storeId) {
+            const defaultStore = await db.get('SELECT id FROM stores WHERE is_active = 1 ORDER BY id LIMIT 1');
+            storeId = defaultStore ? defaultStore.id : 1;
+        }
 
         const result = await db.run(
             `INSERT INTO service_orders 
@@ -127,7 +133,7 @@ router.post('/', auth, async (req, res) => {
               serial_number, problem_description, status, store_id)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [orderNumber, customerId, technicianId || null, deviceType || null, brand || null,
-             model || null, serialNumber || null, problemDescription, defaultStatus, storeId || null]
+             model || null, serialNumber || null, problemDescription, defaultStatus, storeId]
         );
 
         const order = await db.get('SELECT * FROM service_orders WHERE id = ?', [result.lastID]);

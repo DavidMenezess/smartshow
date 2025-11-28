@@ -101,13 +101,19 @@ router.post('/open', auth, async (req, res) => {
         }
         
         // Definir store_id automaticamente (exceto admin)
-        const storeId = (user.role === 'admin' && req.body.store_id) ? req.body.store_id : user.store_id;
+        let storeId = (user.role === 'admin' && req.body.store_id) ? req.body.store_id : user.store_id;
+        
+        // Se store_id for null, usar loja padrão (id=1) ou buscar a primeira loja ativa
+        if (!storeId) {
+            const defaultStore = await db.get('SELECT id FROM stores WHERE is_active = 1 ORDER BY id LIMIT 1');
+            storeId = defaultStore ? defaultStore.id : 1;
+        }
         
         // Criar novo registro de abertura
         const result = await db.run(
             `INSERT INTO cash_control (user_id, initial_cash, observations, opening_date, is_open, store_id)
              VALUES (?, ?, ?, datetime('now'), 1, ?)`,
-            [userId, parseFloat(initialCash) || 0, observations || '', storeId || null]
+            [userId, parseFloat(initialCash) || 0, observations || '', storeId]
         );
         
         res.json({
