@@ -105,21 +105,25 @@
                 </div>
                 <div class="form-group">
                     <label for="productCategory">Categoria</label>
-                    <select id="productCategory" class="form-control">
-                        <option value="">Selecione uma categoria</option>
-                    </select>
-                    <small style="color: #718096; display: block; margin-top: 0.25rem;">
-                        Se a categoria não existir, você pode criá-la na página de Configuração
-                    </small>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <select id="productCategory" class="form-control" style="flex: 1;">
+                            <option value="">Selecione uma categoria</option>
+                        </select>
+                        <button type="button" class="btn btn-secondary" onclick="openQuickCategoryModal()" title="Adicionar nova categoria">
+                            + Nova
+                        </button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="productSupplier">Fornecedor</label>
-                    <select id="productSupplier" class="form-control">
-                        <option value="">Selecione um fornecedor</option>
-                    </select>
-                    <small style="color: #718096; display: block; margin-top: 0.25rem;">
-                        Se o fornecedor não existir, você pode criá-lo na página de Configuração
-                    </small>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <select id="productSupplier" class="form-control" style="flex: 1;">
+                            <option value="">Selecione um fornecedor</option>
+                        </select>
+                        <button type="button" class="btn btn-secondary" onclick="openQuickSupplierModal()" title="Adicionar novo fornecedor">
+                            + Novo
+                        </button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="productPrice">Preço de Venda *</label>
@@ -140,6 +144,58 @@
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Salvar</button>
                     <button type="button" class="btn btn-secondary" onclick="closeProductModal()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Rápido de Categoria -->
+    <div id="quickCategoryModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close" onclick="closeQuickCategoryModal()">&times;</span>
+            <h2>Nova Categoria</h2>
+            <form id="quickCategoryForm">
+                <div class="form-group">
+                    <label for="quickCategoryName">Nome da Categoria *</label>
+                    <input type="text" id="quickCategoryName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="quickCategoryDescription">Descrição</label>
+                    <textarea id="quickCategoryDescription" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeQuickCategoryModal()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Rápido de Fornecedor -->
+    <div id="quickSupplierModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close" onclick="closeQuickSupplierModal()">&times;</span>
+            <h2>Novo Fornecedor</h2>
+            <form id="quickSupplierForm">
+                <div class="form-group">
+                    <label for="quickSupplierName">Nome do Fornecedor *</label>
+                    <input type="text" id="quickSupplierName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="quickSupplierCnpj">CNPJ</label>
+                    <input type="text" id="quickSupplierCnpj" class="form-control" placeholder="00.000.000/0000-00">
+                </div>
+                <div class="form-group">
+                    <label for="quickSupplierPhone">Telefone</label>
+                    <input type="text" id="quickSupplierPhone" class="form-control" placeholder="(00) 00000-0000">
+                </div>
+                <div class="form-group">
+                    <label for="quickSupplierEmail">Email</label>
+                    <input type="email" id="quickSupplierEmail" class="form-control">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeQuickSupplierModal()">Cancelar</button>
                 </div>
             </form>
         </div>
