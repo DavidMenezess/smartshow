@@ -252,11 +252,9 @@
                             // Apenas garantir que o campo fique com o código lido
                             barcodeInput.value = barcode;
                         },
-                        { lookupProduct: false }
+                        { lookupProduct: false, autoFocus: false }
                     );
                 }
-                // Focar no campo para facilitar o uso do leitor
-                barcodeInput.focus();
             }
 
             modal.style.display = 'block';

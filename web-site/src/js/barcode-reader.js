@@ -12,6 +12,7 @@ class BarcodeReader {
         // quando false, só preenche o campo com o código lido (modo cadastro)
         this.options = {
             lookupProduct: true,
+            autoFocus: true, // controlar se o leitor força foco constante no input
             ...options
         };
         this.config = {
@@ -138,17 +139,20 @@ class BarcodeReader {
             }
         });
 
-        // Focar no input quando a página carregar
-        window.addEventListener('load', () => {
-            this.input.focus();
-        });
-
-        // Focar novamente após clicar em qualquer lugar
-        document.addEventListener('click', () => {
-            if (this.input) {
+        // Comportamento agressivo de foco só quando autoFocus estiver habilitado
+        if (this.options.autoFocus) {
+            // Focar no input quando a página carregar
+            window.addEventListener('load', () => {
                 this.input.focus();
-            }
-        });
+            });
+
+            // Focar novamente após clicar em qualquer lugar
+            document.addEventListener('click', () => {
+                if (this.input) {
+                    this.input.focus();
+                }
+            });
+        }
     }
 
     async processBarcode(barcode, isFromReader = false) {
