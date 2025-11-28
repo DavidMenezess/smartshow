@@ -139,7 +139,13 @@ router.post('/', auth, async (req, res) => {
         }
 
         // Definir store_id automaticamente (exceto admin)
-        const storeId = (user.role === 'admin' && req.body.store_id) ? req.body.store_id : user.store_id;
+        let storeId = (user.role === 'admin' && req.body.store_id) ? req.body.store_id : user.store_id;
+        
+        // Se store_id for null, usar loja padrão (id=1) ou buscar a primeira loja ativa
+        if (!storeId) {
+            const defaultStore = await db.get('SELECT id FROM stores WHERE is_active = 1 ORDER BY id LIMIT 1');
+            storeId = defaultStore ? defaultStore.id : 1;
+        }
 
         const result = await db.run(
             `INSERT INTO products 
@@ -147,7 +153,7 @@ router.post('/', auth, async (req, res) => {
               cost_price, sale_price, stock, min_stock, store_id)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [barcode || null, name, description || null, category_id || null, supplier_id || null,
-             brand || null, model || null, cost_price || 0, sale_price, stock || 0, min_stock || 0, storeId || null]
+             brand || null, model || null, cost_price || 0, sale_price, stock || 0, min_stock || 0, storeId]
         );
 
         const product = await db.get('SELECT * FROM products WHERE id = ?', [result.lastID]);

@@ -83,14 +83,20 @@ router.post('/', auth, async (req, res) => {
         }
 
         // Definir store_id automaticamente (exceto admin)
-        const storeId = (user.role === 'admin' && req.body.store_id) ? req.body.store_id : user.store_id;
+        let storeId = (user.role === 'admin' && req.body.store_id) ? req.body.store_id : user.store_id;
+        
+        // Se store_id for null, usar loja padrão (id=1) ou buscar a primeira loja ativa
+        if (!storeId) {
+            const defaultStore = await db.get('SELECT id FROM stores WHERE is_active = 1 ORDER BY id LIMIT 1');
+            storeId = defaultStore ? defaultStore.id : 1;
+        }
 
         const result = await db.run(
             `INSERT INTO customers 
              (name, cpf_cnpj, phone, email, address, city, state, zip_code, credit_limit, store_id)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [name, cpf_cnpj || null, phone || null, email || null, address || null,
-             city || null, state || null, zip_code || null, credit_limit || 0, storeId || null]
+             city || null, state || null, zip_code || null, credit_limit || 0, storeId]
         );
 
         const customer = await db.get('SELECT * FROM customers WHERE id = ?', [result.lastID]);
