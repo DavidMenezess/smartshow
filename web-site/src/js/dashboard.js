@@ -71,14 +71,14 @@ async function loadDashboard() {
             renderComparison(data.comparison, data.sales);
         } else {
             // Modo normal: mostrar dados agregados
-            renderNormalDashboard(data);
+            await renderNormalDashboard(data);
         }
     } catch (error) {
         console.error('Erro ao carregar dashboard:', error);
     }
 }
 
-function renderNormalDashboard(data) {
+async function renderNormalDashboard(data) {
     // Ocultar área de comparação
     const comparisonArea = document.getElementById('comparisonArea');
     if (comparisonArea) comparisonArea.style.display = 'none';
