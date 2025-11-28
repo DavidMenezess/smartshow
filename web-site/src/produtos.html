@@ -476,13 +476,23 @@
             loadProducts(searchTerm, categoryId);
         });
         
-        // Fechar modal ao clicar fora
-        window.onclick = function(event) {
+        // Fechar modal ao clicar fora, sem atrapalhar seleção de texto
+        window.addEventListener('click', function(event) {
+            // Se o usuário estiver selecionando texto, não fechar o modal
+            try {
+                const selection = window.getSelection();
+                if (selection && selection.toString().length > 0) {
+                    return;
+                }
+            } catch (e) {
+                // Ignorar erros de seleção
+            }
+
             const modal = document.getElementById('productModal');
             if (event.target === modal) {
                 closeProductModal();
             }
-        }
+        });
 
         // Carregar dados ao iniciar
         document.addEventListener('DOMContentLoaded', async function() {
