@@ -1,25 +1,38 @@
 #!/bin/bash
 # Script para limpar completamente containers Docker antes do deploy
 
-set -e
+# NÃO usar set -e aqui, queremos continuar mesmo se alguns comandos falharem
+set +e
 
 echo "🛑 Iniciando limpeza completa de containers..."
+
+# PRIMEIRO: Parar TODOS os containers relacionados (mais agressivo)
+echo "🛑 Parando TODOS os containers do projeto..."
+docker stop $(docker ps -q --filter name=smartshow) 2>/dev/null || true
+docker stop $(docker ps -q --filter name=web-site) 2>/dev/null || true
+docker stop smartshow-api web-site-smartshow-api-1 2>/dev/null || true
 
 # Parar e remover via docker-compose (remove todos os containers do projeto)
 echo "📦 Parando containers via docker-compose..."
 docker-compose down -v --remove-orphans 2>/dev/null || true
 docker-compose rm -f 2>/dev/null || true
 
-# Parar e remover containers com nomes específicos (caso ainda existam de deploy anterior)
-echo "🛑 Parando containers do projeto..."
-docker stop smartshow-api web-site-smartshow-api-1 2>/dev/null || true
-
-# Remover containers com nomes específicos (múltiplas tentativas)
-echo "🗑️ Removendo containers específicos..."
+# Remover containers com nomes específicos (múltiplas tentativas com mais força)
+echo "🗑️ Removendo containers específicos (tentativas agressivas)..."
 for container_name in smartshow-api web-site-smartshow-api-1; do
-    for i in {1..5}; do
-        docker rm -f "$container_name" 2>/dev/null && break || sleep 1
+    # Tentar remover pelo nome
+    for i in {1..10}; do
+        docker rm -f "$container_name" 2>/dev/null && break || sleep 0.5
     done
+    
+    # Se ainda existir, tentar encontrar pelo ID e remover
+    CONTAINER_ID=$(docker ps -a --filter name="^${container_name}$" --format '{{.ID}}' 2>/dev/null || echo "")
+    if [ -n "$CONTAINER_ID" ]; then
+        echo "⚠️ Container $container_name ainda existe (ID: $CONTAINER_ID), forçando remoção..."
+        docker stop "$CONTAINER_ID" 2>/dev/null || true
+        docker rm -f "$CONTAINER_ID" 2>/dev/null || true
+        sleep 1
+    fi
 done
 
 # Remover qualquer container relacionado ao projeto (por nome ou filtro)
@@ -43,19 +56,25 @@ echo "🔍 Buscando todos os containers relacionados..."
 ALL_CONTAINERS=$(docker ps -a --format '{{.Names}} {{.ID}}' | grep -E "(smartshow|web-site)" | awk '{print $2}' || echo "")
 if [ -n "$ALL_CONTAINERS" ]; then
     echo "🗑️ Removendo todos os containers relacionados:"
-    echo "$ALL_CONTAINERS" | while read container_id; do
+    for container_id in $ALL_CONTAINERS; do
         if [ -n "$container_id" ]; then
-            echo "  - Removendo container: $container_id"
+            echo "  - Parando e removendo container: $container_id"
+            docker stop "$container_id" 2>/dev/null || true
             docker rm -f "$container_id" 2>/dev/null || true
         fi
     done
 fi
 
+# Remover também por filtro direto do Docker
+echo "🔍 Removendo containers por filtro Docker..."
+docker ps -aq --filter name=smartshow | xargs -r docker rm -f 2>/dev/null || true
+docker ps -aq --filter name=web-site | xargs -r docker rm -f 2>/dev/null || true
+
 # Remover containers parados que possam estar causando conflito
 echo "🧹 Removendo containers parados..."
 docker container prune -f 2>/dev/null || true
 
-# Remover redes
+# Remover redes ANTES de tentar criar novas (importante para evitar conflitos)
 echo "🌐 Removendo redes..."
 docker network rm web-site_loja-network 2>/dev/null || true
 docker network rm loja-network 2>/dev/null || true
@@ -65,15 +84,36 @@ echo "🧹 Limpando redes órfãs..."
 docker network prune -f 2>/dev/null || true
 
 # Aguardar um pouco para garantir que tudo foi limpo
+echo "⏳ Aguardando limpeza completa..."
 sleep 5
 
-# Verificar se ainda há containers com o nome problemático
-echo "🔍 Verificando se ainda há containers com nome problemático..."
-if docker ps -a --format '{{.Names}}' | grep -q "web-site-smartshow-api-1"; then
-    echo "⚠️ Ainda há containers com nome problemático, forçando remoção..."
-    docker ps -a --format '{{.Names}} {{.ID}}' | grep "web-site-smartshow-api-1" | awk '{print $2}' | xargs -r docker rm -f 2>/dev/null || true
-    sleep 2
+# Verificação final: garantir que NÃO há containers com o nome problemático
+echo "🔍 Verificação final: containers problemáticos..."
+PROBLEMATIC_CONTAINERS=$(docker ps -a --format '{{.Names}} {{.ID}}' | grep "web-site-smartshow-api-1" || echo "")
+if [ -n "$PROBLEMATIC_CONTAINERS" ]; then
+    echo "⚠️ AINDA há containers problemáticos encontrados:"
+    echo "$PROBLEMATIC_CONTAINERS"
+    echo "🗑️ Forçando remoção final..."
+    echo "$PROBLEMATIC_CONTAINERS" | awk '{print $2}' | while read container_id; do
+        if [ -n "$container_id" ]; then
+            echo "  - Removendo container ID: $container_id"
+            docker stop "$container_id" 2>/dev/null || true
+            docker rm -f "$container_id" 2>/dev/null || true
+        fi
+    done
+    sleep 3
+else
+    echo "✅ Nenhum container problemático encontrado"
 fi
 
-echo "✅ Limpeza concluída!"
+# Verificação final dupla
+FINAL_CHECK=$(docker ps -a --format '{{.Names}}' | grep -c "web-site-smartshow-api-1" || echo "0")
+if [ "$FINAL_CHECK" -gt 0 ]; then
+    echo "❌ ERRO: Ainda existem $FINAL_CHECK container(s) problemático(s) após limpeza!"
+    echo "📋 Containers encontrados:"
+    docker ps -a --format '{{.Names}} {{.ID}} {{.Status}}' | grep "web-site-smartshow-api-1"
+    exit 1
+else
+    echo "✅ Limpeza concluída com sucesso! Nenhum container problemático restante."
+fi
 
