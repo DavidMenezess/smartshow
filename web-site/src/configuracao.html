@@ -87,11 +87,17 @@
                 </div>
 
                 <div class="form-group" id="fiscalPrinterConfig" style="display: none;">
-                    <label for="fiscalPrinterPath">Caminho/Porta:</label>
-                    <input type="text" id="fiscalPrinterPath" class="form-control" 
-                           placeholder="Ex: /dev/usb/lp0 ou IP:9100">
+                    <label for="fiscalPrinterPath">Impressora:</label>
+                    <select id="fiscalPrinterPath" class="form-control" style="display: none;">
+                        <option value="">Selecione uma impressora...</option>
+                    </select>
+                    <input type="text" id="fiscalPrinterPathText" class="form-control" 
+                           placeholder="Ex: /dev/usb/lp0 ou IP:9100" style="display: none;">
                     <small style="color: #718096; display: block; margin-top: 0.25rem;">
-                        Para USB: deixe vazio para auto-detecção. Para rede: use formato IP:PORTA
+                        <span id="fiscalPrinterHelp">Para USB: selecione uma impressora da lista. Para rede: use formato IP:PORTA</span>
+                        <button type="button" onclick="loadDetectedPrinters()" class="btn btn-sm btn-secondary" style="margin-left: 0.5rem;">
+                            🔄 Atualizar Lista
+                        </button>
                     </small>
                 </div>
 
@@ -122,9 +128,18 @@
                 </div>
 
                 <div class="form-group" id="a4PrinterConfig" style="display: none;">
-                    <label for="a4PrinterPath">Caminho/Porta/Nome:</label>
-                    <input type="text" id="a4PrinterPath" class="form-control" 
-                           placeholder="Ex: /dev/usb/lp1, IP:9100 ou nome da impressora">
+                    <label for="a4PrinterPath">Impressora:</label>
+                    <select id="a4PrinterPath" class="form-control" style="display: none;">
+                        <option value="">Selecione uma impressora...</option>
+                    </select>
+                    <input type="text" id="a4PrinterPathText" class="form-control" 
+                           placeholder="Ex: /dev/usb/lp1, IP:9100 ou nome da impressora" style="display: none;">
+                    <small style="color: #718096; display: block; margin-top: 0.25rem;">
+                        <span id="a4PrinterHelp">Para USB: selecione uma impressora da lista. Para rede: use formato IP:PORTA</span>
+                        <button type="button" onclick="loadDetectedPrinters()" class="btn btn-sm btn-secondary" style="margin-left: 0.5rem;">
+                            🔄 Atualizar Lista
+                        </button>
+                    </small>
                 </div>
 
                 <div class="form-actions" style="margin-top: 1.5rem;">

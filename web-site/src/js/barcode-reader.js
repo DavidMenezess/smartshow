@@ -146,8 +146,32 @@ class BarcodeReader {
                 this.input.focus();
             });
 
-            // Focar novamente após clicar em qualquer lugar
-            document.addEventListener('click', () => {
+            // Focar novamente após clicar, mas apenas se não foi em um campo editável
+            document.addEventListener('click', (e) => {
+                // Não focar se o clique foi em um input, textarea, select ou botão
+                const target = e.target;
+                const isEditable = target.tagName === 'INPUT' || 
+                                  target.tagName === 'TEXTAREA' || 
+                                  target.tagName === 'SELECT' ||
+                                  target.tagName === 'BUTTON' ||
+                                  target.closest('button') !== null ||
+                                  target.closest('input') !== null ||
+                                  target.closest('textarea') !== null ||
+                                  target.closest('select') !== null ||
+                                  target.closest('.modal') !== null; // Não focar se clicou em um modal
+                
+                // Se o clique foi no próprio input de código de barras, focar nele
+                if (target === this.input) {
+                    this.input.focus();
+                    return;
+                }
+                
+                // Se foi em um elemento editável ou modal, não focar
+                if (isEditable) {
+                    return;
+                }
+                
+                // Caso contrário, focar no input de código de barras
                 if (this.input) {
                     this.input.focus();
                 }

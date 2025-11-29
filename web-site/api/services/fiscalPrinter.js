@@ -165,21 +165,58 @@ class FiscalPrinter {
     }
 
     // Teste de impressão
-    async testPrint() {
-        if (!this.connected) {
-            throw new Error('Impressora não conectada');
-        }
-
+    async testPrint(type, path) {
         try {
+            // Se não estiver conectado, tentar conectar
+            if (!this.connected) {
+                if (type === 'usb' && path) {
+                    // Para USB, o path pode ser o nome da impressora ou porta
+                    // Tentar conectar usando o nome/porta
+                    const { exec } = require('child_process');
+                    const { promisify } = require('util');
+                    const execAsync = promisify(exec);
+                    
+                    // No Windows, usar o nome da impressora para encontrar a porta
+                    if (process.platform === 'win32') {
+                        try {
+                            const { stdout } = await execAsync(`wmic printer where name="${path}" get portname /format:list`);
+                            const portMatch = stdout.match(/PortName=([^\r\n]+)/);
+                            if (portMatch) {
+                                path = portMatch[1];
+                            }
+                        } catch (e) {
+                            console.warn('Não foi possível obter porta da impressora:', e.message);
+                        }
+                    }
+                    
+                    // Tentar conectar via USB usando escpos-usb
+                    // Por enquanto, vamos usar uma abordagem mais simples
+                    console.log('⚠️ Conexão USB automática ainda não implementada completamente');
+                } else if (type === 'network' && path) {
+                    const [ip, port] = path.split(':');
+                    await this.connectNetwork(ip, parseInt(port) || 9100);
+                } else {
+                    throw new Error('Impressora não conectada e parâmetros de conexão não fornecidos');
+                }
+            }
+
+            if (!this.connected || !this.printer) {
+                throw new Error('Não foi possível conectar à impressora');
+            }
+
             this.printer
                 .font('a')
                 .align('ct')
+                .style('bu')
+                .size(1, 1)
                 .text('TESTE DE IMPRESSAO')
                 .text('---')
+                .align('lt')
                 .text('Se você está vendo isso,')
                 .text('a impressora está funcionando!')
                 .text('---')
                 .text(new Date().toLocaleString('pt-BR'))
+                .text('---')
                 .cut();
 
             console.log('✅ Teste de impressão concluído');

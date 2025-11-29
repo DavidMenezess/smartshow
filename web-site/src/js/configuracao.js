@@ -36,10 +36,25 @@ function loadConfigurations() {
     if (savedPrinters) {
         printerConfig = JSON.parse(savedPrinters);
         document.getElementById('fiscalPrinterType').value = printerConfig.fiscal.type;
-        document.getElementById('fiscalPrinterPath').value = printerConfig.fiscal.path;
         document.getElementById('autoPrintFiscal').checked = printerConfig.fiscal.autoPrint;
         document.getElementById('a4PrinterType').value = printerConfig.a4.type;
-        document.getElementById('a4PrinterPath').value = printerConfig.a4.path;
+        
+        // Atualizar campos de path (pode ser select ou input text)
+        const fiscalPathSelect = document.getElementById('fiscalPrinterPath');
+        const fiscalPathText = document.getElementById('fiscalPrinterPathText');
+        if (fiscalPathSelect && printerConfig.fiscal.type === 'usb') {
+            fiscalPathSelect.value = printerConfig.fiscal.path;
+        } else if (fiscalPathText) {
+            fiscalPathText.value = printerConfig.fiscal.path;
+        }
+        
+        const a4PathSelect = document.getElementById('a4PrinterPath');
+        const a4PathText = document.getElementById('a4PrinterPathText');
+        if (a4PathSelect && printerConfig.a4.type === 'usb') {
+            a4PathSelect.value = printerConfig.a4.path;
+        } else if (a4PathText) {
+            a4PathText.value = printerConfig.a4.path;
+        }
         
         // Mostrar/esconder campos de configuração
         toggleFiscalPrinterConfig();
@@ -80,8 +95,18 @@ function saveBarcodeConfig() {
 // Salvar configuração da impressora fiscal
 function saveFiscalPrinterConfig() {
     printerConfig.fiscal.type = document.getElementById('fiscalPrinterType').value;
-    printerConfig.fiscal.path = document.getElementById('fiscalPrinterPath').value;
     printerConfig.fiscal.autoPrint = document.getElementById('autoPrintFiscal').checked;
+    
+    // Obter path do campo correto (select ou input text)
+    const fiscalPathSelect = document.getElementById('fiscalPrinterPath');
+    const fiscalPathText = document.getElementById('fiscalPrinterPathText');
+    if (fiscalPathSelect && fiscalPathSelect.style.display !== 'none') {
+        printerConfig.fiscal.path = fiscalPathSelect.value;
+    } else if (fiscalPathText) {
+        printerConfig.fiscal.path = fiscalPathText.value;
+    } else {
+        printerConfig.fiscal.path = '';
+    }
     
     localStorage.setItem('smartshow_printer_config', JSON.stringify(printerConfig));
     alert('Configuração da impressora fiscal salva com sucesso!');
@@ -90,28 +115,233 @@ function saveFiscalPrinterConfig() {
 // Salvar configuração da impressora A4
 function saveA4PrinterConfig() {
     printerConfig.a4.type = document.getElementById('a4PrinterType').value;
-    printerConfig.a4.path = document.getElementById('a4PrinterPath').value;
+    
+    // Obter path do campo correto (select ou input text)
+    const a4PathSelect = document.getElementById('a4PrinterPath');
+    const a4PathText = document.getElementById('a4PrinterPathText');
+    if (a4PathSelect && a4PathSelect.style.display !== 'none') {
+        printerConfig.a4.path = a4PathSelect.value;
+    } else if (a4PathText) {
+        printerConfig.a4.path = a4PathText.value;
+    } else {
+        printerConfig.a4.path = '';
+    }
     
     localStorage.setItem('smartshow_printer_config', JSON.stringify(printerConfig));
     alert('Configuração da impressora A4 salva com sucesso!');
 }
 
+// Detectar impressoras
+async function detectPrinters() {
+    try {
+        const response = await fetch('/api/print/detect', {
+            headers: getAuthHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error('Erro ao detectar impressoras');
+        }
+        
+        const data = await response.json();
+        return data.printers || [];
+    } catch (error) {
+        console.error('Erro ao detectar impressoras:', error);
+        return [];
+    }
+}
+
+// Carregar impressoras detectadas
+async function loadDetectedPrinters() {
+    try {
+        const printers = await detectPrinters();
+        
+        // Atualizar selects de impressoras
+        const fiscalSelect = document.getElementById('fiscalPrinterPath');
+        const a4Select = document.getElementById('a4PrinterPath');
+        const fiscalType = document.getElementById('fiscalPrinterType').value;
+        const a4Type = document.getElementById('a4PrinterType').value;
+        
+        if (fiscalType === 'usb' && fiscalSelect) {
+            // Limpar opções existentes
+            fiscalSelect.innerHTML = '<option value="">Selecione uma impressora...</option>';
+            
+            if (printers.length === 0) {
+                fiscalSelect.innerHTML += '<option value="" disabled>Nenhuma impressora detectada. Verifique se há impressoras conectadas.</option>';
+            } else {
+                printers.forEach(printer => {
+                    const option = document.createElement('option');
+                    option.value = printer.name;
+                    option.textContent = `${printer.name} (${printer.port})`;
+                    if (printer.isDefault) {
+                        option.textContent += ' [Padrão]';
+                        option.selected = true; // Selecionar impressora padrão automaticamente
+                    }
+                    fiscalSelect.appendChild(option);
+                });
+            }
+        }
+        
+        if (a4Type === 'usb' && a4Select) {
+            a4Select.innerHTML = '<option value="">Selecione uma impressora...</option>';
+            
+            if (printers.length === 0) {
+                a4Select.innerHTML += '<option value="" disabled>Nenhuma impressora detectada. Verifique se há impressoras conectadas.</option>';
+            } else {
+                printers.forEach(printer => {
+                    const option = document.createElement('option');
+                    option.value = printer.name;
+                    option.textContent = `${printer.name} (${printer.port})`;
+                    if (printer.isDefault) {
+                        option.textContent += ' [Padrão]';
+                        option.selected = true; // Selecionar impressora padrão automaticamente
+                    }
+                    a4Select.appendChild(option);
+                });
+            }
+        }
+        
+        if (printers.length > 0) {
+            console.log(`✅ ${printers.length} impressora(s) detectada(s)`);
+        } else {
+            console.warn('⚠️ Nenhuma impressora detectada');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar impressoras:', error);
+        alert('Erro ao detectar impressoras: ' + (error.message || 'Erro desconhecido'));
+    }
+}
+
 // Testar impressora fiscal
 async function testFiscalPrinter() {
-    alert('Funcionalidade de teste de impressora fiscal será implementada em breve.');
+    const type = document.getElementById('fiscalPrinterType').value;
+    let path = '';
+    
+    if (type === 'none') {
+        alert('Por favor, selecione um tipo de impressora primeiro.');
+        return;
+    }
+    
+    if (type === 'usb') {
+        const pathSelect = document.getElementById('fiscalPrinterPath');
+        path = pathSelect?.value || '';
+        if (!path) {
+            alert('Por favor, selecione uma impressora da lista.');
+            return;
+        }
+    } else {
+        const pathText = document.getElementById('fiscalPrinterPathText');
+        path = pathText?.value || '';
+        if (type === 'network' && !path) {
+            alert('Por favor, informe o IP e porta da impressora (formato: IP:PORTA).');
+            return;
+        }
+    }
+    
+    try {
+        const response = await fetch('/api/print/fiscal/test', {
+            method: 'POST',
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ type, path })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('Teste de impressão enviado com sucesso! Verifique se a impressora imprimiu o teste.');
+        } else {
+            alert('Erro ao testar impressora: ' + (data.error || 'Erro desconhecido'));
+        }
+    } catch (error) {
+        console.error('Erro ao testar impressora fiscal:', error);
+        alert('Erro ao testar impressora: ' + (error.message || 'Erro desconhecido'));
+    }
 }
 
 // Testar impressora A4
 async function testA4Printer() {
-    alert('Funcionalidade de teste de impressora A4 será implementada em breve.');
+    const type = document.getElementById('a4PrinterType').value;
+    let path = '';
+    
+    if (type === 'none') {
+        alert('Por favor, selecione um tipo de impressora primeiro.');
+        return;
+    }
+    
+    if (type === 'pdf') {
+        alert('Impressão em PDF não requer teste. O arquivo será gerado automaticamente.');
+        return;
+    }
+    
+    if (type === 'usb') {
+        const pathSelect = document.getElementById('a4PrinterPath');
+        path = pathSelect?.value || '';
+        if (!path) {
+            alert('Por favor, selecione uma impressora da lista.');
+            return;
+        }
+    } else {
+        const pathText = document.getElementById('a4PrinterPathText');
+        path = pathText?.value || '';
+        if (type === 'network' && !path) {
+            alert('Por favor, informe o IP e porta da impressora (formato: IP:PORTA).');
+            return;
+        }
+    }
+    
+    try {
+        // Por enquanto, usar o mesmo endpoint de teste fiscal
+        // Futuramente pode ter um endpoint específico para A4
+        const response = await fetch('/api/print/fiscal/test', {
+            method: 'POST',
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ type, path })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('Teste de impressão enviado com sucesso! Verifique se a impressora imprimiu o teste.');
+        } else {
+            alert('Erro ao testar impressora: ' + (data.error || 'Erro desconhecido'));
+        }
+    } catch (error) {
+        console.error('Erro ao testar impressora A4:', error);
+        alert('Erro ao testar impressora: ' + (error.message || 'Erro desconhecido'));
+    }
 }
 
 // Toggle campos de configuração fiscal
 function toggleFiscalPrinterConfig() {
     const type = document.getElementById('fiscalPrinterType').value;
     const configDiv = document.getElementById('fiscalPrinterConfig');
+    const pathSelect = document.getElementById('fiscalPrinterPath');
+    const pathText = document.getElementById('fiscalPrinterPathText');
+    const helpText = document.getElementById('fiscalPrinterHelp');
+    
     if (type !== 'none') {
         configDiv.style.display = 'block';
+        
+        // Mostrar select para USB, input text para rede/serial
+        if (type === 'usb') {
+            pathSelect.style.display = 'block';
+            pathText.style.display = 'none';
+            helpText.textContent = 'Para USB: selecione uma impressora da lista.';
+            loadDetectedPrinters();
+        } else {
+            pathSelect.style.display = 'none';
+            pathText.style.display = 'block';
+            if (type === 'network') {
+                helpText.textContent = 'Para rede: use formato IP:PORTA (ex: 192.168.1.100:9100)';
+            } else {
+                helpText.textContent = 'Para serial: informe a porta serial (ex: COM3 ou /dev/ttyUSB0)';
+            }
+        }
     } else {
         configDiv.style.display = 'none';
     }
@@ -121,8 +351,24 @@ function toggleFiscalPrinterConfig() {
 function toggleA4PrinterConfig() {
     const type = document.getElementById('a4PrinterType').value;
     const configDiv = document.getElementById('a4PrinterConfig');
+    const pathSelect = document.getElementById('a4PrinterPath');
+    const pathText = document.getElementById('a4PrinterPathText');
+    const helpText = document.getElementById('a4PrinterHelp');
+    
     if (type !== 'none' && type !== 'pdf') {
         configDiv.style.display = 'block';
+        
+        // Mostrar select para USB, input text para rede
+        if (type === 'usb') {
+            pathSelect.style.display = 'block';
+            pathText.style.display = 'none';
+            helpText.textContent = 'Para USB: selecione uma impressora da lista.';
+            loadDetectedPrinters();
+        } else {
+            pathSelect.style.display = 'none';
+            pathText.style.display = 'block';
+            helpText.textContent = 'Para rede: use formato IP:PORTA (ex: 192.168.1.100:9100)';
+        }
     } else {
         configDiv.style.display = 'none';
     }
