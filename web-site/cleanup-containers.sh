@@ -14,8 +14,11 @@ docker stop smartshow-api web-site-smartshow-api-1 2>/dev/null || true
 
 # Parar e remover via docker-compose (remove todos os containers do projeto)
 echo "📦 Parando containers via docker-compose..."
-docker-compose down -v --remove-orphans 2>/dev/null || true
-docker-compose rm -f 2>/dev/null || true
+# Usar down com todas as opções para garantir remoção completa
+docker-compose down -v --remove-orphans --rmi local 2>/dev/null || true
+docker-compose rm -f -v 2>/dev/null || true
+# Tentar novamente com mais força
+docker-compose down --remove-orphans 2>/dev/null || true
 
 # Remover containers com nomes específicos (múltiplas tentativas com mais força)
 echo "🗑️ Removendo containers específicos (tentativas agressivas)..."
@@ -89,16 +92,29 @@ sleep 5
 
 # Verificação final: garantir que NÃO há containers com o nome problemático
 echo "🔍 Verificação final: containers problemáticos..."
-PROBLEMATIC_CONTAINERS=$(docker ps -a --format '{{.Names}} {{.ID}}' | grep "web-site-smartshow-api-1" || echo "")
+PROBLEMATIC_CONTAINERS=$(docker ps -a --format '{{.Names}} {{.ID}}' | grep -E "(web-site-smartshow-api|smartshow-api)" || echo "")
 if [ -n "$PROBLEMATIC_CONTAINERS" ]; then
     echo "⚠️ AINDA há containers problemáticos encontrados:"
     echo "$PROBLEMATIC_CONTAINERS"
-    echo "🗑️ Forçando remoção final..."
-    echo "$PROBLEMATIC_CONTAINERS" | awk '{print $2}' | while read container_id; do
-        if [ -n "$container_id" ]; then
-            echo "  - Removendo container ID: $container_id"
-            docker stop "$container_id" 2>/dev/null || true
-            docker rm -f "$container_id" 2>/dev/null || true
+    echo "🗑️ Forçando remoção final (múltiplas tentativas)..."
+    for attempt in {1..5}; do
+        echo "  Tentativa $attempt de 5..."
+        echo "$PROBLEMATIC_CONTAINERS" | awk '{print $2}' | while read container_id; do
+            if [ -n "$container_id" ]; then
+                echo "    - Parando container ID: $container_id"
+                docker stop "$container_id" 2>/dev/null || true
+                sleep 1
+                echo "    - Removendo container ID: $container_id"
+                docker rm -f "$container_id" 2>/dev/null || true
+            fi
+        done
+        sleep 2
+        
+        # Verificar se ainda existem
+        REMAINING=$(docker ps -a --format '{{.Names}} {{.ID}}' | grep -E "(web-site-smartshow-api|smartshow-api)" || echo "")
+        if [ -z "$REMAINING" ]; then
+            echo "  ✅ Todos os containers foram removidos na tentativa $attempt"
+            break
         fi
     done
     sleep 3
@@ -107,12 +123,22 @@ else
 fi
 
 # Verificação final dupla
-FINAL_CHECK=$(docker ps -a --format '{{.Names}}' | grep -c "web-site-smartshow-api-1" || echo "0")
+FINAL_CHECK=$(docker ps -a --format '{{.Names}}' | grep -cE "(web-site-smartshow-api|smartshow-api)" || echo "0")
 if [ "$FINAL_CHECK" -gt 0 ]; then
     echo "❌ ERRO: Ainda existem $FINAL_CHECK container(s) problemático(s) após limpeza!"
     echo "📋 Containers encontrados:"
-    docker ps -a --format '{{.Names}} {{.ID}} {{.Status}}' | grep "web-site-smartshow-api-1"
-    exit 1
+    docker ps -a --format '{{.Names}} {{.ID}} {{.Status}}' | grep -E "(web-site-smartshow-api|smartshow-api)"
+    echo "💡 Tentando remoção final com docker kill..."
+    docker ps -a --format '{{.Names}} {{.ID}}' | grep -E "(web-site-smartshow-api|smartshow-api)" | awk '{print $2}' | xargs -r docker kill 2>/dev/null || true
+    docker ps -a --format '{{.Names}} {{.ID}}' | grep -E "(web-site-smartshow-api|smartshow-api)" | awk '{print $2}' | xargs -r docker rm -f 2>/dev/null || true
+    sleep 2
+    FINAL_CHECK_2=$(docker ps -a --format '{{.Names}}' | grep -cE "(web-site-smartshow-api|smartshow-api)" || echo "0")
+    if [ "$FINAL_CHECK_2" -gt 0 ]; then
+        echo "❌ ERRO CRÍTICO: Não foi possível remover todos os containers!"
+        exit 1
+    else
+        echo "✅ Containers removidos com sucesso após kill!"
+    fi
 else
     echo "✅ Limpeza concluída com sucesso! Nenhum container problemático restante."
 fi
