@@ -74,24 +74,51 @@ async function detectPrinters() {
     try {
         if (platform === 'win32') {
             // Windows: usar wmic para listar impressoras
-            const { stdout } = await execAsync('wmic printer get name,portname,default /format:csv');
-            const lines = stdout.split('\n').filter(line => line.trim() && !line.startsWith('Node'));
-            
-            for (const line of lines) {
-                const parts = line.split(',');
-                if (parts.length >= 3) {
-                    const name = parts[parts.length - 3]?.trim();
-                    const port = parts[parts.length - 2]?.trim();
-                    const isDefault = parts[parts.length - 1]?.trim() === 'TRUE';
+            try {
+                const { stdout } = await execAsync('wmic printer get name,portname,default /format:csv');
+                const lines = stdout.split('\r\n').filter(line => line.trim() && !line.startsWith('Node') && !line.startsWith(','));
+                
+                for (const line of lines) {
+                    if (!line.trim()) continue;
                     
-                    if (name && name !== 'Name') {
-                        printers.push({
-                            name: name,
-                            port: port || 'N/A',
-                            type: port && port.startsWith('USB') ? 'usb' : 'other',
-                            isDefault: isDefault || false
-                        });
+                    const parts = line.split(',');
+                    if (parts.length >= 3) {
+                        // CSV do wmic tem formato: Node,Name,PortName,Default
+                        const name = parts[1]?.trim();
+                        const port = parts[2]?.trim();
+                        const isDefault = parts[3]?.trim() === 'TRUE';
+                        
+                        if (name && name !== 'Name' && name.length > 0) {
+                            printers.push({
+                                name: name,
+                                port: port || 'N/A',
+                                type: (port && (port.startsWith('USB') || port.includes('USB'))) ? 'usb' : 'other',
+                                isDefault: isDefault || false
+                            });
+                        }
                     }
+                }
+            } catch (error) {
+                console.error('Erro ao executar wmic:', error);
+                // Tentar método alternativo usando PowerShell
+                try {
+                    const { stdout } = await execAsync('powershell -Command "Get-Printer | Select-Object Name, PortName | ConvertTo-Json"');
+                    const printerList = JSON.parse(stdout);
+                    const printerArray = Array.isArray(printerList) ? printerList : [printerList];
+                    
+                    printerArray.forEach(printer => {
+                        if (printer && printer.Name) {
+                            printers.push({
+                                name: printer.Name,
+                                port: printer.PortName || 'N/A',
+                                type: (printer.PortName && printer.PortName.includes('USB')) ? 'usb' : 'other',
+                                isDefault: false
+                            });
+                        }
+                    });
+                } catch (psError) {
+                    console.error('Erro ao usar PowerShell:', psError);
+                    throw new Error('Não foi possível detectar impressoras no Windows');
                 }
             }
         } else if (platform === 'linux') {
