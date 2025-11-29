@@ -75,6 +75,10 @@ function loadConfigurations() {
         loadUsers();
         loadStoresForExport();
     }
+    
+    // Adicionar event listeners para mudança de tipo de impressora
+    document.getElementById('fiscalPrinterType')?.addEventListener('change', toggleFiscalPrinterConfig);
+    document.getElementById('a4PrinterType')?.addEventListener('change', toggleA4PrinterConfig);
 }
 
 // Salvar configuração do leitor
