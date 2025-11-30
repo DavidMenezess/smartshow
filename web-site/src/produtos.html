@@ -873,6 +873,9 @@
             document.getElementById('replacementProductContainer').style.display = 'none';
             document.getElementById('returnFormTitle').textContent = 'Nova Devolução';
             document.getElementById('returnSaleSearch').value = '';
+            document.getElementById('returnReplacementProduct').value = '';
+            document.getElementById('returnReplacementProductId').value = '';
+            document.getElementById('priceDifferenceInfo').style.display = 'none';
             selectedSale = null;
             loadProductsForReplacement();
         }
@@ -1148,10 +1151,21 @@
             
             if (actionType === 'different_product') {
                 replacementContainer.style.display = 'block';
-                document.getElementById('returnReplacementProduct').required = true;
+                const searchInput = document.getElementById('returnReplacementProduct');
+                if (searchInput) {
+                    searchInput.required = true;
+                }
             } else {
                 replacementContainer.style.display = 'none';
-                document.getElementById('returnReplacementProduct').required = false;
+                const searchInput = document.getElementById('returnReplacementProduct');
+                if (searchInput) {
+                    searchInput.required = false;
+                    searchInput.value = '';
+                }
+                const hiddenInput = document.getElementById('returnReplacementProductId');
+                if (hiddenInput) {
+                    hiddenInput.value = '';
+                }
                 priceDiffInfo.style.display = 'none';
             }
 
