@@ -163,7 +163,7 @@ function renderReturnsTable(returns) {
     if (returns.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" style="text-align: center; padding: 2rem;">
+                <td colspan="10" style="text-align: center; padding: 2rem;">
                     Nenhuma devolução registrada
                 </td>
             </tr>
@@ -193,16 +193,30 @@ function renderReturnsTable(returns) {
             actionDisplay += ` (R$ ${parseFloat(returnItem.refund_amount).toFixed(2)})`;
         }
 
+        // Montar informações completas da ação
+        let actionDetails = actionDisplay;
+        if (returnItem.action_type === 'different_product') {
+            if (returnItem.replacement_product_name) {
+                actionDetails = `Troca: ${returnItem.product_name} → ${returnItem.replacement_product_name}`;
+                if (returnItem.price_difference !== 0) {
+                    actionDetails += ` (${returnItem.price_difference > 0 ? `Cliente paga R$ ${Math.abs(returnItem.price_difference).toFixed(2)}` : `Loja devolve R$ ${Math.abs(returnItem.price_difference).toFixed(2)}`})`;
+                }
+            }
+        } else if (returnItem.action_type === 'refund' && returnItem.refund_amount) {
+            actionDetails = `Reembolso de R$ ${parseFloat(returnItem.refund_amount).toFixed(2)}`;
+        }
+
         return `
             <tr>
                 <td>${returnItem.return_number}</td>
                 <td>${new Date(returnItem.created_at).toLocaleDateString('pt-BR')}</td>
                 <td>${returnItem.customer_name || 'N/A'}</td>
+                <td>${returnItem.sale_number || 'N/A'}</td>
                 <td>${returnItem.product_name}</td>
                 <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${returnItem.defect_description}">${returnItem.defect_description}</td>
-                <td>${actionDisplay}</td>
+                <td>${actionDetails}</td>
                 <td>R$ ${parseFloat(returnItem.original_price).toFixed(2)}</td>
-                <td>${returnItem.original_payment_method}</td>
+                <td>${returnItem.original_payment_method}${returnItem.installments ? ` (${returnItem.installments}x)` : ''}</td>
                 <td>${statusBadge}</td>
             </tr>
         `;

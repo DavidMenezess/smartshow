@@ -1244,8 +1244,20 @@
                     observations: observations || null
                 };
 
-                await api.createReturn(returnData);
-                alert('Devolução registrada com sucesso!');
+                const createdReturn = await api.createReturn(returnData);
+                
+                // Se for troca por outro produto ou reembolso, imprimir cupom automaticamente
+                if (actionType === 'different_product' || actionType === 'refund') {
+                    try {
+                        await api.printExchangeReceipt(createdReturn);
+                        console.log('Cupom de troca impresso automaticamente');
+                    } catch (printError) {
+                        console.warn('Erro ao imprimir cupom de troca:', printError);
+                        // Não bloquear o fluxo se a impressão falhar
+                    }
+                }
+                
+                alert('Devolução registrada com sucesso!' + (actionType === 'different_product' || actionType === 'refund' ? '\nCupom de troca impresso automaticamente.' : ''));
                 closeReturnFormModal();
                 loadReturns();
             } catch (error) {

@@ -55,6 +55,41 @@ router.post('/fiscal/test', async (req, res) => {
     }
 });
 
+// Imprimir cupom de troca/devolução
+router.post('/exchange-receipt', async (req, res) => {
+    try {
+        const returnData = req.body;
+        
+        // Gerar cupom de troca usando PDF
+        const receiptData = {
+            type: 'exchange',
+            returnNumber: returnData.return_number,
+            date: new Date().toLocaleString('pt-BR'),
+            originalSale: returnData.sale_number,
+            customer: returnData.customer_name || 'Cliente não informado',
+            originalProduct: {
+                name: returnData.product_name,
+                price: returnData.original_price
+            },
+            replacementProduct: returnData.replacement_product_name ? {
+                name: returnData.replacement_product_name,
+                price: returnData.replacement_price
+            } : null,
+            priceDifference: returnData.price_difference || 0,
+            actionType: returnData.action_type,
+            defectDescription: returnData.defect_description,
+            paymentMethod: returnData.original_payment_method,
+            installments: returnData.installments
+        };
+        
+        await pdfGenerator.printExchangeReceipt(receiptData);
+        res.json({ success: true, message: 'Cupom de troca impresso' });
+    } catch (error) {
+        console.error('Erro ao imprimir cupom de troca:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Detectar impressoras USB conectadas
 router.get('/detect', async (req, res) => {
     try {

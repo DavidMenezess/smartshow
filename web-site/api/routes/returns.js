@@ -372,7 +372,7 @@ router.post('/', auth, async (req, res) => {
             }
 
             replacementProductId = replacement_product_id;
-            replacementPrice = replacementProduct.price;
+            replacementPrice = replacementProduct.sale_price || replacementProduct.price;
             priceDifference = replacementPrice - saleItem.unit_price;
         } else if (action_type === 'refund') {
             refundAmount = saleItem.unit_price;
@@ -421,6 +421,12 @@ router.post('/', auth, async (req, res) => {
 
         const returnId = result.lastID;
 
+        // Processar automaticamente se for troca por outro produto ou reembolso
+        let shouldAutoProcess = false;
+        if (action_type === 'different_product' || action_type === 'refund') {
+            shouldAutoProcess = true;
+        }
+
         // Se for troca pelo mesmo produto, atualizar estoque
         if (action_type === 'same_product') {
             // Devolver produto ao estoque
@@ -435,20 +441,128 @@ router.post('/', auth, async (req, res) => {
                  VALUES (?, 'entry', 1, 'Devolução - Troca pelo mesmo produto', ?)`,
                 [product_id, req.user.id]
             );
+        } else if (shouldAutoProcess) {
+            // Processar automaticamente: atualizar estoque e registrar no caixa
+            if (action_type === 'different_product') {
+                // Devolver produto original e remover produto de substituição
+                await db.run(
+                    `UPDATE products SET stock = stock + 1 WHERE id = ?`,
+                    [product_id]
+                );
+
+                if (replacementProductId) {
+                    await db.run(
+                        `UPDATE products SET stock = stock - 1 WHERE id = ?`,
+                        [replacementProductId]
+                    );
+
+                    // Registrar movimentações de estoque
+                    await db.run(
+                        `INSERT INTO stock_movements (product_id, type, quantity, reason, user_id)
+                         VALUES (?, 'entry', 1, 'Devolução - Produto devolvido', ?)`,
+                        [product_id, req.user.id]
+                    );
+
+                    await db.run(
+                        `INSERT INTO stock_movements (product_id, type, quantity, reason, user_id)
+                         VALUES (?, 'exit', 1, 'Devolução - Produto de substituição', ?)`,
+                        [replacementProductId, req.user.id]
+                    );
+                }
+            } else if (action_type === 'refund') {
+                // Devolver produto ao estoque
+                await db.run(
+                    `UPDATE products SET stock = stock + 1 WHERE id = ?`,
+                    [product_id]
+                );
+
+                await db.run(
+                    `INSERT INTO stock_movements (product_id, type, quantity, reason, user_id)
+                     VALUES (?, 'entry', 1, 'Devolução - Reembolso', ?)`,
+                    [product_id, req.user.id]
+                );
+            }
+
+            // Registrar movimentação de caixa se houver diferença de preço ou reembolso
+            if (action_type === 'different_product' && priceDifference !== 0) {
+                // Buscar caixa aberto
+                const today = new Date().toISOString().split('T')[0];
+                const cashControl = await db.get(
+                    `SELECT * FROM cash_control 
+                     WHERE DATE(datetime(opening_date, '-3 hours')) = ? 
+                     AND closing_date IS NULL 
+                     AND is_open = 1
+                     AND store_id = ?
+                     ORDER BY opening_date DESC LIMIT 1`,
+                    [today, storeId]
+                );
+                
+                if (cashControl) {
+                    // Registrar movimentação de caixa
+                    const movementType = priceDifference > 0 ? 'entry' : 'exit';
+                    const amount = Math.abs(priceDifference);
+                    const description = priceDifference > 0 
+                        ? `Devolução - Cliente pagou diferença (Troca: ${returnNumber})`
+                        : `Devolução - Loja devolveu diferença (Troca: ${returnNumber})`;
+                    
+                    await db.run(
+                        `INSERT INTO cash_movements (cash_control_id, type, amount, description, user_id, created_at)
+                         VALUES (?, ?, ?, ?, ?, ?)`,
+                        [cashControl.id, movementType, amount, description, req.user.id, new Date().toISOString()]
+                    );
+                }
+            } else if (action_type === 'refund' && refundAmount > 0) {
+                // Buscar caixa aberto
+                const today = new Date().toISOString().split('T')[0];
+                const cashControl = await db.get(
+                    `SELECT * FROM cash_control 
+                     WHERE DATE(datetime(opening_date, '-3 hours')) = ? 
+                     AND closing_date IS NULL 
+                     AND is_open = 1
+                     AND store_id = ?
+                     ORDER BY opening_date DESC LIMIT 1`,
+                    [today, storeId]
+                );
+                
+                if (cashControl) {
+                    // Registrar saída de caixa para reembolso
+                    await db.run(
+                        `INSERT INTO cash_movements (cash_control_id, type, amount, description, user_id, created_at)
+                         VALUES (?, 'exit', ?, ?, ?, ?)`,
+                        [cashControl.id, refundAmount, `Devolução - Reembolso (${returnNumber})`, req.user.id, new Date().toISOString()]
+                    );
+                }
+            }
+
+            // Atualizar status para completed
+            await db.run(
+                `UPDATE returns 
+                 SET status = 'completed',
+                     processed_by = ?,
+                     processed_at = ?
+                 WHERE id = ?`,
+                [req.user.id, new Date().toISOString(), returnId]
+            );
         }
 
-        // Buscar devolução completa
+        // Buscar devolução completa com informações do produto de substituição
         const returnData = await db.get(
             `SELECT r.*,
                     s.sale_number,
+                    s.installments,
                     p.name as product_name,
+                    p.barcode as product_barcode,
                     c.name as customer_name,
-                    st.name as store_name
+                    c.cpf_cnpj as customer_document,
+                    st.name as store_name,
+                    rp.name as replacement_product_name,
+                    rp.barcode as replacement_product_barcode
              FROM returns r
              LEFT JOIN sales s ON r.sale_id = s.id
              LEFT JOIN products p ON r.product_id = p.id
              LEFT JOIN customers c ON r.customer_id = c.id
              LEFT JOIN stores st ON r.store_id = st.id
+             LEFT JOIN products rp ON r.replacement_product_id = rp.id
              WHERE r.id = ?`,
             [returnId]
         );

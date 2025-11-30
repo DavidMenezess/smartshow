@@ -281,6 +281,10 @@ class API {
         });
     }
 
+    async printExchangeReceipt(returnData) {
+        return await this.request('/print/exchange-receipt', 'POST', returnData);
+    }
+
     // Users
     async getUsers() {
         return await this.request('/users');

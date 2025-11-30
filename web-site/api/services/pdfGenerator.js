@@ -188,6 +188,147 @@ class PDFGenerator {
             stream.on('error', reject);
         });
     }
+
+    // Imprimir cupom de troca/devolução
+    async printExchangeReceipt(returnData) {
+        return new Promise((resolve, reject) => {
+            const filename = `cupom-troca-${returnData.returnNumber || Date.now()}.pdf`;
+            const filepath = path.join(this.outputDir, filename);
+            
+            const doc = new PDFDocument({ margin: 50, size: [226.77, 841.89] }); // Tamanho de cupom (80mm)
+            const stream = fs.createWriteStream(filepath);
+            doc.pipe(stream);
+
+            // Cabeçalho
+            doc.fontSize(16)
+               .text('CUPOM DE TROCA', { align: 'center' })
+               .moveDown(0.5);
+
+            // Dados da empresa
+            doc.fontSize(10)
+               .text('NOME DA SUA EMPRESA', { align: 'center' })
+               .text('CNPJ: 00.000.000/0001-00', { align: 'center' })
+               .moveDown(0.5);
+
+            // Linha separadora
+            doc.moveTo(50, doc.y)
+               .lineTo(176.77, doc.y)
+               .stroke()
+               .moveDown(0.5);
+
+            // Dados da devolução
+            doc.fontSize(9)
+               .text(`Nº Devolução: ${returnData.returnNumber}`)
+               .text(`Data: ${returnData.date}`)
+               .text(`Venda Original: ${returnData.originalSale}`)
+               .text(`Cliente: ${returnData.customer}`)
+               .moveDown(0.5);
+
+            // Produto devolvido
+            doc.fontSize(10)
+               .text('PRODUTO DEVOLVIDO:', { underline: true })
+               .fontSize(9)
+               .text(`${returnData.originalProduct.name}`)
+               .text(`Valor: R$ ${parseFloat(returnData.originalProduct.price).toFixed(2)}`)
+               .text(`Forma de Pagamento: ${returnData.paymentMethod}${returnData.installments ? ` (${returnData.installments}x)` : ''}`)
+               .moveDown(0.5);
+
+            // Defeito
+            doc.fontSize(9)
+               .text('Defeito Relatado:', { underline: true })
+               .text(returnData.defectDescription)
+               .moveDown(0.5);
+
+            // Produto de substituição
+            if (returnData.replacementProduct) {
+                doc.fontSize(10)
+                   .text('PRODUTO DE SUBSTITUIÇÃO:', { underline: true })
+                   .fontSize(9)
+                   .text(`${returnData.replacementProduct.name}`)
+                   .text(`Valor: R$ ${parseFloat(returnData.replacementProduct.price).toFixed(2)}`)
+                   .moveDown(0.5);
+            }
+
+            // Diferença de valor
+            if (returnData.priceDifference !== 0) {
+                doc.fontSize(10)
+                   .text('DIFERENÇA DE VALOR:', { underline: true });
+                
+                if (returnData.priceDifference > 0) {
+                    doc.fontSize(11)
+                       .fillColor('#ef4444')
+                       .text(`Cliente paga: R$ ${Math.abs(returnData.priceDifference).toFixed(2)}`, { align: 'center' })
+                       .fillColor('black');
+                } else {
+                    doc.fontSize(11)
+                       .fillColor('#10b981')
+                       .text(`Loja devolve: R$ ${Math.abs(returnData.priceDifference).toFixed(2)}`, { align: 'center' })
+                       .fillColor('black');
+                }
+                doc.moveDown(0.5);
+            } else if (returnData.actionType === 'refund') {
+                doc.fontSize(10)
+                   .text('REEMBOLSO:', { underline: true })
+                   .fontSize(11)
+                   .fillColor('#10b981')
+                   .text(`Valor devolvido: R$ ${parseFloat(returnData.originalProduct.price).toFixed(2)}`, { align: 'center' })
+                   .fillColor('black')
+                   .moveDown(0.5);
+            }
+
+            // Linha separadora
+            doc.moveTo(50, doc.y)
+               .lineTo(176.77, doc.y)
+               .stroke()
+               .moveDown(0.5);
+
+            // Rodapé
+            doc.fontSize(8)
+               .text('Obrigado pela preferência!', { align: 'center' })
+               .text('Volte sempre!', { align: 'center' })
+               .moveDown(0.5)
+               .text(`Emitido em: ${new Date().toLocaleString('pt-BR')}`, { align: 'center' });
+
+            doc.end();
+
+            stream.on('finish', () => {
+                // Tentar imprimir automaticamente se houver impressora configurada
+                this.printPDF(filepath).catch(err => {
+                    console.warn('Não foi possível imprimir automaticamente:', err.message);
+                });
+                resolve(filepath);
+            });
+
+            stream.on('error', reject);
+        });
+    }
+
+    // Imprimir PDF na impressora A4
+    async printPDF(filepath) {
+        const platform = process.platform;
+        try {
+            if (platform === 'win32') {
+                // Windows: usar o comando padrão de impressão
+                const { exec } = require('child_process');
+                const { promisify } = require('util');
+                const execAsync = promisify(exec);
+                await execAsync(`start /min "" "${filepath}"`);
+            } else if (platform === 'linux') {
+                const { exec } = require('child_process');
+                const { promisify } = require('util');
+                const execAsync = promisify(exec);
+                await execAsync(`lp "${filepath}"`);
+            } else if (platform === 'darwin') {
+                const { exec } = require('child_process');
+                const { promisify } = require('util');
+                const execAsync = promisify(exec);
+                await execAsync(`open -a Preview "${filepath}"`);
+            }
+        } catch (error) {
+            console.error('Erro ao imprimir PDF:', error);
+            throw error;
+        }
+    }
 }
 
 module.exports = new PDFGenerator();
