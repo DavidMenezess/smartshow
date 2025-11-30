@@ -748,10 +748,12 @@
         async function loadReturns() {
             try {
                 returns = await api.getReturns();
+                console.log('Devoluções carregadas:', returns);
                 renderReturns();
             } catch (error) {
                 console.error('Erro ao carregar devoluções:', error);
-                alert('Erro ao carregar devoluções');
+                const errorMessage = error.details || error.error || error.message || 'Erro ao carregar devoluções';
+                alert(errorMessage);
             }
         }
 

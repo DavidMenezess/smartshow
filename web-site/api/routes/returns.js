@@ -53,18 +53,27 @@ router.get('/', auth, async (req, res) => {
 
         // Filtrar por loja
         const filter = getStoreFilter(req.user, store_id);
-        if (!filter.canSeeAll || filter.store_id) {
+        // Se não pode ver todas as lojas, filtrar pela loja do usuário
+        if (!filter.canSeeAll && filter.store_id) {
             sql += ` AND r.store_id = ?`;
             params.push(filter.store_id);
         }
+        // Se canSeeAll é true, não adicionar filtro (admin/gerente vê todas)
 
         sql += ` ORDER BY r.created_at DESC`;
 
+        console.log('SQL:', sql);
+        console.log('Params:', params);
+        
         const returns = await db.all(sql, params);
-        res.json(returns);
+        res.json(returns || []);
     } catch (error) {
         console.error('Erro ao listar devoluções:', error);
-        res.status(500).json({ error: 'Erro ao listar devoluções' });
+        console.error('Stack:', error.stack);
+        res.status(500).json({ 
+            error: 'Erro ao listar devoluções',
+            details: error.message 
+        });
     }
 });
 
