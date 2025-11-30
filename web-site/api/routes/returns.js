@@ -172,18 +172,28 @@ router.get('/', auth, async (req, res) => {
         let returns = [];
         try {
             console.log('🔍 Executando query SQL...');
-            console.log('📝 SQL:', sql);
-            console.log('📝 Parâmetros:', params);
+            console.log('📝 SQL completo:', sql);
+            console.log('📝 Parâmetros:', JSON.stringify(params));
+            console.log('📝 Filtro aplicado:', filter);
+            
+            // Primeiro, verificar se há dados na tabela (query simples)
+            try {
+                const countResult = await db.get("SELECT COUNT(*) as count FROM returns");
+                console.log('📊 Total de devoluções na tabela:', countResult ? countResult.count : 0);
+            } catch (countError) {
+                console.error('⚠️ Erro ao contar devoluções (pode ser tabela vazia):', countError.message);
+            }
             
             returns = await db.all(sql, params);
+            
+            console.log('📦 Resultado bruto da query:', typeof returns, Array.isArray(returns) ? returns.length : 'não é array');
             
             if (!returns) {
                 console.log('⚠️ Query retornou null/undefined, usando array vazio');
                 returns = [];
-            }
-            
-            if (!Array.isArray(returns)) {
+            } else if (!Array.isArray(returns)) {
                 console.log('⚠️ Query não retornou array, convertendo...');
+                console.log('⚠️ Tipo recebido:', typeof returns);
                 returns = [];
             }
             
