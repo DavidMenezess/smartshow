@@ -290,9 +290,15 @@
                 <div id="replacementProductContainer" style="display: none;">
                     <div class="form-group">
                         <label for="returnReplacementProduct">Produto de Substituição *</label>
-                        <select id="returnReplacementProduct" class="form-control">
-                            <option value="">Selecione o produto...</option>
-                        </select>
+                        <div style="position: relative;">
+                            <input type="text" id="returnReplacementProduct" class="form-control" 
+                                   placeholder="Digite o nome do produto para buscar..." 
+                                   autocomplete="off">
+                            <input type="hidden" id="returnReplacementProductId" value="">
+                            <div id="replacementProductResults" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1000; max-height: 300px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 4px; margin-top: 2px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                <!-- Resultados aparecerão aqui -->
+                            </div>
+                        </div>
                         <div id="priceDifferenceInfo" style="margin-top: 0.5rem; padding: 0.5rem; background: #e6fffa; border-radius: 4px; display: none;">
                             <strong>Diferença de valor: </strong><span id="priceDifferenceValue"></span>
                         </div>
@@ -1009,74 +1015,129 @@
             });
         }
 
+        // Variável global para armazenar produtos
+        let allProductsForReplacement = [];
+        
         // Carregar produtos para substituição
         async function loadProductsForReplacement() {
             try {
-                const products = await api.getProducts();
-                const select = document.getElementById('returnReplacementProduct');
-                select.innerHTML = '<option value="">Selecione o produto...</option>';
-                products.forEach(product => {
-                    const option = document.createElement('option');
-                    option.value = product.id;
-                    const price = parseFloat(product.sale_price || product.price || 0);
-                    option.textContent = `${product.name} - R$ ${price.toFixed(2)}`;
-                    option.dataset.price = price;
-                    option.dataset.name = product.name;
-                    option.dataset.barcode = product.barcode || '';
-                    select.appendChild(option);
-                });
-                
-                // Adicionar busca por nome/código
+                allProductsForReplacement = await api.getProducts();
                 initReplacementProductSearch();
             } catch (error) {
                 console.error('Erro ao carregar produtos:', error);
+                allProductsForReplacement = [];
             }
         }
         
         // Inicializar busca de produto de substituição
         function initReplacementProductSearch() {
-            const select = document.getElementById('returnReplacementProduct');
-            const container = select.parentElement;
+            const searchInput = document.getElementById('returnReplacementProduct');
+            const resultsDiv = document.getElementById('replacementProductResults');
+            const hiddenInput = document.getElementById('returnReplacementProductId');
             
-            // Criar campo de busca
-            let searchInput = document.getElementById('replacementProductSearch');
-            if (!searchInput) {
-                searchInput = document.createElement('input');
-                searchInput.type = 'text';
-                searchInput.id = 'replacementProductSearch';
-                searchInput.className = 'form-control';
-                searchInput.style.marginBottom = '0.5rem';
-                searchInput.placeholder = 'Buscar por nome ou código de barras...';
-                container.insertBefore(searchInput, select);
+            if (!searchInput || !resultsDiv) return;
+            
+            let searchTimeout;
+            let selectedProduct = null;
+            
+            // Buscar produtos enquanto digita
+            searchInput.addEventListener('input', function(e) {
+                clearTimeout(searchTimeout);
+                const searchTerm = e.target.value.trim();
                 
-                searchInput.addEventListener('input', function() {
-                    const searchTerm = this.value.toLowerCase().trim();
-                    if (!searchTerm) {
-                        // Mostrar todos os produtos
-                        Array.from(select.options).forEach(option => {
-                            option.style.display = '';
-                        });
-                        return;
-                    }
-                    
-                    // Filtrar produtos
-                    Array.from(select.options).forEach(option => {
-                        if (option.value === '') {
-                            option.style.display = '';
-                            return;
-                        }
-                        
-                        const name = (option.dataset.name || '').toLowerCase();
-                        const barcode = (option.dataset.barcode || '').toLowerCase();
-                        
-                        if (name.includes(searchTerm) || barcode.includes(searchTerm)) {
-                            option.style.display = '';
-                        } else {
-                            option.style.display = 'none';
-                        }
-                    });
-                });
+                // Se campo estiver vazio, limpar seleção
+                if (searchTerm.length === 0) {
+                    resultsDiv.style.display = 'none';
+                    hiddenInput.value = '';
+                    selectedProduct = null;
+                    document.getElementById('priceDifferenceInfo').style.display = 'none';
+                    return;
+                }
+                
+                // Buscar após 200ms de inatividade
+                if (searchTerm.length >= 2) {
+                    searchTimeout = setTimeout(() => {
+                        filterReplacementProducts(searchTerm);
+                    }, 200);
+                } else {
+                    resultsDiv.style.display = 'none';
+                }
+            });
+            
+            // Fechar resultados ao clicar fora
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#returnReplacementProduct') && !e.target.closest('#replacementProductResults')) {
+                    resultsDiv.style.display = 'none';
+                }
+            });
+            
+            // Limpar ao pressionar Escape
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    resultsDiv.style.display = 'none';
+                    searchInput.blur();
+                }
+            });
+        }
+        
+        // Filtrar produtos para substituição
+        function filterReplacementProducts(searchTerm) {
+            const resultsDiv = document.getElementById('replacementProductResults');
+            const term = searchTerm.toLowerCase().trim();
+            
+            if (!resultsDiv) return;
+            
+            // Filtrar produtos
+            const filtered = allProductsForReplacement.filter(product => {
+                const name = (product.name || '').toLowerCase();
+                const barcode = (product.barcode || '').toLowerCase();
+                return name.includes(term) || barcode.includes(term);
+            });
+            
+            if (filtered.length === 0) {
+                resultsDiv.innerHTML = '<div style="padding: 1rem; text-align: center; color: #718096;">Nenhum produto encontrado</div>';
+                resultsDiv.style.display = 'block';
+                return;
             }
+            
+            // Mostrar resultados (máximo 10)
+            resultsDiv.innerHTML = filtered.slice(0, 10).map(product => {
+                const price = parseFloat(product.sale_price || product.price || 0);
+                const name = product.name.replace(/"/g, '&quot;');
+                return `
+                    <div onclick="selectReplacementProduct(${product.id}, '${name}', ${price})" 
+                         style="padding: 0.75rem; cursor: pointer; border-bottom: 1px solid #e2e8f0; transition: background 0.2s;"
+                         onmouseover="this.style.background='#f7fafc'" 
+                         onmouseout="this.style.background='white'">
+                        <div style="font-weight: 600; color: #2d3748;">${product.name}</div>
+                        <div style="font-size: 0.85rem; color: #718096; margin-top: 0.25rem;">
+                            ${product.barcode ? `Código: ${product.barcode} | ` : ''}Preço: R$ ${price.toFixed(2)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            resultsDiv.style.display = 'block';
+        }
+        
+        // Selecionar produto de substituição
+        function selectReplacementProduct(productId, productName, productPrice) {
+            const searchInput = document.getElementById('returnReplacementProduct');
+            const hiddenInput = document.getElementById('returnReplacementProductId');
+            const resultsDiv = document.getElementById('replacementProductResults');
+            
+            if (searchInput) {
+                searchInput.value = `${productName} - R$ ${productPrice.toFixed(2)}`;
+            }
+            if (hiddenInput) {
+                hiddenInput.value = productId;
+            }
+            if (resultsDiv) {
+                resultsDiv.style.display = 'none';
+            }
+            
+            // Calcular diferença de preço
+            calculatePriceDifference();
         }
 
         // Lidar com mudança de tipo de ação
@@ -1144,7 +1205,7 @@
             const productId = document.getElementById('returnProductId').value;
             const defectDescription = document.getElementById('returnDefectDescription').value;
             const actionType = document.getElementById('returnActionType').value;
-            const replacementProductId = document.getElementById('returnReplacementProduct').value;
+            const replacementProductId = document.getElementById('returnReplacementProductId').value;
             const observations = document.getElementById('returnObservations').value;
 
             if (!saleId || !saleItemId || !productId) {
