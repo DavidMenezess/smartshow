@@ -12,10 +12,12 @@ const router = express.Router();
 // Verificar se a tabela returns existe, se não, criar
 async function ensureReturnsTableExists() {
     try {
+        console.log('🔍 Verificando existência da tabela returns...');
         const tableExists = await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='returns'");
+        
         if (!tableExists) {
             console.log('⚠️ Tabela returns não existe. Criando...');
-            await db.run(`
+            const createTableSQL = `
                 CREATE TABLE IF NOT EXISTS returns (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     return_number TEXT UNIQUE NOT NULL,
@@ -45,14 +47,21 @@ async function ensureReturnsTableExists() {
                     FOREIGN KEY (replacement_product_id) REFERENCES products(id),
                     FOREIGN KEY (processed_by) REFERENCES users(id)
                 )
-            `);
+            `;
+            
+            await db.run(createTableSQL);
             console.log('✅ Tabela returns criada com sucesso!');
+        } else {
+            console.log('✅ Tabela returns já existe');
         }
     } catch (error) {
         console.error('❌ Erro ao verificar/criar tabela returns:', error);
-        // Não lançar erro aqui, deixar a query falhar naturalmente se necessário
-        // Mas tentar criar a tabela mesmo assim
+        console.error('❌ Mensagem:', error.message);
+        console.error('❌ Stack:', error.stack);
+        
+        // Tentar criar a tabela mesmo assim (ignorar erro de verificação)
         try {
+            console.log('🔄 Tentando criar tabela diretamente...');
             await db.run(`
                 CREATE TABLE IF NOT EXISTS returns (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,9 +93,11 @@ async function ensureReturnsTableExists() {
                     FOREIGN KEY (processed_by) REFERENCES users(id)
                 )
             `);
-            console.log('✅ Tabela returns criada com sucesso (segunda tentativa)!');
+            console.log('✅ Tabela returns criada com sucesso (tentativa direta)!');
         } catch (createError) {
-            console.error('❌ Erro ao criar tabela returns (segunda tentativa):', createError);
+            console.error('❌ Erro ao criar tabela returns (tentativa direta):', createError);
+            console.error('❌ Mensagem:', createError.message);
+            // Não lançar erro - deixar que a query SQL falhe e seja tratada
         }
     }
 }
@@ -94,10 +105,16 @@ async function ensureReturnsTableExists() {
 // Listar devoluções
 router.get('/', auth, async (req, res) => {
     try {
+        console.log('📥 Requisição GET /returns recebida');
+        console.log('👤 Usuário:', req.user ? { id: req.user.id, role: req.user.role, store_id: req.user.store_id } : 'N/A');
+        
         // Garantir que a tabela existe
+        console.log('🔍 Verificando se tabela returns existe...');
         await ensureReturnsTableExists();
+        console.log('✅ Tabela returns verificada/criada');
         
         const { startDate, endDate, status, store_id } = req.query;
+        console.log('📋 Parâmetros da query:', { startDate, endDate, status, store_id });
         
         let sql = `
             SELECT r.*,
@@ -153,32 +170,56 @@ router.get('/', auth, async (req, res) => {
         // Executar query com tratamento de erro robusto
         let returns = [];
         try {
+            console.log('🔍 Executando query SQL...');
+            console.log('📝 SQL:', sql);
+            console.log('📝 Parâmetros:', params);
+            
             returns = await db.all(sql, params);
+            
             if (!returns) {
+                console.log('⚠️ Query retornou null/undefined, usando array vazio');
                 returns = [];
             }
+            
+            if (!Array.isArray(returns)) {
+                console.log('⚠️ Query não retornou array, convertendo...');
+                returns = [];
+            }
+            
+            console.log('✅ Query executada com sucesso. Devoluções encontradas:', returns.length);
         } catch (queryError) {
             console.error('❌ Erro na query SQL:', queryError);
+            console.error('❌ Mensagem:', queryError.message);
+            console.error('❌ Stack:', queryError.stack);
             console.error('❌ SQL:', sql);
             console.error('❌ Parâmetros:', params);
             
             // Se for erro de tabela não encontrada, tentar criar novamente
-            if (queryError.message && queryError.message.includes('no such table: returns')) {
-                console.log('🔄 Tentando criar tabela novamente...');
+            if (queryError.message && (
+                queryError.message.includes('no such table: returns') ||
+                queryError.message.includes('no such table') && queryError.message.includes('returns')
+            )) {
+                console.log('🔄 Erro de tabela não encontrada. Tentando criar novamente...');
                 try {
                     await ensureReturnsTableExists();
+                    console.log('✅ Tabela criada. Tentando query novamente...');
                     // Tentar novamente
                     returns = await db.all(sql, params) || [];
+                    console.log('✅ Query retry bem-sucedida. Devoluções:', returns.length);
                 } catch (retryError) {
                     console.error('❌ Erro ao tentar novamente:', retryError);
-                    throw queryError; // Lançar erro original
+                    console.error('❌ Mensagem do retry:', retryError.message);
+                    // Retornar array vazio em vez de lançar erro
+                    returns = [];
                 }
             } else {
-                throw queryError;
+                // Para outros erros, também retornar array vazio para não quebrar a interface
+                console.error('❌ Erro desconhecido na query. Retornando array vazio.');
+                returns = [];
             }
         }
         
-        console.log('✅ Devoluções encontradas:', returns.length);
+        console.log('📤 Enviando resposta com', returns.length, 'devoluções');
         res.json(returns);
     } catch (error) {
         console.error('❌ Erro ao listar devoluções:', error);
