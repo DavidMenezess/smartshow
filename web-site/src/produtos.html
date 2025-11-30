@@ -866,6 +866,7 @@
             document.getElementById('saleInfoContainer').style.display = 'none';
             document.getElementById('replacementProductContainer').style.display = 'none';
             document.getElementById('returnFormTitle').textContent = 'Nova Devolução';
+            document.getElementById('returnSaleSearch').value = '';
             selectedSale = null;
             loadProductsForReplacement();
         }
@@ -933,11 +934,14 @@
             document.getElementById('returnCustomerId').value = saleDetails.customer_id || '';
             document.getElementById('returnOriginalPaymentMethod').value = saleDetails.payment_method;
 
-            let itemsHtml = '<p><strong>Venda:</strong> ' + saleDetails.sale_number + '</p>';
-            itemsHtml += '<p><strong>Cliente:</strong> ' + (saleDetails.customer_name || 'Não informado') + '</p>';
-            itemsHtml += '<p><strong>Forma de Pagamento:</strong> ' + saleDetails.payment_method + '</p>';
-            itemsHtml += '<p><strong>Itens da Venda:</strong></p>';
-            itemsHtml += '<ul style="margin: 0.5rem 0; padding-left: 1.5rem;">';
+            let itemsHtml = '<div style="background: white; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">';
+            itemsHtml += '<p style="margin: 0.5rem 0;"><strong>Venda:</strong> ' + saleDetails.sale_number + '</p>';
+            itemsHtml += '<p style="margin: 0.5rem 0;"><strong>Cliente:</strong> ' + (saleDetails.customer_name || 'Não informado') + '</p>';
+            itemsHtml += '<p style="margin: 0.5rem 0;"><strong>Forma de Pagamento:</strong> ' + saleDetails.payment_method + '</p>';
+            itemsHtml += '<p style="margin: 0.5rem 0;"><strong>Data:</strong> ' + new Date(saleDetails.created_at).toLocaleDateString('pt-BR') + '</p>';
+            itemsHtml += '</div>';
+            itemsHtml += '<p><strong>Selecione o item para devolução:</strong></p>';
+            itemsHtml += '<ul style="margin: 0.5rem 0; padding: 0; list-style: none;">';
             
             saleDetails.items.forEach((item, index) => {
                 itemsHtml += `<li id="sale-item-${item.id}" style="margin-bottom: 0.5rem; padding: 0.5rem; border-bottom: 1px solid #e2e8f0;">
