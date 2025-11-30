@@ -1215,6 +1215,11 @@
                 alert('Selecione um item da venda primeiro');
                 return;
             }
+            
+            if (actionType === 'different_product' && !replacementProductId) {
+                alert('Selecione um produto de substituição');
+                return;
+            }
 
             try {
                 const returnData = {
