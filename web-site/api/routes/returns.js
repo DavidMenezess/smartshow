@@ -150,6 +150,9 @@ router.get('/', auth, async (req, res) => {
 // Obter devolução por ID
 router.get('/:id', auth, async (req, res) => {
     try {
+        // Garantir que a tabela existe
+        await ensureReturnsTableExists();
+        
         const { id } = req.params;
         
         const returnData = await db.get(
@@ -464,6 +467,9 @@ router.put('/:id/process', auth, async (req, res) => {
 // Cancelar devolução
 router.put('/:id/cancel', auth, async (req, res) => {
     try {
+        // Garantir que a tabela existe
+        await ensureReturnsTableExists();
+        
         const { id } = req.params;
 
         const returnData = await db.get('SELECT * FROM returns WHERE id = ?', [id]);
