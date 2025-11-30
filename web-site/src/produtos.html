@@ -1169,17 +1169,6 @@
                 priceDiffInfo.style.display = 'none';
             }
 
-            // Calcular diferença de preço quando produto de substituição for selecionado
-            if (actionType === 'different_product') {
-                const replacementSelect = document.getElementById('returnReplacementProduct');
-                // Remover listeners anteriores para evitar duplicação
-                const newSelect = replacementSelect.cloneNode(true);
-                replacementSelect.parentNode.replaceChild(newSelect, replacementSelect);
-                
-                newSelect.addEventListener('change', function() {
-                    calculatePriceDifference();
-                });
-            }
         }
         
         // Calcular diferença de preço
