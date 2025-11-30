@@ -499,6 +499,9 @@ router.put('/:id/cancel', auth, async (req, res) => {
 // Estatísticas de devoluções
 router.get('/stats/summary', auth, async (req, res) => {
     try {
+        // Garantir que a tabela existe
+        await ensureReturnsTableExists();
+        
         const { store_id } = req.query;
         
         const filter = getStoreFilter(req.user, store_id);
