@@ -96,6 +96,8 @@ class API {
                 
                 console.error('❌ Erro na API:', {
                     status: response.status,
+                    url: url,
+                    method: method,
                     statusText: response.statusText,
                     error: errorMessage,
                     data: data,

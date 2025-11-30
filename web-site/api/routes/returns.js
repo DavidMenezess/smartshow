@@ -54,29 +54,46 @@ router.get('/', auth, async (req, res) => {
         // Filtrar por loja
         const filter = getStoreFilter(req.user, store_id);
         // Se não pode ver todas as lojas, filtrar pela loja do usuário
-        if (!filter.canSeeAll && filter.store_id) {
-            sql += ` AND r.store_id = ?`;
-            params.push(filter.store_id);
+        if (!filter.canSeeAll) {
+            if (filter.store_id) {
+                sql += ` AND r.store_id = ?`;
+                params.push(filter.store_id);
+            }
+            // Se não tem store_id, não retornar nada (usuário sem loja não vê devoluções)
         }
         // Se canSeeAll é true, não adicionar filtro (admin/gerente vê todas)
 
         sql += ` ORDER BY r.created_at DESC`;
 
+        console.log('🔍 Query SQL:', sql);
+        console.log('🔍 Parâmetros:', params);
+        console.log('🔍 Filtro:', filter);
+        
         const returns = await db.all(sql, params);
+        console.log('✅ Devoluções encontradas:', returns ? returns.length : 0);
         res.json(returns || []);
     } catch (error) {
-        console.error('Erro ao listar devoluções:', error);
-        console.error('Stack:', error.stack);
+        console.error('❌ Erro ao listar devoluções:', error);
+        console.error('❌ Stack:', error.stack);
+        console.error('❌ Mensagem:', error.message);
         
         // Se o erro for porque a tabela não existe, retornar array vazio
-        if (error.message && error.message.includes('no such table: returns')) {
+        if (error.message && (
+            error.message.includes('no such table: returns') ||
+            error.message.includes('no such table') && error.message.includes('returns')
+        )) {
             console.log('⚠️ Tabela returns não existe ainda. Retornando array vazio.');
             return res.json([]);
         }
         
+        // Se o erro for de SQL, retornar mensagem mais detalhada
+        const errorMessage = error.message || 'Erro desconhecido';
+        console.error('❌ Enviando erro para cliente:', errorMessage);
+        
         res.status(500).json({ 
             error: 'Erro ao listar devoluções',
-            details: error.message 
+            details: errorMessage,
+            type: error.name || 'UnknownError'
         });
     }
 });

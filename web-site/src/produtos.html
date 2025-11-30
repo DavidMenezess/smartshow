@@ -747,12 +747,24 @@
         // Carregar devoluções
         async function loadReturns() {
             try {
+                console.log('📥 Carregando devoluções...');
                 returns = await api.getReturns();
-                console.log('Devoluções carregadas:', returns);
+                console.log('✅ Devoluções carregadas:', returns);
                 renderReturns();
             } catch (error) {
-                console.error('Erro ao carregar devoluções:', error);
-                const errorMessage = error.details || error.error || error.message || 'Erro ao carregar devoluções';
+                console.error('❌ Erro ao carregar devoluções:', error);
+                console.error('❌ Detalhes do erro:', error.details, error.error, error.message);
+                
+                // Tentar obter mensagem de erro mais detalhada
+                let errorMessage = 'Erro ao carregar devoluções';
+                if (error.details) {
+                    errorMessage = error.details;
+                } else if (error.error) {
+                    errorMessage = error.error;
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+                
                 alert(errorMessage);
             }
         }
