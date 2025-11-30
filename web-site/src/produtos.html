@@ -1174,27 +1174,39 @@
         // Calcular diferença de preço
         function calculatePriceDifference() {
             const originalPrice = parseFloat(document.getElementById('returnOriginalPrice').value) || 0;
-            const replacementSelect = document.getElementById('returnReplacementProduct');
-            const replacementProductId = replacementSelect.value;
+            const hiddenInput = document.getElementById('returnReplacementProductId');
+            const replacementProductId = hiddenInput ? hiddenInput.value : '';
             const priceDiffInfo = document.getElementById('priceDifferenceInfo');
             
-            if (replacementProductId) {
-                const selectedOption = replacementSelect.options[replacementSelect.selectedIndex];
-                const replacementPrice = parseFloat(selectedOption.dataset.price) || 0;
-                const difference = replacementPrice - originalPrice;
+            console.log('Calculando diferença:', { originalPrice, replacementProductId });
+            
+            if (replacementProductId && originalPrice > 0) {
+                // Buscar produto selecionado na lista
+                const selectedProduct = allProductsForReplacement.find(p => p.id.toString() === replacementProductId.toString());
                 
-                let message = '';
-                if (difference > 0) {
-                    message = `<span style="color: #ef4444; font-weight: bold;">Cliente paga: R$ ${difference.toFixed(2)} (entra no caixa)</span>`;
-                } else if (difference < 0) {
-                    message = `<span style="color: #10b981; font-weight: bold;">Loja devolve: R$ ${Math.abs(difference).toFixed(2)} (sai do caixa)</span>`;
+                if (selectedProduct) {
+                    const replacementPrice = parseFloat(selectedProduct.sale_price || selectedProduct.price || 0);
+                    const difference = replacementPrice - originalPrice;
+                    
+                    console.log('Diferença calculada:', { replacementPrice, originalPrice, difference });
+                    
+                    let message = '';
+                    if (difference > 0) {
+                        message = `<span style="color: #ef4444; font-weight: bold;">Cliente paga: R$ ${difference.toFixed(2)} (entra no caixa)</span>`;
+                    } else if (difference < 0) {
+                        message = `<span style="color: #10b981; font-weight: bold;">Loja devolve: R$ ${Math.abs(difference).toFixed(2)} (sai do caixa)</span>`;
+                    } else {
+                        message = '<span style="color: #718096;">Sem diferença de valor</span>';
+                    }
+                    
+                    document.getElementById('priceDifferenceValue').innerHTML = message;
+                    priceDiffInfo.style.display = 'block';
                 } else {
-                    message = '<span style="color: #718096;">Sem diferença de valor</span>';
+                    console.warn('Produto não encontrado na lista:', replacementProductId);
+                    priceDiffInfo.style.display = 'none';
                 }
-                
-                document.getElementById('priceDifferenceValue').innerHTML = message;
-                priceDiffInfo.style.display = 'block';
             } else {
+                console.log('Produto não selecionado ou preço original não definido');
                 priceDiffInfo.style.display = 'none';
             }
         }
