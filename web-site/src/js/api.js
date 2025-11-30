@@ -389,8 +389,6 @@ class API {
         const query = params.toString();
         return await this.request(`/returns/stats/summary${query ? `?${query}` : ''}`);
     }
-        return await this.request(`/service-orders/${id}`);
-    }
 
     async createServiceOrder(order) {
         return await this.request('/service-orders', 'POST', order);
