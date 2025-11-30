@@ -194,6 +194,9 @@ router.get('/:id', auth, async (req, res) => {
 // Criar devolução
 router.post('/', auth, async (req, res) => {
     try {
+        // Garantir que a tabela existe
+        await ensureReturnsTableExists();
+        
         const {
             sale_id,
             sale_item_id,
