@@ -97,13 +97,22 @@ if [ -n "$PROBLEMATIC_CONTAINERS" ]; then
     echo "⚠️ AINDA há containers problemáticos encontrados:"
     echo "$PROBLEMATIC_CONTAINERS"
     echo "🗑️ Forçando remoção final (múltiplas tentativas)..."
-    for attempt in {1..5}; do
-        echo "  Tentativa $attempt de 5..."
+    for attempt in {1..10}; do
+        echo "  Tentativa $attempt de 10..."
+        
+        # Parar todos os containers problemáticos primeiro
         echo "$PROBLEMATIC_CONTAINERS" | awk '{print $2}' | while read container_id; do
             if [ -n "$container_id" ]; then
                 echo "    - Parando container ID: $container_id"
+                docker kill "$container_id" 2>/dev/null || true
                 docker stop "$container_id" 2>/dev/null || true
-                sleep 1
+            fi
+        done
+        sleep 1
+        
+        # Remover todos os containers problemáticos
+        echo "$PROBLEMATIC_CONTAINERS" | awk '{print $2}' | while read container_id; do
+            if [ -n "$container_id" ]; then
                 echo "    - Removendo container ID: $container_id"
                 docker rm -f "$container_id" 2>/dev/null || true
             fi
@@ -115,6 +124,9 @@ if [ -n "$PROBLEMATIC_CONTAINERS" ]; then
         if [ -z "$REMAINING" ]; then
             echo "  ✅ Todos os containers foram removidos na tentativa $attempt"
             break
+        else
+            echo "  ⚠️ Ainda restam containers: $REMAINING"
+            PROBLEMATIC_CONTAINERS="$REMAINING"
         fi
     done
     sleep 3
