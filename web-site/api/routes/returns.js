@@ -492,7 +492,7 @@ router.put('/:id/process', auth, async (req, res) => {
                 }
 
                 replacementProductId = replacement_product_id;
-                replacementPrice = replacementProduct.price;
+                replacementPrice = replacementProduct.sale_price || replacementProduct.price;
                 priceDifference = replacementPrice - returnData.original_price;
             }
 
