@@ -196,6 +196,16 @@ class PDV {
             
             if (paymentMethod === 'Dinheiro' && paidAmountGroup) {
                 paidAmountGroup.style.display = 'block';
+                // Adicionar event listener ao campo paidAmount se método já for Dinheiro
+                const paidAmountInput = document.getElementById('paidAmount');
+                if (paidAmountInput) {
+                    // Remover listeners anteriores para evitar duplicação
+                    const newInput = paidAmountInput.cloneNode(true);
+                    paidAmountInput.parentNode.replaceChild(newInput, paidAmountInput);
+                    newInput.addEventListener('input', () => {
+                        this.calculateChange();
+                    });
+                }
             } else if (paidAmountGroup) {
                 paidAmountGroup.style.display = 'none';
             }
@@ -212,6 +222,18 @@ class PDV {
             } else {
                 if (installmentsGroup) installmentsGroup.style.display = 'none';
                 if (creditInfo) creditInfo.style.display = 'none';
+            }
+        }
+        
+        // Garantir que o event listener está ativo mesmo se updatePaymentFieldsVisibility foi chamado
+        const paymentMethod = document.getElementById('paymentMethod')?.value;
+        if (paymentMethod === 'Dinheiro') {
+            const paidAmountInput = document.getElementById('paidAmount');
+            if (paidAmountInput && !paidAmountInput.hasAttribute('data-listener-added')) {
+                paidAmountInput.addEventListener('input', () => {
+                    this.calculateChange();
+                });
+                paidAmountInput.setAttribute('data-listener-added', 'true');
             }
         }
         
