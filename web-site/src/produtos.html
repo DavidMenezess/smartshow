@@ -1262,7 +1262,16 @@
                 loadReturns();
             } catch (error) {
                 console.error('Erro ao criar devolução:', error);
-                alert('Erro ao criar devolução: ' + (error.message || 'Erro desconhecido'));
+                console.error('Detalhes do erro:', error);
+                
+                let errorMessage = 'Erro ao criar devolução';
+                if (error.response && error.response.data) {
+                    errorMessage = error.response.data.details || error.response.data.error || errorMessage;
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+                
+                alert('Erro ao criar devolução: ' + errorMessage);
             }
         });
 
