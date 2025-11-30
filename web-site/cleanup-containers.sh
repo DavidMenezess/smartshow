@@ -19,13 +19,17 @@ docker ps -a --format '{{.Names}} {{.ID}}' | grep -iE "(web-site.*smartshow|smar
 # Parar e remover via docker-compose (remove todos os containers do projeto)
 echo "📦 Parando containers via docker-compose..."
 # Primeiro, parar todos os containers que podem estar rodando
-docker-compose ps -q | xargs -r docker stop 2>/dev/null || true
-docker-compose ps -q | xargs -r docker kill 2>/dev/null || true
+docker-compose ps -q 2>/dev/null | xargs -r docker stop 2>/dev/null || true
+docker-compose ps -q 2>/dev/null | xargs -r docker kill 2>/dev/null || true
+# Remover container específico que está causando conflito
+docker rm -f web-site-smartshow-api-1 2>/dev/null || true
 # Usar down com todas as opções para garantir remoção completa
 docker-compose down -v --remove-orphans --rmi local 2>/dev/null || true
 docker-compose rm -f -v 2>/dev/null || true
 # Tentar novamente com mais força
 docker-compose down --remove-orphans 2>/dev/null || true
+# Remover novamente o container específico após docker-compose down
+docker rm -f web-site-smartshow-api-1 2>/dev/null || true
 
 # Remover containers com nomes específicos (múltiplas tentativas com mais força)
 echo "🗑️ Removendo containers específicos (tentativas agressivas)..."

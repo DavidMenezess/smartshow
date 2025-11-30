@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: smartshow-api-${COMPOSE_PROJECT_NAME:-default}
+    # container_name removido - Docker gerará nome único baseado no projeto
     ports:
       - "3000:3000"
     volumes:
