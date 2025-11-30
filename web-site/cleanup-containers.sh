@@ -12,8 +12,15 @@ docker stop $(docker ps -q --filter name=smartshow) 2>/dev/null || true
 docker stop $(docker ps -q --filter name=web-site) 2>/dev/null || true
 docker stop smartshow-api web-site-smartshow-api-1 2>/dev/null || true
 
+# Parar containers por ID também (para pegar containers com prefixos)
+docker ps -a --format '{{.Names}} {{.ID}}' | grep -iE "(web-site.*smartshow|smartshow.*api)" | awk '{print $2}' | xargs -r docker stop 2>/dev/null || true
+docker ps -a --format '{{.Names}} {{.ID}}' | grep -iE "(web-site.*smartshow|smartshow.*api)" | awk '{print $2}' | xargs -r docker kill 2>/dev/null || true
+
 # Parar e remover via docker-compose (remove todos os containers do projeto)
 echo "📦 Parando containers via docker-compose..."
+# Primeiro, parar todos os containers que podem estar rodando
+docker-compose ps -q | xargs -r docker stop 2>/dev/null || true
+docker-compose ps -q | xargs -r docker kill 2>/dev/null || true
 # Usar down com todas as opções para garantir remoção completa
 docker-compose down -v --remove-orphans --rmi local 2>/dev/null || true
 docker-compose rm -f -v 2>/dev/null || true
