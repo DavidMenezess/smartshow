@@ -185,17 +185,25 @@ router.get('/', auth, async (req, res) => {
         console.error('❌ Stack:', error.stack);
         console.error('❌ Mensagem:', error.message);
         
-        // Se o erro for porque a tabela não existe, retornar array vazio
+        // Se o erro for porque a tabela não existe, tentar criar e retornar array vazio
         if (error.message && (
             error.message.includes('no such table: returns') ||
-            error.message.includes('no such table') && error.message.includes('returns')
+            (error.message.includes('no such table') && error.message.includes('returns'))
         )) {
-            console.log('⚠️ Tabela returns não existe ainda. Retornando array vazio.');
-            return res.json([]);
+            console.log('⚠️ Tabela returns não existe. Tentando criar...');
+            try {
+                await ensureReturnsTableExists();
+                // Retornar array vazio após criar tabela
+                return res.json([]);
+            } catch (createError) {
+                console.error('❌ Erro ao criar tabela no catch:', createError);
+                // Mesmo assim, retornar array vazio para não quebrar a interface
+                return res.json([]);
+            }
         }
         
-        // Se o erro for de SQL, retornar mensagem mais detalhada
-        const errorMessage = error.message || 'Erro desconhecido';
+        // Para outros erros, retornar mensagem de erro
+        const errorMessage = error.message || 'Erro desconhecido ao listar devoluções';
         console.error('❌ Enviando erro para cliente:', errorMessage);
         
         res.status(500).json({ 
