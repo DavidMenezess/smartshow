@@ -535,6 +535,57 @@ router.put('/:id/process', auth, async (req, res) => {
             );
         }
 
+        // Registrar movimentação de caixa se houver diferença de preço ou reembolso
+        if (returnData.action_type === 'different_product' && priceDifference !== 0) {
+            // Buscar caixa aberto
+            const today = new Date().toISOString().split('T')[0];
+            const cashControl = await db.get(
+                `SELECT * FROM cash_control 
+                 WHERE DATE(datetime(opening_date, '-3 hours')) = ? 
+                 AND closing_date IS NULL 
+                 AND is_open = 1
+                 AND store_id = ?
+                 ORDER BY opening_date DESC LIMIT 1`,
+                [today, returnData.store_id]
+            );
+            
+            if (cashControl) {
+                // Registrar movimentação de caixa
+                const movementType = priceDifference > 0 ? 'entry' : 'exit';
+                const amount = Math.abs(priceDifference);
+                const description = priceDifference > 0 
+                    ? `Devolução - Cliente pagou diferença (Troca: ${returnData.return_number})`
+                    : `Devolução - Loja devolveu diferença (Troca: ${returnData.return_number})`;
+                
+                await db.run(
+                    `INSERT INTO cash_movements (cash_control_id, type, amount, description, user_id, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?)`,
+                    [cashControl.id, movementType, amount, description, req.user.id, new Date().toISOString()]
+                );
+            }
+        } else if (returnData.action_type === 'refund' && refundAmount > 0) {
+            // Buscar caixa aberto
+            const today = new Date().toISOString().split('T')[0];
+            const cashControl = await db.get(
+                `SELECT * FROM cash_control 
+                 WHERE DATE(datetime(opening_date, '-3 hours')) = ? 
+                 AND closing_date IS NULL 
+                 AND is_open = 1
+                 AND store_id = ?
+                 ORDER BY opening_date DESC LIMIT 1`,
+                [today, returnData.store_id]
+            );
+            
+            if (cashControl) {
+                // Registrar saída de caixa para reembolso
+                await db.run(
+                    `INSERT INTO cash_movements (cash_control_id, type, amount, description, user_id, created_at)
+                     VALUES (?, 'exit', ?, ?, ?, ?)`,
+                    [cashControl.id, refundAmount, `Devolução - Reembolso (${returnData.return_number})`, req.user.id, new Date().toISOString()]
+                );
+            }
+        }
+
         // Atualizar devolução
         await db.run(
             `UPDATE returns 

@@ -937,7 +937,11 @@
             let itemsHtml = '<div style="background: white; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">';
             itemsHtml += '<p style="margin: 0.5rem 0;"><strong>Venda:</strong> ' + saleDetails.sale_number + '</p>';
             itemsHtml += '<p style="margin: 0.5rem 0;"><strong>Cliente:</strong> ' + (saleDetails.customer_name || 'Não informado') + '</p>';
-            itemsHtml += '<p style="margin: 0.5rem 0;"><strong>Forma de Pagamento:</strong> ' + saleDetails.payment_method + '</p>';
+            let paymentInfo = saleDetails.payment_method;
+            if (saleDetails.payment_method === 'Cartão de Crédito' && saleDetails.installments) {
+                paymentInfo += ` (${saleDetails.installments}x)`;
+            }
+            itemsHtml += '<p style="margin: 0.5rem 0;"><strong>Forma de Pagamento:</strong> ' + paymentInfo + '</p>';
             itemsHtml += '<p style="margin: 0.5rem 0;"><strong>Data:</strong> ' + new Date(saleDetails.created_at).toLocaleDateString('pt-BR') + '</p>';
             itemsHtml += '</div>';
             itemsHtml += '<p><strong>Selecione o item para devolução:</strong></p>';
@@ -1014,12 +1018,64 @@
                 products.forEach(product => {
                     const option = document.createElement('option');
                     option.value = product.id;
-                    option.textContent = `${product.name} - R$ ${parseFloat(product.price).toFixed(2)}`;
-                    option.dataset.price = product.price;
+                    const price = parseFloat(product.sale_price || product.price || 0);
+                    option.textContent = `${product.name} - R$ ${price.toFixed(2)}`;
+                    option.dataset.price = price;
+                    option.dataset.name = product.name;
+                    option.dataset.barcode = product.barcode || '';
                     select.appendChild(option);
                 });
+                
+                // Adicionar busca por nome/código
+                initReplacementProductSearch();
             } catch (error) {
                 console.error('Erro ao carregar produtos:', error);
+            }
+        }
+        
+        // Inicializar busca de produto de substituição
+        function initReplacementProductSearch() {
+            const select = document.getElementById('returnReplacementProduct');
+            const container = select.parentElement;
+            
+            // Criar campo de busca
+            let searchInput = document.getElementById('replacementProductSearch');
+            if (!searchInput) {
+                searchInput = document.createElement('input');
+                searchInput.type = 'text';
+                searchInput.id = 'replacementProductSearch';
+                searchInput.className = 'form-control';
+                searchInput.style.marginBottom = '0.5rem';
+                searchInput.placeholder = 'Buscar por nome ou código de barras...';
+                container.insertBefore(searchInput, select);
+                
+                searchInput.addEventListener('input', function() {
+                    const searchTerm = this.value.toLowerCase().trim();
+                    if (!searchTerm) {
+                        // Mostrar todos os produtos
+                        Array.from(select.options).forEach(option => {
+                            option.style.display = '';
+                        });
+                        return;
+                    }
+                    
+                    // Filtrar produtos
+                    Array.from(select.options).forEach(option => {
+                        if (option.value === '') {
+                            option.style.display = '';
+                            return;
+                        }
+                        
+                        const name = (option.dataset.name || '').toLowerCase();
+                        const barcode = (option.dataset.barcode || '').toLowerCase();
+                        
+                        if (name.includes(searchTerm) || barcode.includes(searchTerm)) {
+                            option.style.display = '';
+                        } else {
+                            option.style.display = 'none';
+                        }
+                    });
+                });
             }
         }
 
@@ -1040,25 +1096,42 @@
 
             // Calcular diferença de preço quando produto de substituição for selecionado
             if (actionType === 'different_product') {
-                document.getElementById('returnReplacementProduct').addEventListener('change', function() {
-                    const originalPrice = parseFloat(document.getElementById('returnOriginalPrice').value) || 0;
-                    const replacementProductId = this.value;
-                    if (replacementProductId) {
-                        const selectedOption = this.options[this.selectedIndex];
-                        const replacementPrice = parseFloat(selectedOption.dataset.price) || 0;
-                        const difference = replacementPrice - originalPrice;
-                        
-                        document.getElementById('priceDifferenceValue').innerHTML = 
-                            difference > 0 
-                                ? `<span style="color: #ef4444;">Cliente paga: R$ ${difference.toFixed(2)}</span>`
-                                : difference < 0
-                                    ? `<span style="color: #10b981;">Loja devolve: R$ ${Math.abs(difference).toFixed(2)}</span>`
-                                    : 'Sem diferença';
-                        priceDiffInfo.style.display = 'block';
-                    } else {
-                        priceDiffInfo.style.display = 'none';
-                    }
+                const replacementSelect = document.getElementById('returnReplacementProduct');
+                // Remover listeners anteriores para evitar duplicação
+                const newSelect = replacementSelect.cloneNode(true);
+                replacementSelect.parentNode.replaceChild(newSelect, replacementSelect);
+                
+                newSelect.addEventListener('change', function() {
+                    calculatePriceDifference();
                 });
+            }
+        }
+        
+        // Calcular diferença de preço
+        function calculatePriceDifference() {
+            const originalPrice = parseFloat(document.getElementById('returnOriginalPrice').value) || 0;
+            const replacementSelect = document.getElementById('returnReplacementProduct');
+            const replacementProductId = replacementSelect.value;
+            const priceDiffInfo = document.getElementById('priceDifferenceInfo');
+            
+            if (replacementProductId) {
+                const selectedOption = replacementSelect.options[replacementSelect.selectedIndex];
+                const replacementPrice = parseFloat(selectedOption.dataset.price) || 0;
+                const difference = replacementPrice - originalPrice;
+                
+                let message = '';
+                if (difference > 0) {
+                    message = `<span style="color: #ef4444; font-weight: bold;">Cliente paga: R$ ${difference.toFixed(2)} (entra no caixa)</span>`;
+                } else if (difference < 0) {
+                    message = `<span style="color: #10b981; font-weight: bold;">Loja devolve: R$ ${Math.abs(difference).toFixed(2)} (sai do caixa)</span>`;
+                } else {
+                    message = '<span style="color: #718096;">Sem diferença de valor</span>';
+                }
+                
+                document.getElementById('priceDifferenceValue').innerHTML = message;
+                priceDiffInfo.style.display = 'block';
+            } else {
+                priceDiffInfo.style.display = 'none';
             }
         }
 

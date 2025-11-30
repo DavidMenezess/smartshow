@@ -299,6 +299,19 @@ class Database {
                 FOREIGN KEY (store_id) REFERENCES stores(id),
                 FOREIGN KEY (replacement_product_id) REFERENCES products(id),
                 FOREIGN KEY (processed_by) REFERENCES users(id)
+            )`,
+
+            // Movimentações de caixa
+            `CREATE TABLE IF NOT EXISTS cash_movements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cash_control_id INTEGER NOT NULL,
+                type TEXT NOT NULL CHECK(type IN ('entry', 'exit')),
+                amount REAL NOT NULL,
+                description TEXT,
+                user_id INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (cash_control_id) REFERENCES cash_control(id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )`
         ];
 
