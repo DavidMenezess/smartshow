@@ -28,8 +28,12 @@ docker-compose down -v --remove-orphans --rmi local 2>/dev/null || true
 docker-compose rm -f -v 2>/dev/null || true
 # Tentar novamente com mais força
 docker-compose down --remove-orphans 2>/dev/null || true
-# Remover novamente o container específico após docker-compose down
-docker rm -f web-site-smartshow-api-1 2>/dev/null || true
+# Remover novamente o container específico após docker-compose down (múltiplas tentativas)
+for i in {1..5}; do
+    docker rm -f web-site-smartshow-api-1 2>/dev/null && break || sleep 1
+done
+# Tentar remover por ID também
+docker ps -a --format '{{.Names}} {{.ID}}' | grep -iE "(web-site.*smartshow-api-1|smartshow.*api-1)" | awk '{print $2}' | xargs -r docker rm -f 2>/dev/null || true
 
 # Remover containers com nomes específicos (múltiplas tentativas com mais força)
 echo "🗑️ Removendo containers específicos (tentativas agressivas)..."
