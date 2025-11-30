@@ -116,6 +116,7 @@ router.get('/', auth, async (req, res) => {
         const { startDate, endDate, status, store_id } = req.query;
         console.log('📋 Parâmetros da query:', { startDate, endDate, status, store_id });
         
+        // Query simplificada primeiro para verificar se a tabela existe e tem dados
         let sql = `
             SELECT r.*,
                    s.sale_number,
