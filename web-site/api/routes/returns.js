@@ -9,9 +9,58 @@ const { getStoreFilter } = require('../middleware/store-filter');
 
 const router = express.Router();
 
+// Verificar se a tabela returns existe, se não, criar
+async function ensureReturnsTableExists() {
+    try {
+        await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='returns'");
+    } catch (error) {
+        console.log('⚠️ Tabela returns não existe. Criando...');
+        try {
+            await db.run(`
+                CREATE TABLE IF NOT EXISTS returns (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    return_number TEXT UNIQUE NOT NULL,
+                    sale_id INTEGER NOT NULL,
+                    sale_item_id INTEGER NOT NULL,
+                    product_id INTEGER NOT NULL,
+                    customer_id INTEGER,
+                    store_id INTEGER NOT NULL,
+                    defect_description TEXT NOT NULL,
+                    action_type TEXT NOT NULL CHECK(action_type IN ('same_product', 'different_product', 'refund')),
+                    original_price REAL NOT NULL,
+                    original_payment_method TEXT NOT NULL,
+                    replacement_product_id INTEGER,
+                    replacement_price REAL,
+                    price_difference REAL DEFAULT 0,
+                    refund_amount REAL,
+                    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'completed', 'cancelled')),
+                    processed_by INTEGER,
+                    observations TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    processed_at DATETIME,
+                    FOREIGN KEY (sale_id) REFERENCES sales(id),
+                    FOREIGN KEY (sale_item_id) REFERENCES sale_items(id),
+                    FOREIGN KEY (product_id) REFERENCES products(id),
+                    FOREIGN KEY (customer_id) REFERENCES customers(id),
+                    FOREIGN KEY (store_id) REFERENCES stores(id),
+                    FOREIGN KEY (replacement_product_id) REFERENCES products(id),
+                    FOREIGN KEY (processed_by) REFERENCES users(id)
+                )
+            `);
+            console.log('✅ Tabela returns criada com sucesso!');
+        } catch (createError) {
+            console.error('❌ Erro ao criar tabela returns:', createError);
+            throw createError;
+        }
+    }
+}
+
 // Listar devoluções
 router.get('/', auth, async (req, res) => {
     try {
+        // Garantir que a tabela existe
+        await ensureReturnsTableExists();
+        
         const { startDate, endDate, status, store_id } = req.query;
         
         let sql = `
@@ -289,6 +338,8 @@ router.post('/', auth, async (req, res) => {
 // Processar devolução (troca por outro produto ou reembolso)
 router.put('/:id/process', auth, async (req, res) => {
     try {
+        // Garantir que a tabela existe
+        await ensureReturnsTableExists();
         const { id } = req.params;
         const { replacement_product_id, refund_amount, observations } = req.body;
 
