@@ -939,14 +939,21 @@
             itemsHtml += '<p><strong>Itens da Venda:</strong></p>';
             itemsHtml += '<ul style="margin: 0.5rem 0; padding-left: 1.5rem;">';
             
-            saleDetails.items.forEach(item => {
-                itemsHtml += `<li>
-                    ${item.product_name} - 
-                    Qtd: ${item.quantity} - 
-                    R$ ${parseFloat(item.unit_price).toFixed(2)} 
-                    <button type="button" class="btn btn-sm btn-primary" onclick="selectSaleItem(${item.id}, ${item.product_id}, ${item.unit_price})" style="margin-left: 0.5rem;">
-                        Selecionar
-                    </button>
+            saleDetails.items.forEach((item, index) => {
+                itemsHtml += `<li id="sale-item-${item.id}" style="margin-bottom: 0.5rem; padding: 0.5rem; border-bottom: 1px solid #e2e8f0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>${item.product_name}</strong><br>
+                            <small style="color: #718096;">
+                                Quantidade: ${item.quantity} | 
+                                Preço Unitário: R$ ${parseFloat(item.unit_price).toFixed(2)} | 
+                                Total: R$ ${(parseFloat(item.unit_price) * item.quantity).toFixed(2)}
+                            </small>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="selectSaleItem(${item.id}, ${item.product_id}, ${item.unit_price})" style="margin-left: 0.5rem;">
+                            Selecionar
+                        </button>
+                    </div>
                 </li>`;
             });
             
@@ -960,6 +967,38 @@
             document.getElementById('returnSaleItemId').value = saleItemId;
             document.getElementById('returnProductId').value = productId;
             document.getElementById('returnOriginalPrice').value = price;
+            
+            // Destacar o item selecionado visualmente
+            const items = document.querySelectorAll('#saleInfoContent li');
+            items.forEach(item => {
+                item.style.background = '';
+                item.style.padding = '';
+                item.style.borderRadius = '';
+            });
+            
+            // Encontrar e destacar o item selecionado
+            const selectedButton = event.target;
+            const selectedItem = selectedButton.closest('li');
+            if (selectedItem) {
+                selectedItem.style.background = '#e6fffa';
+                selectedItem.style.padding = '0.5rem';
+                selectedItem.style.borderRadius = '4px';
+                selectedItem.style.border = '2px solid #10b981';
+                
+                // Mudar o botão para mostrar que foi selecionado
+                selectedButton.textContent = '✓ Selecionado';
+                selectedButton.style.background = '#10b981';
+                selectedButton.disabled = true;
+            }
+            
+            // Desabilitar outros botões de seleção
+            items.forEach(item => {
+                const btn = item.querySelector('button');
+                if (btn && btn !== selectedButton) {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                }
+            });
         }
 
         // Carregar produtos para substituição
