@@ -748,24 +748,50 @@
         async function loadReturns() {
             try {
                 console.log('📥 Carregando devoluções...');
-                returns = await api.getReturns();
-                console.log('✅ Devoluções carregadas:', returns);
+                const response = await api.getReturns();
+                console.log('✅ Resposta recebida:', response);
+                
+                // Garantir que é um array
+                if (Array.isArray(response)) {
+                    returns = response;
+                } else if (response && Array.isArray(response.data)) {
+                    returns = response.data;
+                } else if (response && response.returns && Array.isArray(response.returns)) {
+                    returns = response.returns;
+                } else {
+                    console.warn('⚠️ Resposta não é um array, usando array vazio');
+                    returns = [];
+                }
+                
+                console.log('✅ Devoluções processadas:', returns.length);
                 renderReturns();
             } catch (error) {
                 console.error('❌ Erro ao carregar devoluções:', error);
-                console.error('❌ Detalhes do erro:', error.details, error.error, error.message);
+                console.error('❌ Tipo do erro:', typeof error);
+                console.error('❌ Detalhes do erro:', error);
                 
-                // Tentar obter mensagem de erro mais detalhada
-                let errorMessage = 'Erro ao carregar devoluções';
-                if (error.details) {
-                    errorMessage = error.details;
-                } else if (error.error) {
-                    errorMessage = error.error;
-                } else if (error.message) {
-                    errorMessage = error.message;
+                // Se for erro de rede ou servidor, mostrar mensagem amigável
+                if (error.message && error.message.includes('Failed to fetch')) {
+                    alert('Erro de conexão com o servidor. Verifique sua conexão e tente novamente.');
+                } else {
+                    // Tentar obter mensagem de erro mais detalhada
+                    let errorMessage = 'Erro ao carregar devoluções';
+                    if (error.details) {
+                        errorMessage = error.details;
+                    } else if (error.error) {
+                        errorMessage = error.error;
+                    } else if (error.message) {
+                        errorMessage = error.message;
+                    } else if (typeof error === 'string') {
+                        errorMessage = error;
+                    }
+                    
+                    alert(errorMessage);
                 }
                 
-                alert(errorMessage);
+                // Renderizar tabela vazia mesmo com erro
+                returns = [];
+                renderReturns();
             }
         }
 

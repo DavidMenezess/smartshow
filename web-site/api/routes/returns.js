@@ -12,10 +12,9 @@ const router = express.Router();
 // Verificar se a tabela returns existe, se não, criar
 async function ensureReturnsTableExists() {
     try {
-        await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='returns'");
-    } catch (error) {
-        console.log('⚠️ Tabela returns não existe. Criando...');
-        try {
+        const tableExists = await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='returns'");
+        if (!tableExists) {
+            console.log('⚠️ Tabela returns não existe. Criando...');
             await db.run(`
                 CREATE TABLE IF NOT EXISTS returns (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,9 +47,46 @@ async function ensureReturnsTableExists() {
                 )
             `);
             console.log('✅ Tabela returns criada com sucesso!');
+        }
+    } catch (error) {
+        console.error('❌ Erro ao verificar/criar tabela returns:', error);
+        // Não lançar erro aqui, deixar a query falhar naturalmente se necessário
+        // Mas tentar criar a tabela mesmo assim
+        try {
+            await db.run(`
+                CREATE TABLE IF NOT EXISTS returns (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    return_number TEXT UNIQUE NOT NULL,
+                    sale_id INTEGER NOT NULL,
+                    sale_item_id INTEGER NOT NULL,
+                    product_id INTEGER NOT NULL,
+                    customer_id INTEGER,
+                    store_id INTEGER NOT NULL,
+                    defect_description TEXT NOT NULL,
+                    action_type TEXT NOT NULL CHECK(action_type IN ('same_product', 'different_product', 'refund')),
+                    original_price REAL NOT NULL,
+                    original_payment_method TEXT NOT NULL,
+                    replacement_product_id INTEGER,
+                    replacement_price REAL,
+                    price_difference REAL DEFAULT 0,
+                    refund_amount REAL,
+                    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'completed', 'cancelled')),
+                    processed_by INTEGER,
+                    observations TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    processed_at DATETIME,
+                    FOREIGN KEY (sale_id) REFERENCES sales(id),
+                    FOREIGN KEY (sale_item_id) REFERENCES sale_items(id),
+                    FOREIGN KEY (product_id) REFERENCES products(id),
+                    FOREIGN KEY (customer_id) REFERENCES customers(id),
+                    FOREIGN KEY (store_id) REFERENCES stores(id),
+                    FOREIGN KEY (replacement_product_id) REFERENCES products(id),
+                    FOREIGN KEY (processed_by) REFERENCES users(id)
+                )
+            `);
+            console.log('✅ Tabela returns criada com sucesso (segunda tentativa)!');
         } catch (createError) {
-            console.error('❌ Erro ao criar tabela returns:', createError);
-            throw createError;
+            console.error('❌ Erro ao criar tabela returns (segunda tentativa):', createError);
         }
     }
 }
@@ -114,13 +150,36 @@ router.get('/', auth, async (req, res) => {
 
         sql += ` ORDER BY r.created_at DESC`;
 
-        console.log('🔍 Query SQL:', sql);
-        console.log('🔍 Parâmetros:', params);
-        console.log('🔍 Filtro:', filter);
+        // Executar query com tratamento de erro robusto
+        let returns = [];
+        try {
+            returns = await db.all(sql, params);
+            if (!returns) {
+                returns = [];
+            }
+        } catch (queryError) {
+            console.error('❌ Erro na query SQL:', queryError);
+            console.error('❌ SQL:', sql);
+            console.error('❌ Parâmetros:', params);
+            
+            // Se for erro de tabela não encontrada, tentar criar novamente
+            if (queryError.message && queryError.message.includes('no such table: returns')) {
+                console.log('🔄 Tentando criar tabela novamente...');
+                try {
+                    await ensureReturnsTableExists();
+                    // Tentar novamente
+                    returns = await db.all(sql, params) || [];
+                } catch (retryError) {
+                    console.error('❌ Erro ao tentar novamente:', retryError);
+                    throw queryError; // Lançar erro original
+                }
+            } else {
+                throw queryError;
+            }
+        }
         
-        const returns = await db.all(sql, params);
-        console.log('✅ Devoluções encontradas:', returns ? returns.length : 0);
-        res.json(returns || []);
+        console.log('✅ Devoluções encontradas:', returns.length);
+        res.json(returns);
     } catch (error) {
         console.error('❌ Erro ao listar devoluções:', error);
         console.error('❌ Stack:', error.stack);
