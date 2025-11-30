@@ -353,6 +353,45 @@ class API {
         return await this.request(`/service-orders/${id}`);
     }
 
+    // ========================================
+    // DEVOLUÇÕES
+    // ========================================
+
+    async getReturns(startDate, endDate, status, storeId) {
+        const params = new URLSearchParams();
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+        if (status) params.append('status', status);
+        if (storeId) params.append('store_id', storeId);
+        const query = params.toString();
+        return await this.request(`/returns${query ? `?${query}` : ''}`);
+    }
+
+    async getReturn(id) {
+        return await this.request(`/returns/${id}`);
+    }
+
+    async createReturn(returnData) {
+        return await this.request('/returns', 'POST', returnData);
+    }
+
+    async processReturn(id, data) {
+        return await this.request(`/returns/${id}/process`, 'PUT', data);
+    }
+
+    async cancelReturn(id) {
+        return await this.request(`/returns/${id}/cancel`, 'PUT');
+    }
+
+    async getReturnsStats(storeId) {
+        const params = new URLSearchParams();
+        if (storeId) params.append('store_id', storeId);
+        const query = params.toString();
+        return await this.request(`/returns/stats/summary${query ? `?${query}` : ''}`);
+    }
+        return await this.request(`/service-orders/${id}`);
+    }
+
     async createServiceOrder(order) {
         return await this.request('/service-orders', 'POST', order);
     }

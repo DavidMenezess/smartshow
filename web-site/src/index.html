@@ -89,6 +89,12 @@
                 </div>
 
                 <div class="card">
+                    <h3>Devoluções</h3>
+                    <div class="card-value" id="totalReturns">0</div>
+                    <div class="card-count" id="pendingReturnsCount">0 pendentes</div>
+                </div>
+
+                <div class="card">
                     <h3>Contas a Receber</h3>
                     <div class="card-value" id="receivable">R$ 0,00</div>
                     <div class="card-count" id="receivableCount">0 contas</div>
@@ -189,6 +195,38 @@
                         <h3>Vendas por Forma de Pagamento - Comparativo</h3>
                         <canvas id="comparisonPaymentChart"></canvas>
                     </div>
+                </div>
+            </div>
+
+            <!-- Devoluções -->
+            <div class="chart-card" style="margin-bottom: 2rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3>Devoluções Recentes</h3>
+                    <button class="btn btn-secondary" onclick="window.location.href='produtos.html#returns'">Ver Todas</button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nº Devolução</th>
+                                <th>Data</th>
+                                <th>Cliente</th>
+                                <th>Produto</th>
+                                <th>Defeito</th>
+                                <th>Ação</th>
+                                <th>Valor Original</th>
+                                <th>Forma Pagamento</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="returnsTableBody">
+                            <tr>
+                                <td colspan="9" style="text-align: center; padding: 2rem;">
+                                    Carregando devoluções...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

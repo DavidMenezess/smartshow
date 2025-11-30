@@ -105,6 +105,9 @@ async function renderNormalDashboard(data) {
     // Atualizar card de estoque baixo
     document.getElementById('lowStock').textContent = data.stock.lowStock;
 
+    // Carregar devoluções
+    await loadReturns();
+
     // Atualizar cards financeiros
     document.getElementById('receivable').textContent = 
         `R$ ${data.financial.receivable.total.toFixed(2).replace('.', ',')}`;
@@ -132,6 +135,78 @@ async function renderNormalDashboard(data) {
 
     // Carregar vendas recentes
     await loadRecentSales();
+}
+
+// Carregar devoluções
+async function loadReturns() {
+    try {
+        const stats = await api.getReturnsStats();
+        const returns = await api.getReturns(null, null, null);
+        
+        // Atualizar card
+        document.getElementById('totalReturns').textContent = stats.total_returns || 0;
+        document.getElementById('pendingReturnsCount').textContent = `${stats.pending_returns || 0} pendentes`;
+        
+        // Renderizar tabela (últimas 10)
+        const recentReturns = returns.slice(0, 10);
+        renderReturnsTable(recentReturns);
+    } catch (error) {
+        console.error('Erro ao carregar devoluções:', error);
+    }
+}
+
+// Renderizar tabela de devoluções
+function renderReturnsTable(returns) {
+    const tbody = document.getElementById('returnsTableBody');
+    if (!tbody) return;
+
+    if (returns.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" style="text-align: center; padding: 2rem;">
+                    Nenhuma devolução registrada
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = returns.map(returnItem => {
+        const statusBadge = {
+            'pending': '<span style="background: #fbbf24; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.875rem;">Pendente</span>',
+            'completed': '<span style="background: #10b981; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.875rem;">Concluída</span>',
+            'cancelled': '<span style="background: #ef4444; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.875rem;">Cancelada</span>'
+        }[returnItem.status] || returnItem.status;
+
+        const actionText = {
+            'same_product': 'Troca pelo mesmo',
+            'different_product': returnItem.replacement_product_name ? `Troca por: ${returnItem.replacement_product_name}` : 'Troca por outro',
+            'refund': 'Reembolso'
+        }[returnItem.action_type] || returnItem.action_type;
+
+        const priceDiff = returnItem.price_difference || 0;
+        let actionDisplay = actionText;
+        if (returnItem.action_type === 'different_product' && priceDiff !== 0) {
+            actionDisplay += ` (${priceDiff > 0 ? `+R$ ${priceDiff.toFixed(2)}` : `R$ ${priceDiff.toFixed(2)}`})`;
+        }
+        if (returnItem.action_type === 'refund' && returnItem.refund_amount) {
+            actionDisplay += ` (R$ ${parseFloat(returnItem.refund_amount).toFixed(2)})`;
+        }
+
+        return `
+            <tr>
+                <td>${returnItem.return_number}</td>
+                <td>${new Date(returnItem.created_at).toLocaleDateString('pt-BR')}</td>
+                <td>${returnItem.customer_name || 'N/A'}</td>
+                <td>${returnItem.product_name}</td>
+                <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${returnItem.defect_description}">${returnItem.defect_description}</td>
+                <td>${actionDisplay}</td>
+                <td>R$ ${parseFloat(returnItem.original_price).toFixed(2)}</td>
+                <td>${returnItem.original_payment_method}</td>
+                <td>${statusBadge}</td>
+            </tr>
+        `;
+    }).join('');
 }
 
 function renderComparison(comparisonData, aggregatedSales) {

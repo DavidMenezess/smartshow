@@ -20,6 +20,7 @@ const usersRoutes = require('./users');
 const cashRoutes = require('./cash');
 const storesRoutes = require('./stores');
 const dataRoutes = require('./data');
+const returnsRoutes = require('./returns');
 
 // Usar rotas
 router.use('/auth', authRoutes);
@@ -36,6 +37,7 @@ router.use('/users', usersRoutes);
 router.use('/cash', cashRoutes);
 router.use('/stores', storesRoutes);
 router.use('/data', dataRoutes);
+router.use('/returns', returnsRoutes);
 
 module.exports = router;
 
