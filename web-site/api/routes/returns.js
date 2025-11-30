@@ -62,14 +62,18 @@ router.get('/', auth, async (req, res) => {
 
         sql += ` ORDER BY r.created_at DESC`;
 
-        console.log('SQL:', sql);
-        console.log('Params:', params);
-        
         const returns = await db.all(sql, params);
         res.json(returns || []);
     } catch (error) {
         console.error('Erro ao listar devoluções:', error);
         console.error('Stack:', error.stack);
+        
+        // Se o erro for porque a tabela não existe, retornar array vazio
+        if (error.message && error.message.includes('no such table: returns')) {
+            console.log('⚠️ Tabela returns não existe ainda. Retornando array vazio.');
+            return res.json([]);
+        }
+        
         res.status(500).json({ 
             error: 'Erro ao listar devoluções',
             details: error.message 

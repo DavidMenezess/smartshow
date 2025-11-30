@@ -84,7 +84,16 @@ class API {
             }
 
             if (!response.ok) {
-                const errorMessage = data?.error || data?.details || data?.message || `Erro na requisição (${response.status})`;
+                // Tentar obter mensagem de erro mais detalhada
+                let errorMessage = data?.error || data?.details || data?.message;
+                if (!errorMessage && data) {
+                    // Se data existe mas não tem error/details/message, usar o próprio data
+                    errorMessage = typeof data === 'string' ? data : JSON.stringify(data);
+                }
+                if (!errorMessage) {
+                    errorMessage = `Erro na requisição (${response.status})`;
+                }
+                
                 console.error('❌ Erro na API:', {
                     status: response.status,
                     statusText: response.statusText,
