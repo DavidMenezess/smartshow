@@ -387,7 +387,7 @@ router.post('/', auth, async (req, res) => {
             }
 
             replacementProductId = replacement_product_id;
-            replacementPrice = replacementProduct.sale_price || replacementProduct.price;
+            replacementPrice = replacementProduct.sale_price || replacementProduct.cost_price || 0;
             priceDifference = replacementPrice - saleItem.unit_price;
             console.log('✅ Produto de substituição encontrado:', { 
                 name: replacementProduct.name, 
@@ -767,7 +767,7 @@ router.put('/:id/process', auth, async (req, res) => {
                 }
 
                 replacementProductId = replacement_product_id;
-                replacementPrice = replacementProduct.sale_price || replacementProduct.price;
+                replacementPrice = replacementProduct.sale_price || replacementProduct.cost_price || 0;
                 priceDifference = replacementPrice - returnData.original_price;
             }
 
