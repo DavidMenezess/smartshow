@@ -412,54 +412,77 @@ router.post('/', auth, async (req, res) => {
 
         // Criar devolução
         console.log('💾 Criando devolução no banco de dados...');
+        
+        // Validar e preparar valores
+        const originalPrice = parseFloat(saleItem.unit_price) || 0;
+        const paymentMethod = sale.payment_method || 'Não informado';
+        const customerId = sale.customer_id || null;
+        const finalStoreId = storeId || 1;
+        
+        // Validar valores obrigatórios
+        if (!originalPrice || originalPrice <= 0) {
+            console.error('❌ Preço original inválido:', saleItem.unit_price);
+            return res.status(400).json({ error: 'Preço original do item inválido' });
+        }
+        
+        if (!paymentMethod || paymentMethod.trim() === '') {
+            console.error('❌ Método de pagamento inválido:', sale.payment_method);
+            return res.status(400).json({ error: 'Método de pagamento inválido' });
+        }
+        
         console.log('📋 Dados da devolução:', {
             returnNumber,
             sale_id,
             sale_item_id,
             product_id,
-            customer_id: sale.customer_id || null,
-            storeId,
+            customer_id: customerId,
+            storeId: finalStoreId,
             defect_description,
             action_type,
-            original_price: saleItem.unit_price,
-            original_payment_method: sale.payment_method,
+            original_price: originalPrice,
+            original_payment_method: paymentMethod,
             replacementProductId,
             replacementPrice,
             priceDifference,
             refundAmount
         });
         
-        const result = await db.run(
-            `INSERT INTO returns 
-             (return_number, sale_id, sale_item_id, product_id, customer_id, store_id,
-              defect_description, action_type, original_price, original_payment_method,
-              replacement_product_id, replacement_price, price_difference, refund_amount,
-              observations, processed_by, status, processed_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                returnNumber,
-                sale_id,
-                sale_item_id,
-                product_id,
-                sale.customer_id || null,
-                storeId,
-                defect_description,
-                action_type,
-                saleItem.unit_price,
-                sale.payment_method,
-                replacementProductId,
-                replacementPrice,
-                priceDifference,
-                refundAmount,
-                observations || null,
-                action_type === 'same_product' ? req.user.id : null, // Se for troca pelo mesmo, já processa
-                action_type === 'same_product' ? 'completed' : 'pending',
-                action_type === 'same_product' ? new Date().toISOString() : null
-            ]
-        );
+        try {
+            const result = await db.run(
+                `INSERT INTO returns 
+                 (return_number, sale_id, sale_item_id, product_id, customer_id, store_id,
+                  defect_description, action_type, original_price, original_payment_method,
+                  replacement_product_id, replacement_price, price_difference, refund_amount,
+                  observations, processed_by, status, processed_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    returnNumber,
+                    parseInt(sale_id),
+                    parseInt(sale_item_id),
+                    parseInt(product_id),
+                    customerId,
+                    parseInt(finalStoreId),
+                    defect_description,
+                    action_type,
+                    originalPrice,
+                    paymentMethod,
+                    replacementProductId ? parseInt(replacementProductId) : null,
+                    replacementPrice || null,
+                    priceDifference || 0,
+                    refundAmount || null,
+                    observations || null,
+                    action_type === 'same_product' ? parseInt(req.user.id) : null,
+                    action_type === 'same_product' ? 'completed' : 'pending',
+                    action_type === 'same_product' ? new Date().toISOString() : null
+                ]
+            );
 
-        const returnId = result.lastID;
-        console.log('✅ Devolução criada com ID:', returnId);
+            const returnId = result.lastID;
+            console.log('✅ Devolução criada com ID:', returnId);
+            
+            if (!returnId) {
+                throw new Error('Falha ao criar devolução: ID não retornado');
+            }
 
         // Processar automaticamente se for troca por outro produto ou reembolso
         let shouldAutoProcess = false;
@@ -481,8 +504,9 @@ router.post('/', auth, async (req, res) => {
                  VALUES (?, 'entry', 1, 'Devolução - Troca pelo mesmo produto', ?)`,
                 [product_id, req.user.id]
             );
-        } else if (shouldAutoProcess) {
+        } else if (shouldAutoProcess && returnId) {
             try {
+                console.log('🔄 Processando devolução automaticamente...');
                 // Processar automaticamente: atualizar estoque e registrar no caixa
                 if (action_type === 'different_product') {
                     // Devolver produto original e remover produto de substituição
@@ -609,10 +633,13 @@ router.post('/', auth, async (req, res) => {
                     [req.user.id, new Date().toISOString(), returnId]
                 );
             } catch (processError) {
-                console.error('Erro ao processar devolução automaticamente:', processError);
+                console.error('❌ Erro ao processar devolução automaticamente:', processError);
+                console.error('❌ Stack:', processError.stack);
                 // Não lançar erro aqui - a devolução já foi criada, apenas não foi processada
                 // O usuário pode processar manualmente depois
             }
+        } else {
+            console.log('⏭️ Processamento automático não necessário ou returnId não disponível');
         }
 
         // Buscar devolução completa com informações do produto de substituição
@@ -666,19 +693,44 @@ router.post('/', auth, async (req, res) => {
             returnData.installments = null;
         }
         
-        console.log('✅ Devolução completa buscada:', returnData.return_number);
-        res.status(201).json(returnData);
+            console.log('✅ Devolução completa buscada:', returnData.return_number);
+            res.status(201).json(returnData);
+        } catch (insertError) {
+            console.error('❌ Erro ao inserir devolução no banco:', insertError);
+            console.error('❌ Mensagem:', insertError.message);
+            console.error('❌ Código:', insertError.code);
+            console.error('❌ Stack:', insertError.stack);
+            throw insertError; // Re-lançar para ser capturado pelo catch externo
+        }
     } catch (error) {
-        console.error('Erro ao criar devolução:', error);
-        console.error('Stack trace:', error.stack);
-        console.error('Detalhes do erro:', {
+        console.error('❌ Erro ao criar devolução:', error);
+        console.error('❌ Stack trace:', error.stack);
+        console.error('❌ Detalhes do erro:', {
             message: error.message,
             code: error.code,
-            errno: error.errno
+            errno: error.errno,
+            sql: error.sql,
+            params: error.params
         });
+        
+        // Mensagem de erro mais específica
+        let errorMessage = 'Erro ao criar devolução';
+        if (error.code === 'SQLITE_CONSTRAINT') {
+            if (error.message.includes('FOREIGN KEY')) {
+                errorMessage = 'Erro de integridade: referência inválida (venda, produto ou cliente não encontrado)';
+            } else if (error.message.includes('UNIQUE')) {
+                errorMessage = 'Número de devolução já existe. Tente novamente.';
+            } else {
+                errorMessage = 'Erro de validação: ' + error.message;
+            }
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+        
         res.status(500).json({ 
-            error: 'Erro ao criar devolução',
-            details: error.message || 'Erro desconhecido'
+            error: errorMessage,
+            details: error.message || 'Erro desconhecido',
+            code: error.code || 'UNKNOWN_ERROR'
         });
     }
 });
