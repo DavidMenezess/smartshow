@@ -273,13 +273,18 @@
         // Event listeners
         document.getElementById('addCustomerBtn').addEventListener('click', () => openCustomerModal());
         
-        // Fechar modal ao clicar fora
-        window.onclick = function(event) {
+        // Fechar modal ao clicar fora (mas não quando há texto selecionado)
+        window.addEventListener('click', function(event) {
             const modal = document.getElementById('customerModal');
-            if (event.target === modal) {
+            // Verificar se há texto selecionado - se houver, não fechar o modal
+            const selection = window.getSelection();
+            const hasSelection = selection && selection.toString().trim().length > 0;
+            
+            // Só fechar se clicou no overlay (fora do conteúdo) e não há texto selecionado
+            if (event.target === modal && !hasSelection) {
                 closeCustomerModal();
             }
-        }
+        });
 
         // Carregar clientes ao iniciar
         document.addEventListener('DOMContentLoaded', loadCustomers);
