@@ -1271,7 +1271,12 @@
                 
                 alert('Devolução registrada com sucesso!' + (actionType === 'different_product' || actionType === 'refund' ? '\nCupom de troca impresso automaticamente.' : ''));
                 closeReturnFormModal();
-                loadReturns();
+                
+                // Aguardar um pouco antes de recarregar para garantir que a devolução foi salva
+                setTimeout(() => {
+                    console.log('🔄 Recarregando devoluções após criação...');
+                    loadReturns();
+                }, 500);
             } catch (error) {
                 console.error('Erro ao criar devolução:', error);
                 console.error('Detalhes do erro:', error);
