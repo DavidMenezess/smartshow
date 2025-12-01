@@ -754,7 +754,19 @@
         async function loadReturns() {
             try {
                 console.log('📥 Carregando devoluções...');
-                const response = await api.getReturns();
+                
+                // Obter store_id do usuário se necessário
+                const user = JSON.parse(localStorage.getItem('user') || '{}');
+                let storeIdForReturns = null;
+                
+                // Se não for admin/gerente, usar store_id do usuário
+                if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+                    storeIdForReturns = user.store_id;
+                }
+                
+                console.log('🏪 Carregando devoluções com storeId:', storeIdForReturns, 'Role:', user.role);
+                
+                const response = await api.getReturns(null, null, null, storeIdForReturns);
                 console.log('✅ Resposta recebida:', response);
                 
                 // Garantir que é um array

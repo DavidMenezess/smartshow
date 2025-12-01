@@ -156,13 +156,19 @@ router.get('/', auth, async (req, res) => {
 
         // Filtrar por loja
         const filter = getStoreFilter(req.user, store_id);
+        console.log('🔍 Filtro de loja aplicado:', filter);
+        
         // Se não pode ver todas as lojas, filtrar pela loja do usuário
         if (!filter.canSeeAll) {
             if (filter.store_id) {
                 sql += ` AND r.store_id = ?`;
                 params.push(filter.store_id);
+                console.log('📌 Filtrando por store_id:', filter.store_id);
+            } else {
+                console.warn('⚠️ Usuário sem store_id - não retornará devoluções');
             }
-            // Se não tem store_id, não retornar nada (usuário sem loja não vê devoluções)
+        } else {
+            console.log('✅ Admin/Gerente - vendo todas as devoluções (sem filtro de loja)');
         }
         // Se canSeeAll é true, não adicionar filtro (admin/gerente vê todas)
 
@@ -402,13 +408,26 @@ router.post('/', auth, async (req, res) => {
         // Gerar número da devolução
         const returnNumber = `DEV-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
 
-        // Obter store_id
+        // Obter store_id - garantir que sempre tenha um valor válido
         const userStoreId = req.user.store_id;
         let storeId = sale.store_id || userStoreId;
+        
+        console.log('🏪 Store IDs disponíveis:', {
+            sale_store_id: sale.store_id,
+            user_store_id: userStoreId,
+            storeId_atual: storeId
+        });
+        
         if (!storeId) {
+            console.warn('⚠️ Nenhum store_id encontrado. Buscando loja padrão...');
             const defaultStore = await db.get('SELECT id FROM stores WHERE is_active = 1 ORDER BY id LIMIT 1');
             storeId = defaultStore ? defaultStore.id : 1;
+            console.log('✅ Store_id definido como:', storeId);
         }
+        
+        // Garantir que storeId seja um número válido
+        storeId = parseInt(storeId) || 1;
+        console.log('✅ Store_id final para devolução:', storeId);
 
         // Criar devolução
         console.log('💾 Criando devolução no banco de dados...');
