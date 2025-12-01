@@ -160,8 +160,13 @@ router.get('/', auth, async (req, res) => {
         console.log('👤 Usuário completo:', JSON.stringify(req.user, null, 2));
         
         // TEMPORÁRIO: Para debug, vamos verificar se há devoluções sem filtro primeiro
-        const allReturnsCount = await db.get("SELECT COUNT(*) as count FROM returns");
-        console.log('📊 Total de devoluções SEM filtro:', allReturnsCount ? allReturnsCount.count : 0);
+        let allReturnsCount = null;
+        try {
+            allReturnsCount = await db.get("SELECT COUNT(*) as count FROM returns");
+            console.log('📊 Total de devoluções SEM filtro:', allReturnsCount ? allReturnsCount.count : 0);
+        } catch (countError) {
+            console.error('⚠️ Erro ao contar devoluções:', countError);
+        }
         
         // Se não pode ver todas as lojas, filtrar pela loja do usuário
         if (!filter.canSeeAll) {
@@ -258,34 +263,42 @@ router.get('/', auth, async (req, res) => {
         console.log('📤 Primeira devolução (se houver):', returns.length > 0 ? JSON.stringify(returns[0], null, 2) : 'Nenhuma');
         
         // Se não encontrou devoluções mas sabemos que existem, fazer query sem filtro para debug
-        if (returns.length === 0 && allReturnsCount && allReturnsCount.count > 0) {
-            console.warn('⚠️ ATENÇÃO: Query com filtro retornou 0, mas existem', allReturnsCount.count, 'devoluções no banco!');
-            console.warn('⚠️ Isso indica problema no filtro de store_id');
-            console.warn('⚠️ Retornando todas as devoluções para debug (TEMPORÁRIO)');
-            
-            // TEMPORÁRIO: Retornar todas as devoluções para debug
-            const debugReturns = await db.all(`
-                SELECT r.*,
-                       s.sale_number,
-                       s.payment_method as original_payment_method,
-                       p.name as product_name,
-                       p.barcode as product_barcode,
-                       c.name as customer_name,
-                       c.document as customer_document,
-                       st.name as store_name,
-                       u.name as processed_by_name,
-                       rp.name as replacement_product_name
-                FROM returns r
-                LEFT JOIN sales s ON r.sale_id = s.id
-                LEFT JOIN products p ON r.product_id = p.id
-                LEFT JOIN customers c ON r.customer_id = c.id
-                LEFT JOIN stores st ON r.store_id = st.id
-                LEFT JOIN users u ON r.processed_by = u.id
-                LEFT JOIN products rp ON r.replacement_product_id = rp.id
-                ORDER BY r.created_at DESC
-            `);
-            console.log('🔍 Devoluções retornadas (debug):', debugReturns.length);
-            return res.json(debugReturns);
+        if (returns.length === 0) {
+            // Verificar novamente quantas devoluções existem
+            try {
+                const finalCount = await db.get("SELECT COUNT(*) as count FROM returns");
+                if (finalCount && finalCount.count > 0) {
+                    console.warn('⚠️ ATENÇÃO: Query com filtro retornou 0, mas existem', finalCount.count, 'devoluções no banco!');
+                    console.warn('⚠️ Isso indica problema no filtro de store_id');
+                    console.warn('⚠️ Retornando todas as devoluções para debug (TEMPORÁRIO)');
+                    
+                    // TEMPORÁRIO: Retornar todas as devoluções para debug
+                    const debugReturns = await db.all(`
+                        SELECT r.*,
+                               s.sale_number,
+                               s.payment_method as original_payment_method,
+                               p.name as product_name,
+                               p.barcode as product_barcode,
+                               c.name as customer_name,
+                               c.document as customer_document,
+                               st.name as store_name,
+                               u.name as processed_by_name,
+                               rp.name as replacement_product_name
+                        FROM returns r
+                        LEFT JOIN sales s ON r.sale_id = s.id
+                        LEFT JOIN products p ON r.product_id = p.id
+                        LEFT JOIN customers c ON r.customer_id = c.id
+                        LEFT JOIN stores st ON r.store_id = st.id
+                        LEFT JOIN users u ON r.processed_by = u.id
+                        LEFT JOIN products rp ON r.replacement_product_id = rp.id
+                        ORDER BY r.created_at DESC
+                    `);
+                    console.log('🔍 Devoluções retornadas (debug):', debugReturns.length);
+                    return res.json(debugReturns);
+                }
+            } catch (debugError) {
+                console.error('❌ Erro ao fazer query de debug:', debugError);
+            }
         }
         
         res.json(returns);
