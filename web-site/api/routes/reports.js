@@ -448,11 +448,13 @@ router.get('/', auth, async (req, res) => {
                 const returnsReport = await db.all(
                     `SELECT r.*,
                             s.sale_number,
+                            s.payment_method as original_payment_method,
                             s.installments,
                             p.name as product_name,
                             p.barcode as product_barcode,
                             c.name as customer_name,
                             c.cpf_cnpj as customer_document,
+                            c.document,
                             st.name as store_name,
                             rp.name as replacement_product_name,
                             rp.barcode as replacement_product_barcode,
