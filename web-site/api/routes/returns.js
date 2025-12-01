@@ -157,15 +157,21 @@ router.get('/', auth, async (req, res) => {
         // Filtrar por loja
         const filter = getStoreFilter(req.user, store_id);
         console.log('🔍 Filtro de loja aplicado:', filter);
+        console.log('👤 Usuário completo:', JSON.stringify(req.user, null, 2));
         
         // Se não pode ver todas as lojas, filtrar pela loja do usuário
         if (!filter.canSeeAll) {
             if (filter.store_id) {
+                // Garantir que store_id seja número para comparação correta
+                const storeIdNum = parseInt(filter.store_id);
                 sql += ` AND r.store_id = ?`;
-                params.push(filter.store_id);
-                console.log('📌 Filtrando por store_id:', filter.store_id);
+                params.push(storeIdNum);
+                console.log('📌 Filtrando por store_id:', storeIdNum, '(tipo:', typeof storeIdNum, ')');
             } else {
                 console.warn('⚠️ Usuário sem store_id - não retornará devoluções');
+                // Se usuário não tem store_id mas não é admin, retornar vazio
+                // Mas vamos logar para debug
+                console.warn('⚠️ Usuário role:', req.user.role, 'store_id:', req.user.store_id);
             }
         } else {
             console.log('✅ Admin/Gerente - vendo todas as devoluções (sem filtro de loja)');
@@ -186,6 +192,10 @@ router.get('/', auth, async (req, res) => {
             try {
                 const countResult = await db.get("SELECT COUNT(*) as count FROM returns");
                 console.log('📊 Total de devoluções na tabela:', countResult ? countResult.count : 0);
+                
+                // Debug: ver todas as devoluções sem filtro para diagnóstico
+                const allReturns = await db.all("SELECT id, return_number, store_id, status, created_at FROM returns ORDER BY created_at DESC LIMIT 10");
+                console.log('🔍 Últimas 10 devoluções (sem filtro):', JSON.stringify(allReturns, null, 2));
             } catch (countError) {
                 console.error('⚠️ Erro ao contar devoluções (pode ser tabela vazia):', countError.message);
             }
@@ -427,7 +437,22 @@ router.post('/', auth, async (req, res) => {
         
         // Garantir que storeId seja um número válido
         storeId = parseInt(storeId) || 1;
-        console.log('✅ Store_id final para devolução:', storeId);
+        console.log('✅ Store_id final para devolução:', storeId, '(tipo:', typeof storeId, ')');
+        
+        // Verificar se a loja existe
+        try {
+            const storeExists = await db.get('SELECT id, name FROM stores WHERE id = ?', [storeId]);
+            if (!storeExists) {
+                console.warn('⚠️ Loja não encontrada, usando loja padrão');
+                const defaultStore = await db.get('SELECT id FROM stores WHERE is_active = 1 ORDER BY id LIMIT 1');
+                storeId = defaultStore ? defaultStore.id : 1;
+                console.log('✅ Store_id ajustado para:', storeId);
+            } else {
+                console.log('✅ Loja confirmada:', storeExists.name, '(ID:', storeExists.id, ')');
+            }
+        } catch (storeError) {
+            console.error('❌ Erro ao verificar loja:', storeError);
+        }
 
         // Criar devolução
         console.log('💾 Criando devolução no banco de dados...');
