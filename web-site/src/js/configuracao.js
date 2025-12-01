@@ -346,19 +346,21 @@ function toggleFiscalPrinterConfig() {
     if (type !== 'none') {
         configDiv.style.display = 'block';
         
-        // Mostrar select para USB, input text para rede/serial
-        if (type === 'usb') {
+        // Mostrar select para USB e Serial, input text para rede
+        if (type === 'usb' || type === 'serial') {
             pathSelect.style.display = 'block';
             pathText.style.display = 'none';
-            helpText.textContent = 'Para USB: selecione uma impressora da lista.';
+            if (type === 'usb') {
+                helpText.textContent = 'Para USB: selecione uma impressora da lista.';
+            } else {
+                helpText.textContent = 'Para Serial: selecione uma impressora da lista ou informe a porta COM manualmente.';
+            }
             loadDetectedPrinters();
         } else {
             pathSelect.style.display = 'none';
             pathText.style.display = 'block';
             if (type === 'network') {
-                helpText.textContent = 'Para rede: use formato IP:PORTA (ex: 192.168.1.100:9100)';
-            } else {
-                helpText.textContent = 'Para serial: informe a porta serial (ex: COM3 ou /dev/ttyUSB0)';
+                helpText.textContent = 'Para rede: use formato IP:PORTA (ex: 192.168.1.100:9100) ou apenas o IP.';
             }
         }
     } else {
