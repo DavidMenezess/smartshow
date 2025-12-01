@@ -121,6 +121,7 @@ router.get('/', auth, async (req, res) => {
             SELECT r.*,
                    s.sale_number,
                    s.payment_method as original_payment_method,
+                   s.installments,
                    p.name as product_name,
                    p.barcode as product_barcode,
                    c.name as customer_name,

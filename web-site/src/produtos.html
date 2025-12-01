@@ -223,6 +223,7 @@
                             <th>Nº Devolução</th>
                             <th>Data</th>
                             <th>Cliente</th>
+                            <th>Nº Venda</th>
                             <th>Produto</th>
                             <th>Defeito</th>
                             <th>Ação</th>
@@ -821,7 +822,7 @@
             if (returns.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="10" style="text-align: center; padding: 2rem;">
+                        <td colspan="11" style="text-align: center; padding: 2rem;">
                             Nenhuma devolução registrada
                         </td>
                     </tr>
@@ -854,11 +855,12 @@
                         <td>${returnItem.return_number}</td>
                         <td>${new Date(returnItem.created_at).toLocaleDateString('pt-BR')}</td>
                         <td>${returnItem.customer_name || 'N/A'}</td>
+                        <td>${returnItem.sale_number || 'N/A'}</td>
                         <td>${returnItem.product_name}</td>
                         <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${returnItem.defect_description}">${returnItem.defect_description}</td>
                         <td>${actionText}</td>
                         <td>R$ ${parseFloat(returnItem.original_price).toFixed(2)}</td>
-                        <td>${returnItem.original_payment_method}</td>
+                        <td>${returnItem.original_payment_method}${returnItem.installments ? ` (${returnItem.installments}x)` : ''}</td>
                         <td>${statusBadge}</td>
                         <td>
                             ${returnItem.status === 'pending' ? `
