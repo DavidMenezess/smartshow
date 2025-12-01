@@ -505,7 +505,7 @@
                                             } else if (returnItem.action_type === 'different_product') {
                                                 actionDetails = 'Troca por outro produto';
                                                 if (returnItem.replacement_product_name) {
-                                                    actionDetails += \`: \${returnItem.replacement_product_name}\`;
+                                                    actionDetails += `: ${returnItem.replacement_product_name}`;
                                                 }
                                             } else if (returnItem.action_type === 'refund') {
                                                 actionDetails = 'Reembolso';
