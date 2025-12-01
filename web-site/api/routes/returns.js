@@ -313,6 +313,9 @@ router.get('/:id', auth, async (req, res) => {
 // Criar devolução
 router.post('/', auth, async (req, res) => {
     try {
+        console.log('📝 Iniciando criação de devolução...');
+        console.log('📦 Dados recebidos:', JSON.stringify(req.body, null, 2));
+        
         // Garantir que a tabela existe
         await ensureReturnsTableExists();
         
@@ -326,11 +329,14 @@ router.post('/', auth, async (req, res) => {
             observations
         } = req.body;
 
+        console.log('✅ Dados validados:', { sale_id, sale_item_id, product_id, defect_description, action_type, replacement_product_id });
+
         if (!sale_id || !sale_item_id || !product_id || !defect_description || !action_type) {
             return res.status(400).json({ error: 'Dados obrigatórios: sale_id, sale_item_id, product_id, defect_description, action_type' });
         }
 
         // Buscar informações da venda e do item
+        console.log('🔍 Buscando informações da venda...');
         const sale = await db.get(
             `SELECT s.*, c.id as customer_id, s.store_id
              FROM sales s
@@ -340,9 +346,12 @@ router.post('/', auth, async (req, res) => {
         );
 
         if (!sale) {
+            console.error('❌ Venda não encontrada:', sale_id);
             return res.status(404).json({ error: 'Venda não encontrada' });
         }
+        console.log('✅ Venda encontrada:', sale.sale_number);
 
+        console.log('🔍 Buscando item da venda...');
         const saleItem = await db.get(
             `SELECT si.*, p.price as current_price
              FROM sale_items si
@@ -352,10 +361,13 @@ router.post('/', auth, async (req, res) => {
         );
 
         if (!saleItem) {
+            console.error('❌ Item da venda não encontrado:', { sale_item_id, sale_id });
             return res.status(404).json({ error: 'Item da venda não encontrado' });
         }
+        console.log('✅ Item da venda encontrado:', saleItem);
 
         // Validar ação
+        console.log('🔍 Validando ação:', action_type);
         let replacementProductId = null;
         let replacementPrice = null;
         let priceDifference = 0;
@@ -363,19 +375,28 @@ router.post('/', auth, async (req, res) => {
 
         if (action_type === 'different_product') {
             if (!replacement_product_id) {
+                console.error('❌ replacement_product_id não fornecido');
                 return res.status(400).json({ error: 'replacement_product_id é obrigatório para troca por outro produto' });
             }
 
+            console.log('🔍 Buscando produto de substituição:', replacement_product_id);
             const replacementProduct = await db.get('SELECT * FROM products WHERE id = ?', [replacement_product_id]);
             if (!replacementProduct) {
+                console.error('❌ Produto de substituição não encontrado:', replacement_product_id);
                 return res.status(404).json({ error: 'Produto de substituição não encontrado' });
             }
 
             replacementProductId = replacement_product_id;
             replacementPrice = replacementProduct.sale_price || replacementProduct.price;
             priceDifference = replacementPrice - saleItem.unit_price;
+            console.log('✅ Produto de substituição encontrado:', { 
+                name: replacementProduct.name, 
+                price: replacementPrice, 
+                priceDifference 
+            });
         } else if (action_type === 'refund') {
             refundAmount = saleItem.unit_price;
+            console.log('✅ Reembolso calculado:', refundAmount);
         }
 
         // Gerar número da devolução
@@ -390,6 +411,24 @@ router.post('/', auth, async (req, res) => {
         }
 
         // Criar devolução
+        console.log('💾 Criando devolução no banco de dados...');
+        console.log('📋 Dados da devolução:', {
+            returnNumber,
+            sale_id,
+            sale_item_id,
+            product_id,
+            customer_id: sale.customer_id || null,
+            storeId,
+            defect_description,
+            action_type,
+            original_price: saleItem.unit_price,
+            original_payment_method: sale.payment_method,
+            replacementProductId,
+            replacementPrice,
+            priceDifference,
+            refundAmount
+        });
+        
         const result = await db.run(
             `INSERT INTO returns 
              (return_number, sale_id, sale_item_id, product_id, customer_id, store_id,
@@ -420,6 +459,7 @@ router.post('/', auth, async (req, res) => {
         );
 
         const returnId = result.lastID;
+        console.log('✅ Devolução criada com ID:', returnId);
 
         // Processar automaticamente se for troca por outro produto ou reembolso
         let shouldAutoProcess = false;
@@ -576,27 +616,57 @@ router.post('/', auth, async (req, res) => {
         }
 
         // Buscar devolução completa com informações do produto de substituição
-        const returnData = await db.get(
-            `SELECT r.*,
-                    s.sale_number,
-                    s.installments,
-                    p.name as product_name,
-                    p.barcode as product_barcode,
-                    c.name as customer_name,
-                    c.cpf_cnpj as customer_document,
-                    st.name as store_name,
-                    rp.name as replacement_product_name,
-                    rp.barcode as replacement_product_barcode
-             FROM returns r
-             LEFT JOIN sales s ON r.sale_id = s.id
-             LEFT JOIN products p ON r.product_id = p.id
-             LEFT JOIN customers c ON r.customer_id = c.id
-             LEFT JOIN stores st ON r.store_id = st.id
-             LEFT JOIN products rp ON r.replacement_product_id = rp.id
-             WHERE r.id = ?`,
-            [returnId]
-        );
-
+        console.log('🔍 Buscando devolução completa...');
+        let returnData;
+        try {
+            // Tentar buscar com installments primeiro
+            returnData = await db.get(
+                `SELECT r.*,
+                        s.sale_number,
+                        s.installments,
+                        p.name as product_name,
+                        p.barcode as product_barcode,
+                        c.name as customer_name,
+                        c.cpf_cnpj as customer_document,
+                        st.name as store_name,
+                        rp.name as replacement_product_name,
+                        rp.barcode as replacement_product_barcode
+                 FROM returns r
+                 LEFT JOIN sales s ON r.sale_id = s.id
+                 LEFT JOIN products p ON r.product_id = p.id
+                 LEFT JOIN customers c ON r.customer_id = c.id
+                 LEFT JOIN stores st ON r.store_id = st.id
+                 LEFT JOIN products rp ON r.replacement_product_id = rp.id
+                 WHERE r.id = ?`,
+                [returnId]
+            );
+        } catch (queryError) {
+            // Se falhar por causa da coluna installments, tentar sem ela
+            console.warn('⚠️ Erro ao buscar com installments, tentando sem:', queryError.message);
+            returnData = await db.get(
+                `SELECT r.*,
+                        s.sale_number,
+                        p.name as product_name,
+                        p.barcode as product_barcode,
+                        c.name as customer_name,
+                        c.cpf_cnpj as customer_document,
+                        st.name as store_name,
+                        rp.name as replacement_product_name,
+                        rp.barcode as replacement_product_barcode
+                 FROM returns r
+                 LEFT JOIN sales s ON r.sale_id = s.id
+                 LEFT JOIN products p ON r.product_id = p.id
+                 LEFT JOIN customers c ON r.customer_id = c.id
+                 LEFT JOIN stores st ON r.store_id = st.id
+                 LEFT JOIN products rp ON r.replacement_product_id = rp.id
+                 WHERE r.id = ?`,
+                [returnId]
+            );
+            // Adicionar installments como null se não existir
+            returnData.installments = null;
+        }
+        
+        console.log('✅ Devolução completa buscada:', returnData.return_number);
         res.status(201).json(returnData);
     } catch (error) {
         console.error('Erro ao criar devolução:', error);
