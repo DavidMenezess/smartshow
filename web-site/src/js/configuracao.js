@@ -59,6 +59,9 @@ function loadConfigurations() {
         // Mostrar/esconder campos de configuração
         toggleFiscalPrinterConfig();
         toggleA4PrinterConfig();
+        
+        // Carregar impressoras automaticamente ao abrir a página
+        loadDetectedPrinters();
     }
 
     // Carregar categorias e fornecedores (todos podem ver)
@@ -165,17 +168,23 @@ async function loadDetectedPrinters() {
         const fiscalType = document.getElementById('fiscalPrinterType').value;
         const a4Type = document.getElementById('a4PrinterType').value;
         
-        if (fiscalType === 'usb' && fiscalSelect) {
+        if ((fiscalType === 'usb' || fiscalType === 'serial') && fiscalSelect) {
             // Limpar opções existentes
             fiscalSelect.innerHTML = '<option value="">Selecione uma impressora...</option>';
             
-            if (printers.length === 0) {
+            // Filtrar impressoras por tipo se necessário
+            const filteredPrinters = fiscalType === 'serial' 
+                ? printers.filter(p => p.type === 'serial')
+                : printers.filter(p => p.type === 'usb' || p.type === 'other');
+            
+            if (filteredPrinters.length === 0) {
                 fiscalSelect.innerHTML += '<option value="" disabled>Nenhuma impressora detectada. Verifique se há impressoras conectadas.</option>';
             } else {
-                printers.forEach(printer => {
+                filteredPrinters.forEach(printer => {
                     const option = document.createElement('option');
                     option.value = printer.name;
-                    option.textContent = `${printer.name} (${printer.port})`;
+                    const typeLabel = printer.type === 'serial' ? 'Serial' : printer.type === 'usb' ? 'USB' : printer.type === 'network' ? 'Rede' : 'Outro';
+                    option.textContent = `${printer.name} (${printer.port}) [${typeLabel}]`;
                     if (printer.isDefault) {
                         option.textContent += ' [Padrão]';
                         option.selected = true; // Selecionar impressora padrão automaticamente
@@ -185,16 +194,22 @@ async function loadDetectedPrinters() {
             }
         }
         
-        if (a4Type === 'usb' && a4Select) {
+        if ((a4Type === 'usb' || a4Type === 'serial') && a4Select) {
             a4Select.innerHTML = '<option value="">Selecione uma impressora...</option>';
             
-            if (printers.length === 0) {
+            // Filtrar impressoras por tipo se necessário
+            const filteredPrinters = a4Type === 'serial' 
+                ? printers.filter(p => p.type === 'serial')
+                : printers.filter(p => p.type === 'usb' || p.type === 'other');
+            
+            if (filteredPrinters.length === 0) {
                 a4Select.innerHTML += '<option value="" disabled>Nenhuma impressora detectada. Verifique se há impressoras conectadas.</option>';
             } else {
-                printers.forEach(printer => {
+                filteredPrinters.forEach(printer => {
                     const option = document.createElement('option');
                     option.value = printer.name;
-                    option.textContent = `${printer.name} (${printer.port})`;
+                    const typeLabel = printer.type === 'serial' ? 'Serial' : printer.type === 'usb' ? 'USB' : printer.type === 'network' ? 'Rede' : 'Outro';
+                    option.textContent = `${printer.name} (${printer.port}) [${typeLabel}]`;
                     if (printer.isDefault) {
                         option.textContent += ' [Padrão]';
                         option.selected = true; // Selecionar impressora padrão automaticamente

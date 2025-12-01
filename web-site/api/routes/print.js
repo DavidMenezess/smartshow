@@ -108,53 +108,108 @@ async function detectPrinters() {
     
     try {
         if (platform === 'win32') {
-            // Windows: usar wmic para listar impressoras
+            // Windows: usar PowerShell para detectar TODAS as impressoras (USB, Serial, Rede)
             try {
-                const { stdout } = await execAsync('wmic printer get name,portname,default /format:csv');
-                const lines = stdout.split('\r\n').filter(line => line.trim() && !line.startsWith('Node') && !line.startsWith(','));
-                
-                for (const line of lines) {
-                    if (!line.trim()) continue;
-                    
-                    const parts = line.split(',');
-                    if (parts.length >= 3) {
-                        // CSV do wmic tem formato: Node,Name,PortName,Default
-                        const name = parts[1]?.trim();
-                        const port = parts[2]?.trim();
-                        const isDefault = parts[3]?.trim() === 'TRUE';
-                        
-                        if (name && name !== 'Name' && name.length > 0) {
-                            printers.push({
-                                name: name,
-                                port: port || 'N/A',
-                                type: (port && (port.startsWith('USB') || port.includes('USB'))) ? 'usb' : 'other',
-                                isDefault: isDefault || false
-                            });
+                // Comando PowerShell mais robusto que detecta todas as impressoras com detalhes
+                const psCommand = `
+                    $printers = Get-Printer | Select-Object Name, PortName, PrinterStatus, Default, DriverName, Shared, Location
+                    $result = @()
+                    foreach ($printer in $printers) {
+                        $port = $printer.PortName
+                        $type = 'other'
+                        if ($port -like '*USB*' -or $port -like '*TMUSB*' -or $port -like '*usb*') {
+                            $type = 'usb'
+                        } elseif ($port -like 'COM*' -or $port -like '*COM*') {
+                            $type = 'serial'
+                        } elseif ($port -like '*.*.*.*' -or $port -like '*IP_*' -or $port -like '*TCP*') {
+                            $type = 'network'
+                        }
+                        $result += @{
+                            Name = $printer.Name
+                            Port = $port
+                            Type = $type
+                            IsDefault = $printer.Default
+                            Status = $printer.PrinterStatus.ToString()
+                            Driver = $printer.DriverName
+                            Shared = $printer.Shared
+                            Location = $printer.Location
                         }
                     }
+                    $result | ConvertTo-Json -Compress
+                `;
+                
+                const { stdout } = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`);
+                
+                // Limpar stdout e parsear JSON
+                const cleanOutput = stdout.trim();
+                if (cleanOutput) {
+                    try {
+                        const printerList = JSON.parse(cleanOutput);
+                        const printerArray = Array.isArray(printerList) ? printerList : [printerList];
+                        
+                        printerArray.forEach(printer => {
+                            if (printer && printer.Name) {
+                                printers.push({
+                                    name: printer.Name,
+                                    port: printer.Port || 'N/A',
+                                    type: printer.Type || 'other',
+                                    isDefault: printer.IsDefault || false,
+                                    status: printer.Status || 'Unknown',
+                                    driver: printer.Driver || 'N/A',
+                                    shared: printer.Shared || false,
+                                    location: printer.Location || ''
+                                });
+                            }
+                        });
+                    } catch (parseError) {
+                        console.error('Erro ao parsear JSON do PowerShell:', parseError);
+                        console.error('Output recebido:', cleanOutput);
+                    }
                 }
-            } catch (error) {
-                console.error('Erro ao executar wmic:', error);
-                // Tentar método alternativo usando PowerShell
-                try {
-                    const { stdout } = await execAsync('powershell -Command "Get-Printer | Select-Object Name, PortName | ConvertTo-Json"');
-                    const printerList = JSON.parse(stdout);
-                    const printerArray = Array.isArray(printerList) ? printerList : [printerList];
-                    
-                    printerArray.forEach(printer => {
-                        if (printer && printer.Name) {
-                            printers.push({
-                                name: printer.Name,
-                                port: printer.PortName || 'N/A',
-                                type: (printer.PortName && printer.PortName.includes('USB')) ? 'usb' : 'other',
-                                isDefault: false
-                            });
+                
+                // Se não encontrou impressoras, tentar método alternativo com wmic
+                if (printers.length === 0) {
+                    console.log('Tentando método alternativo com wmic...');
+                    try {
+                        const { stdout: wmicOutput } = await execAsync('wmic printer get name,portname,default /format:csv');
+                        const lines = wmicOutput.split('\r\n').filter(line => line.trim() && !line.startsWith('Node') && !line.startsWith(','));
+                        
+                        for (const line of lines) {
+                            if (!line.trim()) continue;
+                            
+                            const parts = line.split(',');
+                            if (parts.length >= 3) {
+                                const name = parts[1]?.trim();
+                                const port = parts[2]?.trim();
+                                const isDefault = parts[3]?.trim() === 'TRUE';
+                                
+                                if (name && name !== 'Name' && name.length > 0) {
+                                    let type = 'other';
+                                    if (port && (port.includes('USB') || port.includes('TMUSB') || port.includes('usb'))) {
+                                        type = 'usb';
+                                    } else if (port && (port.startsWith('COM') || port.includes('COM'))) {
+                                        type = 'serial';
+                                    } else if (port && (port.match(/^\d+\.\d+\.\d+\.\d+/) || port.includes('IP_') || port.includes('TCP'))) {
+                                        type = 'network';
+                                    }
+                                    
+                                    printers.push({
+                                        name: name,
+                                        port: port || 'N/A',
+                                        type: type,
+                                        isDefault: isDefault || false
+                                    });
+                                }
+                            }
                         }
-                    });
-                } catch (psError) {
-                    console.error('Erro ao usar PowerShell:', psError);
-                    throw new Error('Não foi possível detectar impressoras no Windows');
+                    } catch (wmicError) {
+                        console.error('Erro ao usar wmic como fallback:', wmicError);
+                    }
                 }
+            } catch (psError) {
+                console.error('Erro ao usar PowerShell:', psError);
+                console.error('Detalhes:', psError.message);
+                // Não lançar erro, apenas logar e retornar array vazio ou tentar outro método
             }
         } else if (platform === 'linux') {
             // Linux: usar lpstat ou lsusb
