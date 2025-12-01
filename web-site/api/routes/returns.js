@@ -169,36 +169,23 @@ router.get('/', auth, async (req, res) => {
             console.error('⚠️ Erro ao contar devoluções:', countError);
         }
         
-        // Se não pode ver todas as lojas, filtrar pela loja do usuário
-        if (!filter.canSeeAll) {
-            if (filter.store_id) {
-                // Garantir que store_id seja número para comparação correta
-                const storeIdNum = parseInt(filter.store_id);
-                
-                // Debug: verificar tipos e valores antes de filtrar
-                const allStoreIds = await db.all("SELECT DISTINCT store_id FROM returns ORDER BY store_id");
-                console.log('🔍 Store_ids existentes nas devoluções:', JSON.stringify(allStoreIds));
-                console.log('🔍 Store_id do filtro (número):', storeIdNum, 'Tipo:', typeof storeIdNum);
-                console.log('🔍 Store_id do usuário (original):', req.user.store_id, 'Tipo:', typeof req.user.store_id);
-                
-                // CORREÇÃO: Usar CAST para garantir compatibilidade de tipos
+        // Filtrar por loja - simplificado e garantido
+        if (filter.store_id !== null && filter.store_id !== undefined) {
+            // Tem store_id para filtrar (usuário comum ou admin/gerente com loja específica)
+            const storeIdNum = parseInt(filter.store_id);
+            if (!isNaN(storeIdNum)) {
                 sql += ` AND CAST(r.store_id AS INTEGER) = ?`;
                 params.push(storeIdNum);
-                console.log('📌 Filtrando por store_id (com CAST):', storeIdNum, '(tipo:', typeof storeIdNum, ')');
-                
-                // Debug: ver quantas devoluções existem para este store_id
-                const filteredCount = await db.get("SELECT COUNT(*) as count FROM returns WHERE CAST(store_id AS INTEGER) = ?", [storeIdNum]);
-                console.log('📊 Devoluções para store_id', storeIdNum, '(com CAST):', filteredCount ? filteredCount.count : 0);
-            } else {
-                console.warn('⚠️ Usuário sem store_id - não retornará devoluções');
-                // Se usuário não tem store_id mas não é admin, retornar vazio
-                // Mas vamos logar para debug
-                console.warn('⚠️ Usuário role:', req.user.role, 'store_id:', req.user.store_id);
+                console.log('📌 Filtrando por store_id:', storeIdNum, '(canSeeAll:', filter.canSeeAll, ')');
             }
-        } else {
+        } else if (filter.canSeeAll) {
+            // Admin/Gerente sem store_id - ver todas (não adicionar filtro)
             console.log('✅ Admin/Gerente - vendo todas as devoluções (sem filtro de loja)');
+        } else {
+            // Usuário sem store_id e não admin - não retornar nada
+            console.warn('⚠️ Usuário sem store_id - não retornará devoluções');
+            console.warn('⚠️ Usuário role:', req.user.role, 'store_id:', req.user.store_id);
         }
-        // Se canSeeAll é true, não adicionar filtro (admin/gerente vê todas)
 
         sql += ` ORDER BY r.created_at DESC`;
 
@@ -271,7 +258,7 @@ router.get('/', auth, async (req, res) => {
         console.log('📤 Enviando resposta com', returns.length, 'devoluções');
         console.log('📤 Primeira devolução (se houver):', returns.length > 0 ? JSON.stringify(returns[0], null, 2) : 'Nenhuma');
         
-        // Se não encontrou devoluções mas sabemos que existem, fazer query sem filtro para debug
+        // Se não encontrou devoluções, verificar se há problema no filtro
         if (returns.length === 0) {
             // Verificar novamente quantas devoluções existem
             try {
@@ -1112,10 +1099,15 @@ router.get('/stats/summary', auth, async (req, res) => {
         FROM returns WHERE 1=1`;
         const params = [];
 
-        if (!filter.canSeeAll || filter.store_id) {
-            sql += ` AND store_id = ?`;
-            params.push(filter.store_id);
+        // Filtrar por loja - mesma lógica da rota principal
+        if (filter.store_id !== null && filter.store_id !== undefined) {
+            const storeIdNum = parseInt(filter.store_id);
+            if (!isNaN(storeIdNum)) {
+                sql += ` AND CAST(store_id AS INTEGER) = ?`;
+                params.push(storeIdNum);
+            }
         }
+        // Se canSeeAll é true e não há store_id, não adicionar filtro (ver todas)
 
         const stats = await db.get(sql, params);
         res.json(stats);
