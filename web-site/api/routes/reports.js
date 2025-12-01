@@ -444,6 +444,33 @@ router.get('/', auth, async (req, res) => {
                 );
                 return res.json({ type: 'service', data: serviceReport });
 
+            case 'returns':
+                const returnsReport = await db.all(
+                    `SELECT r.*,
+                            s.sale_number,
+                            s.installments,
+                            p.name as product_name,
+                            p.barcode as product_barcode,
+                            c.name as customer_name,
+                            c.cpf_cnpj as customer_document,
+                            st.name as store_name,
+                            rp.name as replacement_product_name,
+                            rp.barcode as replacement_product_barcode,
+                            u.name as processed_by_name
+                     FROM returns r
+                     LEFT JOIN sales s ON r.sale_id = s.id
+                     LEFT JOIN products p ON r.product_id = p.id
+                     LEFT JOIN customers c ON r.customer_id = c.id
+                     LEFT JOIN stores st ON r.store_id = st.id
+                     LEFT JOIN products rp ON r.replacement_product_id = rp.id
+                     LEFT JOIN users u ON r.processed_by = u.id
+                     WHERE DATE(datetime(r.created_at, '-3 hours')) >= ? 
+                     AND DATE(datetime(r.created_at, '-3 hours')) <= ?
+                     ORDER BY r.created_at DESC`,
+                    [startDate, endDate]
+                );
+                return res.json({ type: 'returns', data: returnsReport });
+
             default:
                 return res.status(400).json({ error: 'Tipo de relatório inválido' });
         }

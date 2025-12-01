@@ -140,8 +140,22 @@ async function renderNormalDashboard(data) {
 // Carregar devoluções
 async function loadReturns() {
     try {
-        const stats = await api.getReturnsStats();
-        const returns = await api.getReturns(null, null, null);
+        // Obter store_id se houver loja selecionada
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        let storeIdForReturns = null;
+        
+        if (selectedStoreId) {
+            storeIdForReturns = selectedStoreId;
+        } else if (user.store_id && (user.role !== 'admin' && user.role !== 'gerente')) {
+            storeIdForReturns = user.store_id;
+        }
+        
+        console.log('📦 Carregando devoluções com storeId:', storeIdForReturns);
+        
+        const stats = await api.getReturnsStats(storeIdForReturns);
+        const returns = await api.getReturns(null, null, null, storeIdForReturns);
+        
+        console.log('✅ Devoluções carregadas:', returns.length, 'devoluções encontradas');
         
         // Atualizar card
         document.getElementById('totalReturns').textContent = stats.total_returns || 0;
@@ -151,7 +165,8 @@ async function loadReturns() {
         const recentReturns = returns.slice(0, 10);
         renderReturnsTable(recentReturns);
     } catch (error) {
-        console.error('Erro ao carregar devoluções:', error);
+        console.error('❌ Erro ao carregar devoluções:', error);
+        console.error('❌ Detalhes:', error);
     }
 }
 
