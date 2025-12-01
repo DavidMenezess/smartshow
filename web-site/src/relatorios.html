@@ -426,6 +426,126 @@
                         </div>
                     `;
 
+                case 'returns':
+                    const totalReturns = data.length;
+                    const pendingReturns = data.filter(r => r.status === 'pending').length;
+                    const completedReturns = data.filter(r => r.status === 'completed').length;
+                    const cancelledReturns = data.filter(r => r.status === 'cancelled').length;
+                    const totalRefunds = data.filter(r => r.action_type === 'refund').reduce((sum, r) => sum + (parseFloat(r.refund_amount) || 0), 0);
+                    const totalPriceDiff = data.filter(r => r.action_type === 'different_product').reduce((sum, r) => sum + (parseFloat(r.price_difference) || 0), 0);
+                    
+                    return `
+                        <div style="margin-top: 2rem;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                                <div style="background: #f7fafc; padding: 1rem; border-radius: 8px;">
+                                    <div style="font-size: 0.875rem; color: #718096;">Total de Devoluções</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #2d3748;">${totalReturns}</div>
+                                </div>
+                                <div style="background: #f7fafc; padding: 1rem; border-radius: 8px;">
+                                    <div style="font-size: 0.875rem; color: #718096;">Pendentes</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #fbbf24;">${pendingReturns}</div>
+                                </div>
+                                <div style="background: #f7fafc; padding: 1rem; border-radius: 8px;">
+                                    <div style="font-size: 0.875rem; color: #718096;">Concluídas</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">${completedReturns}</div>
+                                </div>
+                                <div style="background: #f7fafc; padding: 1rem; border-radius: 8px;">
+                                    <div style="font-size: 0.875rem; color: #718096;">Canceladas</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #ef4444;">${cancelledReturns}</div>
+                                </div>
+                                <div style="background: #f7fafc; padding: 1rem; border-radius: 8px;">
+                                    <div style="font-size: 0.875rem; color: #718096;">Total Reembolsos</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #2d3748;">R$ ${totalRefunds.toFixed(2).replace('.', ',')}</div>
+                                </div>
+                                <div style="background: #f7fafc; padding: 1rem; border-radius: 8px;">
+                                    <div style="font-size: 0.875rem; color: #718096;">Diferença de Valores</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: ${totalPriceDiff >= 0 ? '#10b981' : '#ef4444'};">R$ ${Math.abs(totalPriceDiff).toFixed(2).replace('.', ',')}</div>
+                                </div>
+                            </div>
+                            <div style="overflow-x: auto;">
+                                <table class="data-table" style="width: 100%; min-width: 1200px;">
+                                    <thead>
+                                        <tr>
+                                            <th>Nº Devolução</th>
+                                            <th>Data/Hora</th>
+                                            <th>Nº Venda</th>
+                                            <th>Cliente</th>
+                                            <th>Produto Devolvido</th>
+                                            <th>Produto Substituição</th>
+                                            <th>Defeito</th>
+                                            <th>Ação</th>
+                                            <th>Valor Original</th>
+                                            <th>Diferença Valor</th>
+                                            <th>Forma Pagamento</th>
+                                            <th>Processado Por</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${data.map(returnItem => {
+                                            const statusBadge = {
+                                                'pending': '<span style="background: #fbbf24; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.875rem;">Pendente</span>',
+                                                'completed': '<span style="background: #10b981; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.875rem;">Concluída</span>',
+                                                'cancelled': '<span style="background: #ef4444; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.875rem;">Cancelada</span>'
+                                            }[returnItem.status] || returnItem.status;
+
+                                            let actionDetails = '';
+                                            if (returnItem.action_type === 'same_product') {
+                                                actionDetails = 'Troca pelo mesmo produto';
+                                            } else if (returnItem.action_type === 'different_product') {
+                                                actionDetails = 'Troca por outro produto';
+                                                if (returnItem.replacement_product_name) {
+                                                    actionDetails += \`: \${returnItem.replacement_product_name}\`;
+                                                }
+                                            } else if (returnItem.action_type === 'refund') {
+                                                actionDetails = 'Reembolso';
+                                            }
+
+                                            const returnDate = new Date(returnItem.created_at);
+                                            const dateStr = returnDate.toLocaleDateString('pt-BR');
+                                            const timeStr = returnDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                                            
+                                            const priceDiff = parseFloat(returnItem.price_difference) || 0;
+                                            let priceDiffDisplay = '';
+                                            if (returnItem.action_type === 'different_product' && priceDiff !== 0) {
+                                                if (priceDiff > 0) {
+                                                    priceDiffDisplay = \`<span style="color: #ef4444; font-weight: bold;">+R$ \${priceDiff.toFixed(2).replace('.', ',')}</span><br><small style="color: #718096;">Cliente paga</small>\`;
+                                                } else {
+                                                    priceDiffDisplay = \`<span style="color: #10b981; font-weight: bold;">R$ \${priceDiff.toFixed(2).replace('.', ',')}</span><br><small style="color: #718096;">Loja devolve</small>\`;
+                                                }
+                                            } else if (returnItem.action_type === 'refund' && returnItem.refund_amount) {
+                                                priceDiffDisplay = \`<span style="color: #ef4444; font-weight: bold;">R$ \${parseFloat(returnItem.refund_amount).toFixed(2).replace('.', ',')}</span><br><small style="color: #718096;">Reembolso</small>\`;
+                                            } else {
+                                                priceDiffDisplay = '<span style="color: #718096;">Sem diferença</span>';
+                                            }
+                                            
+                                            return \`
+                                                <tr>
+                                                    <td style="font-weight: 500;">\${returnItem.return_number}</td>
+                                                    <td>
+                                                        <div style="font-weight: 500;">\${dateStr}</div>
+                                                        <div style="font-size: 0.875rem; color: #718096;">\${timeStr}</div>
+                                                    </td>
+                                                    <td>\${returnItem.sale_number || 'N/A'}</td>
+                                                    <td>\${returnItem.customer_name || 'N/A'}</td>
+                                                    <td>\${returnItem.product_name || 'N/A'}</td>
+                                                    <td>\${returnItem.replacement_product_name || '-'}</td>
+                                                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="\${returnItem.defect_description}">\${returnItem.defect_description}</td>
+                                                    <td>\${actionDetails}</td>
+                                                    <td>R$ \${parseFloat(returnItem.original_price).toFixed(2).replace('.', ',')}</td>
+                                                    <td>\${priceDiffDisplay}</td>
+                                                    <td>\${getPaymentMethodName(returnItem.original_payment_method, returnItem.installments)}</td>
+                                                    <td>\${returnItem.processed_by_name || '-'}</td>
+                                                    <td>\${statusBadge}</td>
+                                                </tr>
+                                            \`;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+
                 default:
                     return `<pre style="background: #f7fafc; padding: 1rem; border-radius: 8px; overflow-x: auto;">${JSON.stringify(data, null, 2)}</pre>`;
             }

@@ -180,15 +180,14 @@ router.get('/', auth, async (req, res) => {
                 console.log('🔍 Store_id do filtro (número):', storeIdNum, 'Tipo:', typeof storeIdNum);
                 console.log('🔍 Store_id do usuário (original):', req.user.store_id, 'Tipo:', typeof req.user.store_id);
                 
-                sql += ` AND r.store_id = ?`;
+                // CORREÇÃO: Usar CAST para garantir compatibilidade de tipos
+                sql += ` AND CAST(r.store_id AS INTEGER) = ?`;
                 params.push(storeIdNum);
-                console.log('📌 Filtrando por store_id:', storeIdNum, '(tipo:', typeof storeIdNum, ')');
+                console.log('📌 Filtrando por store_id (com CAST):', storeIdNum, '(tipo:', typeof storeIdNum, ')');
                 
-                // Debug: ver quantas devoluções existem para este store_id (testar ambos os tipos)
-                const filteredCount = await db.get("SELECT COUNT(*) as count FROM returns WHERE store_id = ?", [storeIdNum]);
-                const filteredCountCast = await db.get("SELECT COUNT(*) as count FROM returns WHERE CAST(store_id AS INTEGER) = ?", [storeIdNum]);
-                console.log('📊 Devoluções para store_id', storeIdNum, '(direto):', filteredCount ? filteredCount.count : 0);
-                console.log('📊 Devoluções para store_id', storeIdNum, '(com CAST):', filteredCountCast ? filteredCountCast.count : 0);
+                // Debug: ver quantas devoluções existem para este store_id
+                const filteredCount = await db.get("SELECT COUNT(*) as count FROM returns WHERE CAST(store_id AS INTEGER) = ?", [storeIdNum]);
+                console.log('📊 Devoluções para store_id', storeIdNum, '(com CAST):', filteredCount ? filteredCount.count : 0);
             } else {
                 console.warn('⚠️ Usuário sem store_id - não retornará devoluções');
                 // Se usuário não tem store_id mas não é admin, retornar vazio
@@ -286,34 +285,26 @@ router.get('/', auth, async (req, res) => {
                     console.warn('🔍 Store_id do usuário:', req.user.store_id, 'Tipo:', typeof req.user.store_id);
                     console.warn('🔍 Store_id do filtro:', filter.store_id, 'Tipo:', typeof filter.store_id);
                     
-                    // Se o usuário é caixa/vendedor e tem store_id, verificar se há problema de tipo
-                    if (req.user.role === 'caixa' || req.user.role === 'vendedor') {
-                        // Verificar se há devoluções com o store_id do usuário (comparando como string e número)
-                        const userStoreIdStr = String(req.user.store_id);
+                    // CORREÇÃO: Se o usuário é caixa/vendedor e tem store_id, mas não encontrou devoluções,
+                    // pode ser problema de tipo. Vamos retornar todas as devoluções da loja do usuário usando CAST
+                    if (req.user.role === 'caixa' || req.user.role === 'vendedor' || req.user.role === 'tecnico') {
                         const userStoreIdNum = parseInt(req.user.store_id);
                         
-                        const countStr = await db.get("SELECT COUNT(*) as count FROM returns WHERE CAST(store_id AS TEXT) = ?", [userStoreIdStr]);
-                        const countNum = await db.get("SELECT COUNT(*) as count FROM returns WHERE store_id = ?", [userStoreIdNum]);
+                        // Tentar buscar com CAST para garantir compatibilidade
+                        const sqlWithCast = sql.replace(' AND r.store_id = ?', ' AND CAST(r.store_id AS INTEGER) = ?');
+                        const returnsWithCast = await db.all(sqlWithCast, params);
                         
-                        console.warn('🔍 Devoluções com store_id como string:', countStr ? countStr.count : 0);
-                        console.warn('🔍 Devoluções com store_id como número:', countNum ? countNum.count : 0);
-                        
-                        // Se encontrou com algum tipo, retornar essas
-                        if (countNum && countNum.count > 0) {
-                            console.warn('✅ Encontradas', countNum.count, 'devoluções com store_id numérico. Retornando...');
-                            returns = await db.all(sql.replace(' AND r.store_id = ?', ''), params.filter(p => p !== storeIdNum));
-                            // Não, espera - preciso refazer a query sem o filtro de store_id
-                            const sqlWithoutStoreFilter = sql.replace(/ AND r\.store_id = \?/, '');
-                            const paramsWithoutStoreFilter = params.filter(p => p !== storeIdNum);
-                            returns = await db.all(sqlWithoutStoreFilter, paramsWithoutStoreFilter);
-                            console.warn('✅ Retornando', returns.length, 'devoluções sem filtro de store_id');
+                        if (returnsWithCast && returnsWithCast.length > 0) {
+                            console.warn('✅ Encontradas', returnsWithCast.length, 'devoluções usando CAST. Retornando...');
+                            returns = returnsWithCast;
                         } else {
-                            // Retornar todas para debug
-                            console.warn('⚠️ Retornando todas as devoluções para debug (TEMPORÁRIO)');
+                            // Se ainda não encontrou, retornar todas as devoluções da loja do usuário sem outros filtros
+                            console.warn('⚠️ Retornando todas as devoluções da loja do usuário (TEMPORÁRIO para correção)');
                             const debugReturns = await db.all(`
                                 SELECT r.*,
                                        s.sale_number,
                                        s.payment_method as original_payment_method,
+                                       s.installments,
                                        p.name as product_name,
                                        p.barcode as product_barcode,
                                        c.name as customer_name,
@@ -328,18 +319,20 @@ router.get('/', auth, async (req, res) => {
                                 LEFT JOIN stores st ON r.store_id = st.id
                                 LEFT JOIN users u ON r.processed_by = u.id
                                 LEFT JOIN products rp ON r.replacement_product_id = rp.id
+                                WHERE CAST(r.store_id AS INTEGER) = ?
                                 ORDER BY r.created_at DESC
-                            `);
-                            console.log('🔍 Devoluções retornadas (debug):', debugReturns.length);
+                            `, [userStoreIdNum]);
+                            console.log('🔍 Devoluções retornadas (correção):', debugReturns.length);
                             return res.json(debugReturns);
                         }
                     } else {
                         // Para admin/gerente, retornar todas
-                        console.warn('⚠️ Retornando todas as devoluções para debug (TEMPORÁRIO)');
+                        console.warn('⚠️ Admin/Gerente - retornando todas as devoluções');
                         const debugReturns = await db.all(`
                             SELECT r.*,
                                    s.sale_number,
                                    s.payment_method as original_payment_method,
+                                   s.installments,
                                    p.name as product_name,
                                    p.barcode as product_barcode,
                                    c.name as customer_name,
@@ -356,7 +349,7 @@ router.get('/', auth, async (req, res) => {
                             LEFT JOIN products rp ON r.replacement_product_id = rp.id
                             ORDER BY r.created_at DESC
                         `);
-                        console.log('🔍 Devoluções retornadas (debug):', debugReturns.length);
+                        console.log('🔍 Devoluções retornadas (admin):', debugReturns.length);
                         return res.json(debugReturns);
                     }
                 }
