@@ -91,15 +91,25 @@
 
                 const data = await response.json();
                 
+                console.log('📊 Dados recebidos do relatório:', data);
+                console.log('📊 Tipo do relatório:', data.type);
+                console.log('📊 Quantidade de dados:', data.data ? data.data.length : 0);
+                
                 // Formatar relatório baseado no tipo
                 let html = `
                     <h3>Relatório de ${getReportTypeName(reportType)}</h3>
                     <p><strong>Período:</strong> ${new Date(startDate).toLocaleDateString('pt-BR')} a ${new Date(endDate).toLocaleDateString('pt-BR')}</p>
                 `;
 
-                if (data.data && data.data.length > 0) {
-                    html += formatReportData(data.type, data.data);
+                if (data && data.data && Array.isArray(data.data) && data.data.length > 0) {
+                    console.log('✅ Formatando relatório com', data.data.length, 'itens');
+                    html += formatReportData(data.type || reportType, data.data);
+                } else if (data && Array.isArray(data) && data.length > 0) {
+                    // Fallback: se data já é um array
+                    console.log('✅ Formatando relatório (dados diretos) com', data.length, 'itens');
+                    html += formatReportData(reportType, data);
                 } else {
+                    console.warn('⚠️ Nenhum dado encontrado no relatório');
                     html += '<p style="text-align: center; padding: 2rem; color: #718096;">Nenhum dado encontrado para o período selecionado.</p>';
                 }
 

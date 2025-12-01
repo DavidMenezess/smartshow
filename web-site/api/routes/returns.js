@@ -585,8 +585,7 @@ router.post('/', auth, async (req, res) => {
             refundAmount
         });
         
-        try {
-            const result = await db.run(
+        const result = await db.run(
                 `INSERT INTO returns 
                  (return_number, sale_id, sale_item_id, product_id, customer_id, store_id,
                   defect_description, action_type, original_price, original_payment_method,
@@ -615,12 +614,12 @@ router.post('/', auth, async (req, res) => {
                 ]
             );
 
-            const returnId = result.lastID;
-            console.log('✅ Devolução criada com ID:', returnId);
-            
-            if (!returnId) {
-                throw new Error('Falha ao criar devolução: ID não retornado');
-            }
+        const returnId = result.lastID;
+        console.log('✅ Devolução criada com ID:', returnId);
+        
+        if (!returnId) {
+            throw new Error('Falha ao criar devolução: ID não retornado');
+        }
 
         // Processar automaticamente se for troca por outro produto ou reembolso
         let shouldAutoProcess = false;
@@ -831,15 +830,8 @@ router.post('/', auth, async (req, res) => {
             returnData.installments = null;
         }
         
-            console.log('✅ Devolução completa buscada:', returnData.return_number);
-            res.status(201).json(returnData);
-        } catch (insertError) {
-            console.error('❌ Erro ao inserir devolução no banco:', insertError);
-            console.error('❌ Mensagem:', insertError.message);
-            console.error('❌ Código:', insertError.code);
-            console.error('❌ Stack:', insertError.stack);
-            throw insertError; // Re-lançar para ser capturado pelo catch externo
-        }
+        console.log('✅ Devolução completa buscada:', returnData.return_number);
+        res.status(201).json(returnData);
     } catch (error) {
         console.error('❌ Erro ao criar devolução:', error);
         console.error('❌ Stack trace:', error.stack);
