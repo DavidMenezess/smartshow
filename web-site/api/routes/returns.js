@@ -286,46 +286,37 @@ router.get('/', auth, async (req, res) => {
                     console.warn('🔍 Store_id do usuário:', req.user.store_id, 'Tipo:', typeof req.user.store_id);
                     console.warn('🔍 Store_id do filtro:', filter.store_id, 'Tipo:', typeof filter.store_id);
                     
-                    // CORREÇÃO: Se o usuário é caixa/vendedor e tem store_id, mas não encontrou devoluções,
-                    // pode ser problema de tipo. Vamos retornar todas as devoluções da loja do usuário usando CAST
+                    // CORREÇÃO: Se o usuário é caixa/vendedor/tecnico e tem store_id, mas não encontrou devoluções,
+                    // retornar todas as devoluções da loja do usuário usando CAST diretamente
                     if (req.user.role === 'caixa' || req.user.role === 'vendedor' || req.user.role === 'tecnico') {
                         const userStoreIdNum = parseInt(req.user.store_id);
                         
-                        // Tentar buscar com CAST para garantir compatibilidade
-                        const sqlWithCast = sql.replace(' AND r.store_id = ?', ' AND CAST(r.store_id AS INTEGER) = ?');
-                        const returnsWithCast = await db.all(sqlWithCast, params);
-                        
-                        if (returnsWithCast && returnsWithCast.length > 0) {
-                            console.warn('✅ Encontradas', returnsWithCast.length, 'devoluções usando CAST. Retornando...');
-                            returns = returnsWithCast;
-                        } else {
-                            // Se ainda não encontrou, retornar todas as devoluções da loja do usuário sem outros filtros
-                            console.warn('⚠️ Retornando todas as devoluções da loja do usuário (TEMPORÁRIO para correção)');
-                            const debugReturns = await db.all(`
-                                SELECT r.*,
-                                       s.sale_number,
-                                       s.payment_method as original_payment_method,
-                                       s.installments,
-                                       p.name as product_name,
-                                       p.barcode as product_barcode,
-                                       c.name as customer_name,
-                                       c.document as customer_document,
-                                       st.name as store_name,
-                                       u.name as processed_by_name,
-                                       rp.name as replacement_product_name
-                                FROM returns r
-                                LEFT JOIN sales s ON r.sale_id = s.id
-                                LEFT JOIN products p ON r.product_id = p.id
-                                LEFT JOIN customers c ON r.customer_id = c.id
-                                LEFT JOIN stores st ON r.store_id = st.id
-                                LEFT JOIN users u ON r.processed_by = u.id
-                                LEFT JOIN products rp ON r.replacement_product_id = rp.id
-                                WHERE CAST(r.store_id AS INTEGER) = ?
-                                ORDER BY r.created_at DESC
-                            `, [userStoreIdNum]);
-                            console.log('🔍 Devoluções retornadas (correção):', debugReturns.length);
-                            return res.json(debugReturns);
-                        }
+                        // Retornar todas as devoluções da loja do usuário sem outros filtros
+                        console.warn('⚠️ Retornando todas as devoluções da loja do usuário (fallback com CAST)');
+                        const debugReturns = await db.all(`
+                            SELECT r.*,
+                                   s.sale_number,
+                                   s.payment_method as original_payment_method,
+                                   s.installments,
+                                   p.name as product_name,
+                                   p.barcode as product_barcode,
+                                   c.name as customer_name,
+                                   c.document as customer_document,
+                                   st.name as store_name,
+                                   u.name as processed_by_name,
+                                   rp.name as replacement_product_name
+                            FROM returns r
+                            LEFT JOIN sales s ON r.sale_id = s.id
+                            LEFT JOIN products p ON r.product_id = p.id
+                            LEFT JOIN customers c ON r.customer_id = c.id
+                            LEFT JOIN stores st ON r.store_id = st.id
+                            LEFT JOIN users u ON r.processed_by = u.id
+                            LEFT JOIN products rp ON r.replacement_product_id = rp.id
+                            WHERE CAST(r.store_id AS INTEGER) = ?
+                            ORDER BY r.created_at DESC
+                        `, [userStoreIdNum]);
+                        console.log('🔍 Devoluções retornadas (fallback):', debugReturns.length);
+                        return res.json(debugReturns);
                     } else {
                         // Para admin/gerente, retornar todas
                         console.warn('⚠️ Admin/Gerente - retornando todas as devoluções');
