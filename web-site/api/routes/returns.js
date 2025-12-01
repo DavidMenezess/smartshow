@@ -566,11 +566,15 @@ router.post('/', auth, async (req, res) => {
                 storeId = defaultStore ? defaultStore.id : 1;
                 console.log('✅ Store_id ajustado para:', storeId);
             } else {
-                console.log('✅ Loja confirmada:', storeExists.name, '(ID:', storeExists.id, ')');
+                console.log('✅ Loja confirmada:', storeExists.name, '(ID:', storeExists.id, ', tipo no banco:', typeof storeExists.id, ')');
             }
         } catch (storeError) {
             console.error('❌ Erro ao verificar loja:', storeError);
         }
+        
+        // Garantir que seja sempre INTEGER para o banco
+        const finalStoreId = parseInt(storeId);
+        console.log('💾 Store_id que será salvo:', finalStoreId, '(tipo:', typeof finalStoreId, ')');
 
         // Criar devolução
         console.log('💾 Criando devolução no banco de dados...');
@@ -579,7 +583,7 @@ router.post('/', auth, async (req, res) => {
         const originalPrice = parseFloat(saleItem.unit_price) || 0;
         const paymentMethod = sale.payment_method || 'Não informado';
         const customerId = sale.customer_id || null;
-        const finalStoreId = storeId || 1;
+        // finalStoreId será definido após verificação da loja
         
         // Validar valores obrigatórios
         if (!originalPrice || originalPrice <= 0) {
