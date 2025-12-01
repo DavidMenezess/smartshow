@@ -281,13 +281,13 @@ router.get('/:id', auth, async (req, res) => {
                     s.total as sale_total,
                     p.name as product_name,
                     p.barcode as product_barcode,
-                    p.price as current_product_price,
+                    p.sale_price as current_product_price,
                     c.name as customer_name,
                     c.document as customer_document,
                     st.name as store_name,
                     u.name as processed_by_name,
                     rp.name as replacement_product_name,
-                    rp.price as replacement_product_price
+                    rp.sale_price as replacement_product_price
              FROM returns r
              LEFT JOIN sales s ON r.sale_id = s.id
              LEFT JOIN products p ON r.product_id = p.id
@@ -353,7 +353,7 @@ router.post('/', auth, async (req, res) => {
 
         console.log('🔍 Buscando item da venda...');
         const saleItem = await db.get(
-            `SELECT si.*, p.price as current_price
+            `SELECT si.*, p.sale_price as current_price
              FROM sale_items si
              JOIN products p ON si.product_id = p.id
              WHERE si.id = ? AND si.sale_id = ?`,
