@@ -627,7 +627,7 @@ router.post('/', auth, async (req, res) => {
                     parseInt(sale_item_id),
                     parseInt(product_id),
                     customerId,
-                    parseInt(finalStoreId),
+                    finalStoreId, // Já é INTEGER
                     defect_description,
                     action_type,
                     originalPrice,
