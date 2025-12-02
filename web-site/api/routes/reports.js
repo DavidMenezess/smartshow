@@ -198,10 +198,10 @@ router.get('/dashboard', auth, async (req, res) => {
                             COUNT(*) as count, 
                             COALESCE(SUM(total), 0) as total
                      FROM sales 
-                     WHERE DATE(datetime(created_at, '-3 hours')) >= date('now', '-7 days') AND store_id = ?
+                     WHERE DATE(datetime(created_at, '-3 hours')) >= date('now', '-7 days') AND CAST(store_id AS INTEGER) = ?
                      GROUP BY DATE(datetime(created_at, '-3 hours'))
                      ORDER BY date ASC`,
-                    [storeId]
+                    [parseInt(storeId)]
                 );
                 
                 // Vendas por forma de pagamento por loja
@@ -210,18 +210,18 @@ router.get('/dashboard', auth, async (req, res) => {
                             COUNT(*) as count, 
                             COALESCE(SUM(total), 0) as total
                      FROM sales 
-                     WHERE DATE(datetime(created_at, '-3 hours')) >= date('now', '-30 days') AND store_id = ?
+                     WHERE DATE(datetime(created_at, '-3 hours')) >= date('now', '-30 days') AND CAST(store_id AS INTEGER) = ?
                      GROUP BY payment_method
                      ORDER BY total DESC`,
-                    [storeId]
+                    [parseInt(storeId)]
                 );
                 
                 // OS por status por loja
                 const storeOSByStatus = {};
                 for (const status of osStatuses) {
                     const result = await db.get(
-                        `SELECT COUNT(*) as count FROM service_orders WHERE status = ? AND store_id = ?`,
-                        [status, storeId]
+                        `SELECT COUNT(*) as count FROM service_orders WHERE status = ? AND CAST(store_id AS INTEGER) = ?`,
+                        [status, parseInt(storeId)]
                     );
                     storeOSByStatus[status] = result.count;
                 }
