@@ -707,7 +707,7 @@ router.post('/', auth, async (req, res) => {
                              AND is_open = 1
                              AND store_id = ?
                              ORDER BY opening_date DESC LIMIT 1`,
-                            [today, storeId]
+                            [today, finalStoreId]
                         );
                         
                         if (cashControl) {
@@ -741,7 +741,7 @@ router.post('/', auth, async (req, res) => {
                              AND is_open = 1
                              AND store_id = ?
                              ORDER BY opening_date DESC LIMIT 1`,
-                            [today, storeId]
+                            [today, finalStoreId]
                         );
                         
                         if (cashControl) {
