@@ -769,6 +769,8 @@
                 
                 const response = await api.getReturns(null, null, null, storeIdForReturns);
                 console.log('✅ Resposta recebida:', response);
+                console.log('✅ Tipo da resposta:', typeof response);
+                console.log('✅ É array?', Array.isArray(response));
                 
                 // Garantir que é um array
                 if (Array.isArray(response)) {
@@ -779,10 +781,14 @@
                     returns = response.returns;
                 } else {
                     console.warn('⚠️ Resposta não é um array, usando array vazio');
+                    console.warn('⚠️ Conteúdo da resposta:', JSON.stringify(response));
                     returns = [];
                 }
                 
                 console.log('✅ Devoluções processadas:', returns.length);
+                if (returns.length > 0) {
+                    console.log('✅ Primeira devolução:', returns[0]);
+                }
                 renderReturns();
             } catch (error) {
                 console.error('❌ Erro ao carregar devoluções:', error);
@@ -1275,10 +1281,30 @@
                 closeReturnFormModal();
                 
                 // Aguardar um pouco antes de recarregar para garantir que a devolução foi salva
-                setTimeout(() => {
+                // Aumentar delay para dar tempo ao banco de dados persistir
+                setTimeout(async () => {
                     console.log('🔄 Recarregando devoluções após criação...');
-                    loadReturns();
-                }, 500);
+                    // Tentar recarregar múltiplas vezes se necessário
+                    let attempts = 0;
+                    const maxAttempts = 3;
+                    
+                    while (attempts < maxAttempts) {
+                        await loadReturns();
+                        attempts++;
+                        
+                        // Verificar se as devoluções foram carregadas
+                        const returnsTable = document.querySelector('#returnsTableBody');
+                        if (returnsTable && returnsTable.children.length > 0) {
+                            console.log('✅ Devoluções carregadas com sucesso após', attempts, 'tentativa(s)');
+                            break;
+                        } else if (attempts < maxAttempts) {
+                            console.log('⏳ Devoluções ainda não aparecem, tentando novamente em 1 segundo...');
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        } else {
+                            console.warn('⚠️ Devoluções não apareceram após', maxAttempts, 'tentativas');
+                        }
+                    }
+                }, 1000);
             } catch (error) {
                 console.error('Erro ao criar devolução:', error);
                 console.error('Detalhes do erro:', error);
