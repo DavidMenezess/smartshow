@@ -449,9 +449,11 @@ router.get('/', auth, async (req, res) => {
                     // Verificar se a tabela returns existe
                     const tableExists = await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='returns'");
                     if (!tableExists) {
+                        console.warn('⚠️ Tabela returns não existe. Retornando array vazio.');
                         return res.json({ type: 'returns', data: [] });
                     }
 
+                    console.log('📊 Gerando relatório de devoluções para período:', startDate, 'a', endDate);
                     const returnsReport = await db.all(
                         `SELECT r.*,
                                 s.sale_number,
@@ -478,9 +480,12 @@ router.get('/', auth, async (req, res) => {
                          ORDER BY r.created_at DESC`,
                         [startDate, endDate]
                     );
+                    console.log('✅ Relatório de devoluções gerado com sucesso:', returnsReport ? returnsReport.length : 0, 'itens');
                     return res.json({ type: 'returns', data: returnsReport || [] });
                 } catch (returnsError) {
-                    console.error('Erro ao gerar relatório de devoluções:', returnsError);
+                    console.error('❌ Erro ao gerar relatório de devoluções:', returnsError);
+                    console.error('❌ Mensagem:', returnsError.message);
+                    console.error('❌ Stack:', returnsError.stack);
                     // Retornar array vazio em caso de erro para não quebrar a interface
                     return res.json({ type: 'returns', data: [] });
                 }
