@@ -160,7 +160,7 @@ router.get('/', auth, async (req, res) => {
         console.log('🔍 Filtro de loja aplicado:', filter);
         console.log('👤 Usuário completo:', JSON.stringify(req.user, null, 2));
         
-        // TEMPORÁRIO: Para debug, vamos verificar se há devoluções sem filtro primeiro
+        // Verificar se há devoluções sem filtro primeiro (para debug)
         let allReturnsCount = null;
         try {
             allReturnsCount = await db.get("SELECT COUNT(*) as count FROM returns");
@@ -169,14 +169,16 @@ router.get('/', auth, async (req, res) => {
             console.error('⚠️ Erro ao contar devoluções:', countError);
         }
         
-        // Filtrar por loja - simplificado e garantido
+        // Filtrar por loja - sempre usar CAST para garantir compatibilidade de tipos
         if (filter.store_id !== null && filter.store_id !== undefined) {
             // Tem store_id para filtrar (usuário comum ou admin/gerente com loja específica)
             const storeIdNum = parseInt(filter.store_id);
-            if (!isNaN(storeIdNum)) {
+            if (!isNaN(storeIdNum) && storeIdNum > 0) {
                 sql += ` AND CAST(r.store_id AS INTEGER) = ?`;
                 params.push(storeIdNum);
                 console.log('📌 Filtrando por store_id:', storeIdNum, '(canSeeAll:', filter.canSeeAll, ')');
+            } else {
+                console.warn('⚠️ Store_id inválido no filtro:', filter.store_id);
             }
         } else if (filter.canSeeAll) {
             // Admin/Gerente sem store_id - ver todas (não adicionar filtro)
@@ -268,46 +270,53 @@ router.get('/', auth, async (req, res) => {
                     console.warn('⚠️ Isso indica problema no filtro de store_id');
                     
                     // Debug: ver todas as devoluções e seus store_ids
-                    const allReturnsDebug = await db.all("SELECT id, return_number, store_id, created_at FROM returns ORDER BY created_at DESC LIMIT 10");
+                    const allReturnsDebug = await db.all("SELECT id, return_number, store_id, typeof(store_id) as store_id_type, created_at FROM returns ORDER BY created_at DESC LIMIT 10");
                     console.warn('🔍 Últimas 10 devoluções no banco:', JSON.stringify(allReturnsDebug, null, 2));
                     console.warn('🔍 Store_id do usuário:', req.user.store_id, 'Tipo:', typeof req.user.store_id);
                     console.warn('🔍 Store_id do filtro:', filter.store_id, 'Tipo:', typeof filter.store_id);
                     
-                    // CORREÇÃO: Se o usuário é caixa/vendedor/tecnico e tem store_id, mas não encontrou devoluções,
-                    // retornar todas as devoluções da loja do usuário usando CAST diretamente
-                    if (req.user.role === 'caixa' || req.user.role === 'vendedor' || req.user.role === 'tecnico') {
+                    // CORREÇÃO: Tentar buscar novamente com diferentes estratégias
+                    let fallbackReturns = [];
+                    
+                    // Estratégia 1: Se o usuário tem store_id, buscar diretamente com CAST
+                    if (req.user.store_id) {
                         const userStoreIdNum = parseInt(req.user.store_id);
-                        
-                        // Retornar todas as devoluções da loja do usuário sem outros filtros
-                        console.warn('⚠️ Retornando todas as devoluções da loja do usuário (fallback com CAST)');
-                        const debugReturns = await db.all(`
-                            SELECT r.*,
-                                   s.sale_number,
-                                   s.payment_method as original_payment_method,
-                                   s.installments,
-                                   p.name as product_name,
-                                   p.barcode as product_barcode,
-                                   c.name as customer_name,
-                                   c.document as customer_document,
-                                   st.name as store_name,
-                                   u.name as processed_by_name,
-                                   rp.name as replacement_product_name
-                            FROM returns r
-                            LEFT JOIN sales s ON r.sale_id = s.id
-                            LEFT JOIN products p ON r.product_id = p.id
-                            LEFT JOIN customers c ON r.customer_id = c.id
-                            LEFT JOIN stores st ON r.store_id = st.id
-                            LEFT JOIN users u ON r.processed_by = u.id
-                            LEFT JOIN products rp ON r.replacement_product_id = rp.id
-                            WHERE CAST(r.store_id AS INTEGER) = ?
-                            ORDER BY r.created_at DESC
-                        `, [userStoreIdNum]);
-                        console.log('🔍 Devoluções retornadas (fallback):', debugReturns.length);
-                        return res.json(debugReturns);
-                    } else {
-                        // Para admin/gerente, retornar todas
-                        console.warn('⚠️ Admin/Gerente - retornando todas as devoluções');
-                        const debugReturns = await db.all(`
+                        if (!isNaN(userStoreIdNum) && userStoreIdNum > 0) {
+                            console.warn('🔄 Tentativa 1: Buscando com CAST usando store_id do usuário:', userStoreIdNum);
+                            fallbackReturns = await db.all(`
+                                SELECT r.*,
+                                       s.sale_number,
+                                       s.payment_method as original_payment_method,
+                                       s.installments,
+                                       p.name as product_name,
+                                       p.barcode as product_barcode,
+                                       c.name as customer_name,
+                                       c.document as customer_document,
+                                       st.name as store_name,
+                                       u.name as processed_by_name,
+                                       rp.name as replacement_product_name
+                                FROM returns r
+                                LEFT JOIN sales s ON r.sale_id = s.id
+                                LEFT JOIN products p ON r.product_id = p.id
+                                LEFT JOIN customers c ON r.customer_id = c.id
+                                LEFT JOIN stores st ON r.store_id = st.id
+                                LEFT JOIN users u ON r.processed_by = u.id
+                                LEFT JOIN products rp ON r.replacement_product_id = rp.id
+                                WHERE CAST(r.store_id AS INTEGER) = ?
+                                ORDER BY r.created_at DESC
+                            `, [userStoreIdNum]);
+                            console.log('✅ Devoluções encontradas (fallback 1):', fallbackReturns.length);
+                            
+                            if (fallbackReturns.length > 0) {
+                                return res.json(fallbackReturns);
+                            }
+                        }
+                    }
+                    
+                    // Estratégia 2: Buscar todas as devoluções e filtrar no código (último recurso)
+                    if (fallbackReturns.length === 0 && (req.user.role === 'admin' || req.user.role === 'gerente' || filter.canSeeAll)) {
+                        console.warn('🔄 Tentativa 2: Admin/Gerente - retornando todas as devoluções');
+                        fallbackReturns = await db.all(`
                             SELECT r.*,
                                    s.sale_number,
                                    s.payment_method as original_payment_method,
@@ -328,8 +337,11 @@ router.get('/', auth, async (req, res) => {
                             LEFT JOIN products rp ON r.replacement_product_id = rp.id
                             ORDER BY r.created_at DESC
                         `);
-                        console.log('🔍 Devoluções retornadas (admin):', debugReturns.length);
-                        return res.json(debugReturns);
+                        console.log('✅ Devoluções encontradas (fallback 2):', fallbackReturns.length);
+                        
+                        if (fallbackReturns.length > 0) {
+                            return res.json(fallbackReturns);
+                        }
                     }
                 }
             } catch (debugError) {
@@ -619,6 +631,27 @@ router.post('/', auth, async (req, res) => {
         
         if (!returnId) {
             throw new Error('Falha ao criar devolução: ID não retornado');
+        }
+        
+        // Verificar se o store_id foi salvo corretamente
+        try {
+            const savedReturn = await db.get('SELECT id, return_number, store_id, typeof(store_id) as store_id_type FROM returns WHERE id = ?', [returnId]);
+            console.log('🔍 Devolução salva verificada:', {
+                id: savedReturn.id,
+                return_number: savedReturn.return_number,
+                store_id: savedReturn.store_id,
+                store_id_type: savedReturn.store_id_type,
+                expected_store_id: finalStoreId
+            });
+            
+            // Se o store_id não corresponde, corrigir
+            if (savedReturn.store_id != finalStoreId) {
+                console.warn('⚠️ Store_id não corresponde! Corrigindo...');
+                await db.run('UPDATE returns SET store_id = ? WHERE id = ?', [finalStoreId, returnId]);
+                console.log('✅ Store_id corrigido para:', finalStoreId);
+            }
+        } catch (verifyError) {
+            console.error('❌ Erro ao verificar store_id salvo:', verifyError);
         }
 
         // Processar automaticamente se for troca por outro produto ou reembolso

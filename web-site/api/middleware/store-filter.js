@@ -12,14 +12,17 @@ function getStoreFilter(user, storeIdParam = null) {
     if (user.role === 'admin' || user.role === 'gerente') {
         // Se foi passado um store_id como parâmetro, usar esse
         if (storeIdParam) {
-            return { store_id: parseInt(storeIdParam), canSeeAll: false };
+            const parsedStoreId = parseInt(storeIdParam);
+            return { store_id: isNaN(parsedStoreId) ? null : parsedStoreId, canSeeAll: false };
         }
         // Caso contrário, pode ver todas
         return { store_id: null, canSeeAll: true };
     }
     
     // Outros usuários veem apenas sua loja
-    return { store_id: user.store_id, canSeeAll: false };
+    // Garantir que store_id seja sempre um número válido
+    const userStoreId = user.store_id ? parseInt(user.store_id) : null;
+    return { store_id: (userStoreId && !isNaN(userStoreId) && userStoreId > 0) ? userStoreId : null, canSeeAll: false };
 }
 
 /**
@@ -48,6 +51,7 @@ module.exports = {
     getStoreFilter,
     addStoreFilter
 };
+
 
 
 
