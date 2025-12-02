@@ -636,8 +636,20 @@ async function loadRecentSales() {
         const brazilTime = new Date(now.getTime() + (brazilOffset - now.getTimezoneOffset()) * 60 * 1000);
         const today = brazilTime.toISOString().split('T')[0];
         
-        // Se estiver comparando, não filtrar por loja (mostrar todas)
-        const sales = await api.getSales(today, today);
+        // Obter store_id se houver loja selecionada
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        let storeIdForSales = null;
+        
+        if (selectedStoreId) {
+            storeIdForSales = selectedStoreId;
+        } else if (user.store_id && (user.role !== 'admin' && user.role !== 'gerente')) {
+            storeIdForSales = user.store_id;
+        }
+        
+        console.log('📊 Carregando vendas recentes com storeId:', storeIdForSales, 'Role:', user.role);
+        
+        // Buscar vendas com filtro de loja
+        const sales = await api.getSales(today, today, null, null, storeIdForSales);
 
         const tbody = document.getElementById('recentSalesBody');
         if (sales.length === 0) {

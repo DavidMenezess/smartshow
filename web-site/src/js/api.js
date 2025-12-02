@@ -188,12 +188,13 @@ class API {
     }
 
     // Sales
-    async getSales(startDate, endDate, customerId, sellerId) {
+    async getSales(startDate, endDate, customerId, sellerId, storeId) {
         const params = new URLSearchParams();
         if (startDate) params.append('startDate', startDate);
         if (endDate) params.append('endDate', endDate);
         if (customerId) params.append('customerId', customerId);
         if (sellerId) params.append('sellerId', sellerId);
+        if (storeId) params.append('store_id', storeId);
         return await this.request(`/sales?${params}`);
     }
 

@@ -537,7 +537,7 @@ router.get('/sales', async (req, res) => {
 // Vendas do dia (para o caixa)
 router.get('/today-sales', auth, async (req, res) => {
     try {
-        const { date } = req.query;
+        const { date, store_id } = req.query;
         const user = req.user;
         
         // Usar data atual no timezone do Brasil (UTC-3)
@@ -546,14 +546,25 @@ router.get('/today-sales', auth, async (req, res) => {
         const brazilTime = new Date(now.getTime() + (brazilOffset - now.getTimezoneOffset()) * 60 * 1000);
         const targetDate = date || brazilTime.toISOString().split('T')[0];
         
-        console.log(`📅 Buscando vendas para a data: ${targetDate}`);
+        console.log(`📅 Buscando vendas para a data: ${targetDate}, store_id: ${store_id || 'todas'}`);
         
         // Construir filtro de loja
         let storeFilter = '';
         const storeParams = [];
-        if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
-            storeFilter = ' AND store_id = ?';
-            storeParams.push(user.store_id);
+        
+        // Se for admin/gerente e foi passado store_id, usar esse
+        if ((user.role === 'admin' || user.role === 'gerente') && store_id) {
+            const storeIdNum = parseInt(store_id);
+            storeFilter = ' AND CAST(store_id AS INTEGER) = ?';
+            storeParams.push(storeIdNum);
+            console.log('📌 Today-sales filtrando por store_id:', storeIdNum);
+        }
+        // Se não for admin/gerente, usar loja do usuário
+        else if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
+            const userStoreIdNum = parseInt(user.store_id);
+            storeFilter = ' AND CAST(store_id AS INTEGER) = ?';
+            storeParams.push(userStoreIdNum);
+            console.log('📌 Today-sales filtrando por store_id do usuário:', userStoreIdNum);
         }
         
         // Usar timezone do Brasil (UTC-3)

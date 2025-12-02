@@ -51,10 +51,19 @@ router.get('/', auth, async (req, res) => {
 
         // Filtrar por loja
         const filter = getStoreFilter(req.user, store_id);
-        if (!filter.canSeeAll || filter.store_id) {
-            sql += ` AND s.store_id = ?`;
-            params.push(filter.store_id);
+        if (!filter.canSeeAll && filter.store_id) {
+            const storeIdNum = parseInt(filter.store_id);
+            sql += ` AND CAST(s.store_id AS INTEGER) = ?`;
+            params.push(storeIdNum);
+            console.log('📌 Sales filtrando por store_id:', storeIdNum);
+        } else if (filter.canSeeAll && filter.store_id) {
+            // Admin/Gerente com loja específica
+            const storeIdNum = parseInt(filter.store_id);
+            sql += ` AND CAST(s.store_id AS INTEGER) = ?`;
+            params.push(storeIdNum);
+            console.log('📌 Sales (admin) filtrando por store_id:', storeIdNum);
         }
+        // Se canSeeAll é true e não há store_id, não adicionar filtro (ver todas)
 
         sql += ` GROUP BY s.id ORDER BY s.created_at DESC`;
 
@@ -142,6 +151,10 @@ router.post('/', auth, async (req, res) => {
             const defaultStore = await db.get('SELECT id FROM stores WHERE is_active = 1 ORDER BY id LIMIT 1');
             storeId = defaultStore ? defaultStore.id : 1;
         }
+        
+        // Garantir que storeId seja um número válido
+        storeId = parseInt(storeId) || 1;
+        console.log('🏪 Store_id da venda:', storeId, '(tipo:', typeof storeId, ')');
 
         // Calcular total
         let total = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
