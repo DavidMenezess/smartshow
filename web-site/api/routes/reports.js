@@ -41,7 +41,7 @@ router.get('/dashboard', auth, async (req, res) => {
         if ((user.role === 'admin' || user.role === 'gerente') && compare_stores) {
             storeIdsForComparison = compare_stores.split(',').map(id => parseInt(id)).filter(id => !isNaN(id));
             if (storeIdsForComparison.length > 0) {
-                storeFilter = ` AND store_id IN (${storeIdsForComparison.map(() => '?').join(',')})`;
+                storeFilter = ` AND CAST(store_id AS INTEGER) IN (${storeIdsForComparison.map(() => '?').join(',')})`;
                 storeParams.push(...storeIdsForComparison);
                 isComparing = true;
             }
@@ -107,8 +107,8 @@ router.get('/dashboard', auth, async (req, res) => {
             // mantemos sem filtro de loja para mostrar visão geral da rede.
         } else if (user.store_id) {
             // Usuários comuns veem apenas a própria loja
-            lowStockSql += ` AND p.store_id = ?`;
-            lowStockParams.push(user.store_id);
+            lowStockSql += ` AND CAST(p.store_id AS INTEGER) = ?`;
+            lowStockParams.push(parseInt(user.store_id));
         }
 
         lowStockSql += ` ORDER BY p.stock ASC, p.name ASC LIMIT 50`;
@@ -134,8 +134,8 @@ router.get('/dashboard', auth, async (req, res) => {
             let osSql = `SELECT COUNT(*) as count FROM service_orders WHERE status = ?`;
             const osParams = [status];
             if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
-                osSql += ` AND store_id = ?`;
-                osParams.push(user.store_id);
+                osSql += ` AND CAST(store_id AS INTEGER) = ?`;
+                osParams.push(parseInt(user.store_id));
             }
             const result = await db.get(osSql, osParams);
             osByStatus[status] = result.count;
