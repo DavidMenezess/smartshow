@@ -633,7 +633,7 @@ router.post('/', auth, async (req, res) => {
             throw new Error('Falha ao criar devolução: ID não retornado');
         }
         
-        // Verificar se o store_id foi salvo corretamente
+        // Verificar se o store_id foi salvo corretamente e garantir que seja INTEGER
         try {
             const savedReturn = await db.get('SELECT id, return_number, store_id, typeof(store_id) as store_id_type FROM returns WHERE id = ?', [returnId]);
             console.log('🔍 Devolução salva verificada:', {
@@ -644,11 +644,21 @@ router.post('/', auth, async (req, res) => {
                 expected_store_id: finalStoreId
             });
             
-            // Se o store_id não corresponde, corrigir
-            if (savedReturn.store_id != finalStoreId) {
-                console.warn('⚠️ Store_id não corresponde! Corrigindo...');
+            // Sempre garantir que o store_id seja INTEGER no banco
+            const savedStoreId = parseInt(savedReturn.store_id);
+            if (savedStoreId !== finalStoreId || savedReturn.store_id_type !== 'integer') {
+                console.warn('⚠️ Store_id não corresponde ou não é INTEGER! Corrigindo...');
+                console.warn('⚠️ Store_id salvo:', savedReturn.store_id, 'Tipo:', savedReturn.store_id_type);
+                console.warn('⚠️ Store_id esperado:', finalStoreId, 'Tipo:', typeof finalStoreId);
+                
+                // Forçar atualização para garantir que seja INTEGER
                 await db.run('UPDATE returns SET store_id = ? WHERE id = ?', [finalStoreId, returnId]);
-                console.log('✅ Store_id corrigido para:', finalStoreId);
+                
+                // Verificar novamente
+                const recheck = await db.get('SELECT store_id, typeof(store_id) as store_id_type FROM returns WHERE id = ?', [returnId]);
+                console.log('✅ Store_id corrigido. Novo valor:', recheck.store_id, 'Tipo:', recheck.store_id_type);
+            } else {
+                console.log('✅ Store_id está correto e é INTEGER');
             }
         } catch (verifyError) {
             console.error('❌ Erro ao verificar store_id salvo:', verifyError);
