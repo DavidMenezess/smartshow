@@ -37,10 +37,24 @@ docker ps -a --format '{{.Names}} {{.ID}}' | grep -iE "(web-site.*smartshow-api-
 
 # Remover containers com nomes específicos (múltiplas tentativas com mais força)
 echo "🗑️ Removendo containers específicos (tentativas agressivas)..."
-for container_name in smartshow-api web-site-smartshow-api-1; do
-    # Tentar remover pelo nome
+for container_name in smartshow-api web-site-smartshow-api-1 smartshow-smartshow-api-1; do
+    # Tentar remover pelo nome exato
     for i in {1..10}; do
         docker rm -f "$container_name" 2>/dev/null && break || sleep 0.5
+    done
+    
+    # Remover containers que contenham o nome (com qualquer prefixo)
+    echo "🔍 Buscando containers que contenham '$container_name' no nome..."
+    docker ps -a --format '{{.Names}} {{.ID}}' | grep -iE ".*${container_name}" | while read line; do
+        CONTAINER_NAME=$(echo "$line" | awk '{print $1}')
+        CONTAINER_ID=$(echo "$line" | awk '{print $2}')
+        if [ -n "$CONTAINER_ID" ]; then
+            echo "  - Removendo container: $CONTAINER_NAME (ID: $CONTAINER_ID)"
+            docker kill "$CONTAINER_ID" 2>/dev/null || true
+            docker stop "$CONTAINER_ID" 2>/dev/null || true
+            docker rm -f "$CONTAINER_ID" 2>/dev/null || true
+            docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+        fi
     done
     
     # Se ainda existir, tentar encontrar pelo ID e remover
@@ -50,6 +64,20 @@ for container_name in smartshow-api web-site-smartshow-api-1; do
         docker stop "$CONTAINER_ID" 2>/dev/null || true
         docker rm -f "$CONTAINER_ID" 2>/dev/null || true
         sleep 1
+    fi
+done
+
+# Remover containers com prefixos aleatórios do Docker Compose
+echo "🔍 Removendo containers com prefixos aleatórios (ex: 3fda6301716f_smartshow-smartshow-api-1)..."
+docker ps -a --format '{{.Names}} {{.ID}}' | grep -iE ".*smartshow.*api.*1" | while read line; do
+    CONTAINER_NAME=$(echo "$line" | awk '{print $1}')
+    CONTAINER_ID=$(echo "$line" | awk '{print $2}')
+    if [ -n "$CONTAINER_ID" ]; then
+        echo "  - Removendo container com prefixo: $CONTAINER_NAME (ID: $CONTAINER_ID)"
+        docker kill "$CONTAINER_ID" 2>/dev/null || true
+        docker stop "$CONTAINER_ID" 2>/dev/null || true
+        docker rm -f "$CONTAINER_ID" 2>/dev/null || true
+        docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
     fi
 done
 
@@ -77,11 +105,26 @@ if [ -n "$ALL_CONTAINERS" ]; then
     for container_id in $ALL_CONTAINERS; do
         if [ -n "$container_id" ]; then
             echo "  - Parando e removendo container: $container_id"
+            docker kill "$container_id" 2>/dev/null || true
             docker stop "$container_id" 2>/dev/null || true
             docker rm -f "$container_id" 2>/dev/null || true
         fi
     done
 fi
+
+# Remover containers com padrão específico do erro (qualquer prefixo + smartshow-smartshow-api-1)
+echo "🔍 Removendo containers com padrão do erro (qualquer prefixo + smartshow-smartshow-api-1)..."
+docker ps -a --format '{{.Names}} {{.ID}}' | grep -iE ".*smartshow-smartshow-api-1" | while read line; do
+    CONTAINER_NAME=$(echo "$line" | awk '{print $1}')
+    CONTAINER_ID=$(echo "$line" | awk '{print $2}')
+    if [ -n "$CONTAINER_ID" ]; then
+        echo "  - Removendo container do erro: $CONTAINER_NAME (ID: $CONTAINER_ID)"
+        docker kill "$CONTAINER_ID" 2>/dev/null || true
+        docker stop "$CONTAINER_ID" 2>/dev/null || true
+        docker rm -f "$CONTAINER_ID" 2>/dev/null || true
+        docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+    fi
+done
 
 # Remover também por filtro direto do Docker
 echo "🔍 Removendo containers por filtro Docker..."
