@@ -28,8 +28,10 @@ router.get('/dashboard', auth, async (req, res) => {
         
         // Se for admin/gerente e foi passado store_id, usar esse
         if ((user.role === 'admin' || user.role === 'gerente') && store_id) {
-            storeFilter = ' AND store_id = ?';
-            storeParams.push(parseInt(store_id));
+            const storeIdNum = parseInt(store_id);
+            storeFilter = ' AND CAST(store_id AS INTEGER) = ?';
+            storeParams.push(storeIdNum);
+            console.log('📌 Dashboard filtrando por store_id:', storeIdNum);
         } 
         // Se for admin/gerente e foi passado compare_stores, filtrar por múltiplas lojas
         // OU se não foi passado store_id (Todas as Lojas), buscar dados por loja para comparação
@@ -51,8 +53,10 @@ router.get('/dashboard', auth, async (req, res) => {
         }
         // Se não for admin/gerente, usar loja do usuário
         else if (user.role !== 'admin' && user.role !== 'gerente' && user.store_id) {
-            storeFilter = ' AND store_id = ?';
-            storeParams.push(user.store_id);
+            const userStoreIdNum = parseInt(user.store_id);
+            storeFilter = ' AND CAST(store_id AS INTEGER) = ?';
+            storeParams.push(userStoreIdNum);
+            console.log('📌 Dashboard filtrando por store_id do usuário:', userStoreIdNum);
         }
 
         // Vendas do dia - considerar timezone do Brasil
