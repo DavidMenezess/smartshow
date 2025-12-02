@@ -519,36 +519,36 @@
                                             let priceDiffDisplay = '';
                                             if (returnItem.action_type === 'different_product' && priceDiff !== 0) {
                                                 if (priceDiff > 0) {
-                                                    priceDiffDisplay = \`<span style="color: #ef4444; font-weight: bold;">+R$ \${priceDiff.toFixed(2).replace('.', ',')}</span><br><small style="color: #718096;">Cliente paga</small>\`;
+                                                    priceDiffDisplay = `<span style="color: #ef4444; font-weight: bold;">+R$ ${priceDiff.toFixed(2).replace('.', ',')}</span><br><small style="color: #718096;">Cliente paga</small>`;
                                                 } else {
-                                                    priceDiffDisplay = \`<span style="color: #10b981; font-weight: bold;">R$ \${priceDiff.toFixed(2).replace('.', ',')}</span><br><small style="color: #718096;">Loja devolve</small>\`;
+                                                    priceDiffDisplay = `<span style="color: #10b981; font-weight: bold;">R$ ${priceDiff.toFixed(2).replace('.', ',')}</span><br><small style="color: #718096;">Loja devolve</small>`;
                                                 }
                                             } else if (returnItem.action_type === 'refund' && returnItem.refund_amount) {
-                                                priceDiffDisplay = \`<span style="color: #ef4444; font-weight: bold;">R$ \${parseFloat(returnItem.refund_amount).toFixed(2).replace('.', ',')}</span><br><small style="color: #718096;">Reembolso</small>\`;
+                                                priceDiffDisplay = `<span style="color: #ef4444; font-weight: bold;">R$ ${parseFloat(returnItem.refund_amount).toFixed(2).replace('.', ',')}</span><br><small style="color: #718096;">Reembolso</small>`;
                                             } else {
                                                 priceDiffDisplay = '<span style="color: #718096;">Sem diferença</span>';
                                             }
                                             
-                                            return \`
+                                            return `
                                                 <tr>
-                                                    <td style="font-weight: 500;">\${returnItem.return_number}</td>
+                                                    <td style="font-weight: 500;">${returnItem.return_number}</td>
                                                     <td>
-                                                        <div style="font-weight: 500;">\${dateStr}</div>
-                                                        <div style="font-size: 0.875rem; color: #718096;">\${timeStr}</div>
+                                                        <div style="font-weight: 500;">${dateStr}</div>
+                                                        <div style="font-size: 0.875rem; color: #718096;">${timeStr}</div>
                                                     </td>
-                                                    <td>\${returnItem.sale_number || 'N/A'}</td>
-                                                    <td>\${returnItem.customer_name || 'N/A'}</td>
-                                                    <td>\${returnItem.product_name || 'N/A'}</td>
-                                                    <td>\${returnItem.replacement_product_name || '-'}</td>
-                                                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="\${returnItem.defect_description}">\${returnItem.defect_description}</td>
-                                                    <td>\${actionDetails}</td>
-                                                    <td>R$ \${parseFloat(returnItem.original_price).toFixed(2).replace('.', ',')}</td>
-                                                    <td>\${priceDiffDisplay}</td>
-                                                    <td>\${getPaymentMethodName(returnItem.original_payment_method, returnItem.installments)}</td>
-                                                    <td>\${returnItem.processed_by_name || '-'}</td>
-                                                    <td>\${statusBadge}</td>
+                                                    <td>${returnItem.sale_number || 'N/A'}</td>
+                                                    <td>${returnItem.customer_name || 'N/A'}</td>
+                                                    <td>${returnItem.product_name || 'N/A'}</td>
+                                                    <td>${returnItem.replacement_product_name || '-'}</td>
+                                                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${returnItem.defect_description}">${returnItem.defect_description}</td>
+                                                    <td>${actionDetails}</td>
+                                                    <td>R$ ${parseFloat(returnItem.original_price).toFixed(2).replace('.', ',')}</td>
+                                                    <td>${priceDiffDisplay}</td>
+                                                    <td>${getPaymentMethodName(returnItem.original_payment_method, returnItem.installments)}</td>
+                                                    <td>${returnItem.processed_by_name || '-'}</td>
+                                                    <td>${statusBadge}</td>
                                                 </tr>
-                                            \`;
+                                            `;
                                         }).join('')}
                                     </tbody>
                                 </table>
