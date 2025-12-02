@@ -96,11 +96,11 @@ router.get('/dashboard', auth, async (req, res) => {
         if (user.role === 'admin' || user.role === 'gerente') {
             if (isComparing && storeIdsForComparison.length > 0) {
                 // Quando estiver comparando, trazer produtos apenas das lojas comparadas
-                lowStockSql += ` AND p.store_id IN (${storeIdsForComparison.map(() => '?').join(',')})`;
+                lowStockSql += ` AND CAST(p.store_id AS INTEGER) IN (${storeIdsForComparison.map(() => '?').join(',')})`;
                 lowStockParams.push(...storeIdsForComparison);
             } else if (store_id) {
                 // Quando uma loja específica foi selecionada
-                lowStockSql += ` AND p.store_id = ?`;
+                lowStockSql += ` AND CAST(p.store_id AS INTEGER) = ?`;
                 lowStockParams.push(parseInt(store_id));
             }
             // Caso admin/gerente com "Todas as Lojas" sem comparação explícita,
@@ -180,16 +180,16 @@ router.get('/dashboard', auth, async (req, res) => {
                 const storeTodaySales = await db.get(
                     `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
                      FROM sales 
-                     WHERE DATE(datetime(created_at, '-3 hours')) = ? AND store_id = ?`,
-                    [today, storeId]
+                     WHERE DATE(datetime(created_at, '-3 hours')) = ? AND CAST(store_id AS INTEGER) = ?`,
+                    [today, parseInt(storeId)]
                 );
                 
                 // Vendas do mês por loja
                 const storeMonthSales = await db.get(
                     `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
                      FROM sales 
-                     WHERE DATE(datetime(created_at, '-3 hours')) >= ? AND store_id = ?`,
-                    [monthStart, storeId]
+                     WHERE DATE(datetime(created_at, '-3 hours')) >= ? AND CAST(store_id AS INTEGER) = ?`,
+                    [monthStart, parseInt(storeId)]
                 );
                 
                 // Vendas por dia dos últimos 7 dias por loja
