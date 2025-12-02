@@ -766,11 +766,13 @@
                 }
                 
                 console.log('🏪 Carregando devoluções com storeId:', storeIdForReturns, 'Role:', user.role);
+                console.log('🏪 User completo:', JSON.stringify(user, null, 2));
                 
                 const response = await api.getReturns(null, null, null, storeIdForReturns);
                 console.log('✅ Resposta recebida:', response);
                 console.log('✅ Tipo da resposta:', typeof response);
                 console.log('✅ É array?', Array.isArray(response));
+                console.log('✅ Tamanho da resposta:', Array.isArray(response) ? response.length : 'N/A');
                 
                 // Garantir que é um array
                 if (Array.isArray(response)) {
@@ -1264,7 +1266,10 @@
                     observations: observations || null
                 };
 
+                console.log('📤 Enviando dados para criar devolução:', returnData);
                 const createdReturn = await api.createReturn(returnData);
+                console.log('✅ Devolução criada com sucesso:', createdReturn);
+                console.log('✅ Store_id da devolução criada:', createdReturn?.store_id);
                 
                 // Se for troca por outro produto ou reembolso, imprimir cupom automaticamente
                 if (actionType === 'different_product' || actionType === 'refund') {

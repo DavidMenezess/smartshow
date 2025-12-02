@@ -73,6 +73,16 @@ class API {
                 if (text && text.trim()) {
                     try {
                         data = JSON.parse(text);
+                        // Log detalhado para devoluções
+                        if (endpoint.includes('/returns') && method === 'GET') {
+                            console.log('📥 Resposta de devoluções:', {
+                                endpoint,
+                                status: response.status,
+                                isArray: Array.isArray(data),
+                                length: Array.isArray(data) ? data.length : 'N/A',
+                                data: Array.isArray(data) ? data.slice(0, 2) : data
+                            });
+                        }
                     } catch (parseError) {
                         console.error('❌ Erro ao fazer parse do JSON:', parseError, 'Texto:', text);
                         throw new Error('Resposta inválida do servidor');
