@@ -170,13 +170,17 @@ router.get('/', auth, async (req, res) => {
         }
         
         // Filtrar por loja - sempre usar CAST para garantir compatibilidade de tipos
+        // IMPORTANTE: Usar múltiplas estratégias de comparação para garantir que encontre
         if (filter.store_id !== null && filter.store_id !== undefined) {
             // Tem store_id para filtrar (usuário comum ou admin/gerente com loja específica)
             const storeIdNum = parseInt(filter.store_id);
             if (!isNaN(storeIdNum) && storeIdNum > 0) {
-                sql += ` AND CAST(r.store_id AS INTEGER) = ?`;
-                params.push(storeIdNum);
+                // Usar OR para tentar múltiplas formas de comparação
+                // Isso garante que encontre mesmo se o tipo não estiver exatamente correto
+                sql += ` AND (CAST(r.store_id AS INTEGER) = ? OR r.store_id = ? OR CAST(r.store_id AS TEXT) = ?)`;
+                params.push(storeIdNum, storeIdNum, storeIdNum.toString());
                 console.log('📌 Filtrando por store_id:', storeIdNum, '(canSeeAll:', filter.canSeeAll, ')');
+                console.log('📌 Usando múltiplas estratégias de comparação para garantir compatibilidade');
             } else {
                 console.warn('⚠️ Store_id inválido no filtro:', filter.store_id);
             }
@@ -278,11 +282,12 @@ router.get('/', auth, async (req, res) => {
                     // CORREÇÃO: Tentar buscar novamente com diferentes estratégias
                     let fallbackReturns = [];
                     
-                    // Estratégia 1: Se o usuário tem store_id, buscar diretamente com CAST
+                    // Estratégia 1: Se o usuário tem store_id, buscar diretamente com múltiplas estratégias
                     if (req.user.store_id) {
                         const userStoreIdNum = parseInt(req.user.store_id);
                         if (!isNaN(userStoreIdNum) && userStoreIdNum > 0) {
-                            console.warn('🔄 Tentativa 1: Buscando com CAST usando store_id do usuário:', userStoreIdNum);
+                            console.warn('🔄 Tentativa 1: Buscando com múltiplas estratégias usando store_id do usuário:', userStoreIdNum);
+                            // Tentar com CAST primeiro
                             fallbackReturns = await db.all(`
                                 SELECT r.*,
                                        s.sale_number,
@@ -302,13 +307,27 @@ router.get('/', auth, async (req, res) => {
                                 LEFT JOIN stores st ON r.store_id = st.id
                                 LEFT JOIN users u ON r.processed_by = u.id
                                 LEFT JOIN products rp ON r.replacement_product_id = rp.id
-                                WHERE CAST(r.store_id AS INTEGER) = ?
+                                WHERE (CAST(r.store_id AS INTEGER) = ? OR r.store_id = ? OR CAST(r.store_id AS TEXT) = ?)
                                 ORDER BY r.created_at DESC
-                            `, [userStoreIdNum]);
+                            `, [userStoreIdNum, userStoreIdNum, userStoreIdNum.toString()]);
                             console.log('✅ Devoluções encontradas (fallback 1):', fallbackReturns.length);
                             
                             if (fallbackReturns.length > 0) {
+                                console.log('✅ Retornando devoluções encontradas pelo fallback 1');
                                 return res.json(fallbackReturns);
+                            }
+                            
+                            // Se ainda não encontrou, tentar sem JOINs para ver se o problema está nos JOINs
+                            console.warn('🔄 Tentativa 1.1: Buscando sem JOINs para diagnosticar...');
+                            const simpleReturns = await db.all(`
+                                SELECT * FROM returns 
+                                WHERE (CAST(store_id AS INTEGER) = ? OR store_id = ? OR CAST(store_id AS TEXT) = ?)
+                                ORDER BY created_at DESC
+                            `, [userStoreIdNum, userStoreIdNum, userStoreIdNum.toString()]);
+                            console.log('✅ Devoluções encontradas sem JOINs:', simpleReturns.length);
+                            if (simpleReturns.length > 0) {
+                                console.log('⚠️ PROBLEMA: Devoluções existem mas JOINs podem estar falhando');
+                                console.log('⚠️ Primeira devolução (sem JOIN):', JSON.stringify(simpleReturns[0], null, 2));
                             }
                         }
                     }
@@ -662,6 +681,67 @@ router.post('/', auth, async (req, res) => {
             }
         } catch (verifyError) {
             console.error('❌ Erro ao verificar store_id salvo:', verifyError);
+        }
+        
+        // VERIFICAÇÃO CRÍTICA: Testar se a devolução pode ser encontrada pela query de busca
+        try {
+            console.log('🔍 TESTE: Verificando se devolução pode ser encontrada pela query de busca...');
+            const testQuery = `
+                SELECT r.*,
+                       s.sale_number,
+                       s.payment_method as original_payment_method,
+                       s.installments,
+                       p.name as product_name,
+                       p.barcode as product_barcode,
+                       c.name as customer_name,
+                       c.document as customer_document,
+                       st.name as store_name,
+                       u.name as processed_by_name,
+                       rp.name as replacement_product_name
+                FROM returns r
+                LEFT JOIN sales s ON r.sale_id = s.id
+                LEFT JOIN products p ON r.product_id = p.id
+                LEFT JOIN customers c ON r.customer_id = c.id
+                LEFT JOIN stores st ON r.store_id = st.id
+                LEFT JOIN users u ON r.processed_by = u.id
+                LEFT JOIN products rp ON r.replacement_product_id = rp.id
+                WHERE CAST(r.store_id AS INTEGER) = ? AND r.id = ?
+            `;
+            const testResult = await db.all(testQuery, [finalStoreId, returnId]);
+            console.log('🔍 TESTE: Query de busca encontrou', testResult.length, 'devolução(ões)');
+            if (testResult.length === 0) {
+                console.error('❌ PROBLEMA CRÍTICO: Devolução criada mas não encontrada pela query de busca!');
+                console.error('❌ Store_id usado na busca:', finalStoreId, 'Tipo:', typeof finalStoreId);
+                console.error('❌ Return ID:', returnId);
+                
+                // Tentar buscar sem CAST para ver se encontra
+                const testQuery2 = `SELECT * FROM returns WHERE id = ?`;
+                const testResult2 = await db.get(testQuery2, [returnId]);
+                if (testResult2) {
+                    console.error('❌ Devolução existe no banco:', {
+                        id: testResult2.id,
+                        store_id: testResult2.store_id,
+                        store_id_type: typeof testResult2.store_id,
+                        return_number: testResult2.return_number
+                    });
+                    
+                    // Tentar buscar com store_id como string
+                    const testQuery3 = `SELECT * FROM returns WHERE store_id = ? AND id = ?`;
+                    const testResult3 = await db.all(testQuery3, [finalStoreId.toString(), returnId]);
+                    console.log('🔍 TESTE: Busca com store_id como string encontrou', testResult3.length, 'devolução(ões)');
+                    
+                    // Tentar buscar sem filtro de store_id
+                    const testQuery4 = `SELECT * FROM returns WHERE id = ?`;
+                    const testResult4 = await db.all(testQuery4, [returnId]);
+                    console.log('🔍 TESTE: Busca sem filtro de store_id encontrou', testResult4.length, 'devolução(ões)');
+                } else {
+                    console.error('❌ Devolução não existe no banco!');
+                }
+            } else {
+                console.log('✅ TESTE: Devolução pode ser encontrada pela query de busca!');
+            }
+        } catch (testError) {
+            console.error('❌ Erro ao testar busca da devolução:', testError);
         }
 
         // Processar automaticamente se for troca por outro produto ou reembolso
