@@ -318,8 +318,31 @@ router.get('/', auth, async (req, res) => {
             }
         }
         
+        // Garantir que todos os campos obrigatórios tenham valores padrão
+        returns = returns.map(ret => {
+            // Garantir que product_name não seja null ou undefined
+            if (!ret.product_name && ret.product_id) {
+                // Tentar buscar o nome do produto se não estiver presente
+                // (isso pode acontecer se o JOIN falhou)
+                console.warn('⚠️ Product_name está faltando para devolução', ret.id, '- tentando buscar...');
+            }
+            return {
+                ...ret,
+                product_name: ret.product_name || ret.product_barcode || 'Produto não encontrado',
+                customer_name: ret.customer_name || null,
+                sale_number: ret.sale_number || null,
+                original_payment_method: ret.original_payment_method || 'Não informado'
+            };
+        });
+        
         console.log('📤 Enviando resposta com', returns.length, 'devoluções');
-        console.log('📤 Primeira devolução (se houver):', returns.length > 0 ? JSON.stringify(returns[0], null, 2) : 'Nenhuma');
+        console.log('📤 Primeira devolução (se houver):', returns.length > 0 ? {
+            id: returns[0].id,
+            return_number: returns[0].return_number,
+            product_name: returns[0].product_name,
+            customer_name: returns[0].customer_name,
+            sale_number: returns[0].sale_number
+        } : 'Nenhuma');
         
         // Se não encontrou devoluções, verificar se há problema no filtro
         if (returns.length === 0) {
