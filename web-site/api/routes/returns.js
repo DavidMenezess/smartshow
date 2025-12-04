@@ -169,18 +169,17 @@ router.get('/', auth, async (req, res) => {
             console.error('⚠️ Erro ao contar devoluções:', countError);
         }
         
-        // Filtrar por loja - sempre usar CAST para garantir compatibilidade de tipos
-        // IMPORTANTE: Usar múltiplas estratégias de comparação para garantir que encontre
+        // Filtrar por loja - CORREÇÃO CRÍTICA: Simplificar para garantir que encontre
         if (filter.store_id !== null && filter.store_id !== undefined) {
             // Tem store_id para filtrar (usuário comum ou admin/gerente com loja específica)
             const storeIdNum = parseInt(filter.store_id);
             if (!isNaN(storeIdNum) && storeIdNum > 0) {
-                // Usar OR para tentar múltiplas formas de comparação
-                // Isso garante que encontre mesmo se o tipo não estiver exatamente correto
-                sql += ` AND (CAST(r.store_id AS INTEGER) = ? OR r.store_id = ? OR CAST(r.store_id AS TEXT) = ?)`;
-                params.push(storeIdNum, storeIdNum, storeIdNum.toString());
+                // CORREÇÃO: Usar apenas comparação direta primeiro, SQLite faz conversão automática
+                // Se não funcionar, tentar com CAST como fallback
+                sql += ` AND r.store_id = ?`;
+                params.push(storeIdNum);
                 console.log('📌 Filtrando por store_id:', storeIdNum, '(canSeeAll:', filter.canSeeAll, ')');
-                console.log('📌 Usando múltiplas estratégias de comparação para garantir compatibilidade');
+                console.log('📌 Usando comparação direta (SQLite faz conversão automática)');
             } else {
                 console.warn('⚠️ Store_id inválido no filtro:', filter.store_id);
             }
@@ -215,6 +214,31 @@ router.get('/', auth, async (req, res) => {
                 console.error('⚠️ Erro ao contar devoluções (pode ser tabela vazia):', countError.message);
             }
             
+            // CORREÇÃO CRÍTICA: Tentar primeiro sem JOINs para verificar se o problema está nos JOINs
+            if (filter.store_id !== null && filter.store_id !== undefined) {
+                const storeIdNum = parseInt(filter.store_id);
+                if (!isNaN(storeIdNum) && storeIdNum > 0) {
+                    console.log('🔍 TESTE: Buscando devoluções SEM JOINs primeiro para diagnosticar...');
+                    const simpleQuery = `SELECT * FROM returns WHERE store_id = ? ORDER BY created_at DESC`;
+                    const simpleReturns = await db.all(simpleQuery, [storeIdNum]);
+                    console.log('🔍 TESTE: Devoluções encontradas SEM JOINs:', simpleReturns.length);
+                    if (simpleReturns.length > 0) {
+                        console.log('✅ Devoluções existem no banco! O problema pode estar nos JOINs.');
+                        console.log('🔍 Primeira devolução (sem JOIN):', JSON.stringify(simpleReturns[0], null, 2));
+                    } else {
+                        console.warn('⚠️ Nenhuma devolução encontrada mesmo sem JOINs. Verificando todas...');
+                        const allReturnsCheck = await db.all(`SELECT * FROM returns ORDER BY created_at DESC LIMIT 5`);
+                        console.log('🔍 Total de devoluções no banco (sem filtro):', allReturnsCheck.length);
+                        if (allReturnsCheck.length > 0) {
+                            console.log('⚠️ PROBLEMA: Existem devoluções mas não para store_id', storeIdNum);
+                            allReturnsCheck.forEach((ret, idx) => {
+                                console.log(`  Devolução ${idx + 1}: ID=${ret.id}, store_id=${ret.store_id} (tipo: ${typeof ret.store_id}), return_number=${ret.return_number}`);
+                            });
+                        }
+                    }
+                }
+            }
+            
             returns = await db.all(sql, params);
             
             console.log('📦 Resultado bruto da query:', typeof returns, Array.isArray(returns) ? returns.length : 'não é array');
@@ -229,6 +253,39 @@ router.get('/', auth, async (req, res) => {
             }
             
             console.log('✅ Query executada com sucesso. Devoluções encontradas:', returns.length);
+            
+            // Se não encontrou com JOINs mas encontrou sem JOINs, retornar as sem JOINs com dados básicos
+            if (returns.length === 0 && filter.store_id !== null && filter.store_id !== undefined) {
+                const storeIdNum = parseInt(filter.store_id);
+                if (!isNaN(storeIdNum) && storeIdNum > 0) {
+                    console.warn('⚠️ Query com JOINs retornou 0, mas devoluções existem. Buscando sem JOINs...');
+                    const fallbackSimple = await db.all(`SELECT * FROM returns WHERE store_id = ? ORDER BY created_at DESC`, [storeIdNum]);
+                    if (fallbackSimple.length > 0) {
+                        console.log('✅ Encontradas', fallbackSimple.length, 'devoluções sem JOINs. Adicionando dados básicos...');
+                        // Adicionar dados básicos manualmente
+                        for (const ret of fallbackSimple) {
+                            try {
+                                const sale = await db.get('SELECT sale_number, payment_method FROM sales WHERE id = ?', [ret.sale_id]);
+                                const product = await db.get('SELECT name, barcode FROM products WHERE id = ?', [ret.product_id]);
+                                const customer = ret.customer_id ? await db.get('SELECT name, document FROM customers WHERE id = ?', [ret.customer_id]) : null;
+                                const store = await db.get('SELECT name FROM stores WHERE id = ?', [ret.store_id]);
+                                
+                                ret.sale_number = sale?.sale_number || null;
+                                ret.original_payment_method = sale?.payment_method || ret.original_payment_method;
+                                ret.product_name = product?.name || null;
+                                ret.product_barcode = product?.barcode || null;
+                                ret.customer_name = customer?.name || null;
+                                ret.customer_document = customer?.document || null;
+                                ret.store_name = store?.name || null;
+                            } catch (joinError) {
+                                console.warn('⚠️ Erro ao buscar dados adicionais para devolução', ret.id, ':', joinError.message);
+                            }
+                        }
+                        returns = fallbackSimple;
+                        console.log('✅ Retornando', returns.length, 'devoluções com dados básicos adicionados');
+                    }
+                }
+            }
         } catch (queryError) {
             console.error('❌ Erro na query SQL:', queryError);
             console.error('❌ Mensagem:', queryError.message);
@@ -282,12 +339,53 @@ router.get('/', auth, async (req, res) => {
                     // CORREÇÃO: Tentar buscar novamente com diferentes estratégias
                     let fallbackReturns = [];
                     
-                    // Estratégia 1: Se o usuário tem store_id, buscar diretamente com múltiplas estratégias
+                    // Estratégia 1: Se o usuário tem store_id, buscar diretamente (comparação simples)
                     if (req.user.store_id) {
                         const userStoreIdNum = parseInt(req.user.store_id);
                         if (!isNaN(userStoreIdNum) && userStoreIdNum > 0) {
-                            console.warn('🔄 Tentativa 1: Buscando com múltiplas estratégias usando store_id do usuário:', userStoreIdNum);
-                            // Tentar com CAST primeiro
+                            console.warn('🔄 Tentativa 1: Buscando com store_id do usuário (comparação direta):', userStoreIdNum);
+                            // Tentar primeiro sem JOINs para verificar se o problema está nos JOINs
+                            const simpleReturns = await db.all(`
+                                SELECT * FROM returns 
+                                WHERE store_id = ?
+                                ORDER BY created_at DESC
+                            `, [userStoreIdNum]);
+                            console.log('✅ Devoluções encontradas sem JOINs:', simpleReturns.length);
+                            
+                            if (simpleReturns.length > 0) {
+                                console.log('⚠️ PROBLEMA: Devoluções existem mas JOINs podem estar falhando');
+                                console.log('⚠️ Primeira devolução (sem JOIN):', JSON.stringify(simpleReturns[0], null, 2));
+                                
+                                // Se encontrou sem JOINs, adicionar dados básicos manualmente
+                                console.log('🔄 Adicionando dados básicos manualmente...');
+                                for (const ret of simpleReturns) {
+                                    try {
+                                        const sale = await db.get('SELECT sale_number, payment_method, installments FROM sales WHERE id = ?', [ret.sale_id]);
+                                        const product = await db.get('SELECT name, barcode FROM products WHERE id = ?', [ret.product_id]);
+                                        const customer = ret.customer_id ? await db.get('SELECT name, document FROM customers WHERE id = ?', [ret.customer_id]) : null;
+                                        const store = await db.get('SELECT name FROM stores WHERE id = ?', [ret.store_id]);
+                                        const processedBy = ret.processed_by ? await db.get('SELECT name FROM users WHERE id = ?', [ret.processed_by]) : null;
+                                        const replacementProduct = ret.replacement_product_id ? await db.get('SELECT name FROM products WHERE id = ?', [ret.replacement_product_id]) : null;
+                                        
+                                        ret.sale_number = sale?.sale_number || null;
+                                        ret.original_payment_method = sale?.payment_method || ret.original_payment_method;
+                                        ret.installments = sale?.installments || null;
+                                        ret.product_name = product?.name || null;
+                                        ret.product_barcode = product?.barcode || null;
+                                        ret.customer_name = customer?.name || null;
+                                        ret.customer_document = customer?.document || null;
+                                        ret.store_name = store?.name || null;
+                                        ret.processed_by_name = processedBy?.name || null;
+                                        ret.replacement_product_name = replacementProduct?.name || null;
+                                    } catch (joinError) {
+                                        console.warn('⚠️ Erro ao buscar dados adicionais para devolução', ret.id, ':', joinError.message);
+                                    }
+                                }
+                                console.log('✅ Retornando', simpleReturns.length, 'devoluções com dados básicos adicionados');
+                                return res.json(simpleReturns);
+                            }
+                            
+                            // Se não encontrou nem sem JOINs, tentar com JOINs
                             fallbackReturns = await db.all(`
                                 SELECT r.*,
                                        s.sale_number,
@@ -307,27 +405,14 @@ router.get('/', auth, async (req, res) => {
                                 LEFT JOIN stores st ON r.store_id = st.id
                                 LEFT JOIN users u ON r.processed_by = u.id
                                 LEFT JOIN products rp ON r.replacement_product_id = rp.id
-                                WHERE (CAST(r.store_id AS INTEGER) = ? OR r.store_id = ? OR CAST(r.store_id AS TEXT) = ?)
+                                WHERE r.store_id = ?
                                 ORDER BY r.created_at DESC
-                            `, [userStoreIdNum, userStoreIdNum, userStoreIdNum.toString()]);
-                            console.log('✅ Devoluções encontradas (fallback 1):', fallbackReturns.length);
+                            `, [userStoreIdNum]);
+                            console.log('✅ Devoluções encontradas (fallback 1 com JOINs):', fallbackReturns.length);
                             
                             if (fallbackReturns.length > 0) {
                                 console.log('✅ Retornando devoluções encontradas pelo fallback 1');
                                 return res.json(fallbackReturns);
-                            }
-                            
-                            // Se ainda não encontrou, tentar sem JOINs para ver se o problema está nos JOINs
-                            console.warn('🔄 Tentativa 1.1: Buscando sem JOINs para diagnosticar...');
-                            const simpleReturns = await db.all(`
-                                SELECT * FROM returns 
-                                WHERE (CAST(store_id AS INTEGER) = ? OR store_id = ? OR CAST(store_id AS TEXT) = ?)
-                                ORDER BY created_at DESC
-                            `, [userStoreIdNum, userStoreIdNum, userStoreIdNum.toString()]);
-                            console.log('✅ Devoluções encontradas sem JOINs:', simpleReturns.length);
-                            if (simpleReturns.length > 0) {
-                                console.log('⚠️ PROBLEMA: Devoluções existem mas JOINs podem estar falhando');
-                                console.log('⚠️ Primeira devolução (sem JOIN):', JSON.stringify(simpleReturns[0], null, 2));
                             }
                         }
                     }
@@ -954,6 +1039,32 @@ router.post('/', auth, async (req, res) => {
         }
         
         console.log('✅ Devolução completa buscada:', returnData.return_number);
+        
+        // VERIFICAÇÃO FINAL: Garantir que a devolução pode ser encontrada pela query de busca
+        // Isso garante que o commit foi feito e a devolução está disponível
+        try {
+            console.log('🔍 VERIFICAÇÃO FINAL: Testando busca imediata da devolução criada...');
+            const finalTestQuery = `SELECT * FROM returns WHERE id = ? AND store_id = ?`;
+            const finalTest = await db.get(finalTestQuery, [returnId, finalStoreId]);
+            if (finalTest) {
+                console.log('✅ VERIFICAÇÃO FINAL: Devolução pode ser encontrada imediatamente após criação!');
+                console.log('✅ Store_id confirmado:', finalTest.store_id, 'Tipo no banco:', typeof finalTest.store_id);
+            } else {
+                console.error('❌ VERIFICAÇÃO FINAL: Devolução NÃO pode ser encontrada imediatamente!');
+                console.error('❌ Isso indica problema de commit ou timing');
+                // Tentar buscar sem filtro de store_id
+                const testWithoutStoreFilter = await db.get(`SELECT * FROM returns WHERE id = ?`, [returnId]);
+                if (testWithoutStoreFilter) {
+                    console.error('❌ Devolução existe mas store_id não corresponde:', {
+                        saved: testWithoutStoreFilter.store_id,
+                        expected: finalStoreId
+                    });
+                }
+            }
+        } catch (finalTestError) {
+            console.error('❌ Erro na verificação final:', finalTestError);
+        }
+        
         res.status(201).json(returnData);
     } catch (error) {
         console.error('❌ Erro ao criar devolução:', error);
