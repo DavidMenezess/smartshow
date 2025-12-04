@@ -150,16 +150,43 @@ async function loadReturns() {
             storeIdForReturns = user.store_id;
         }
         
-        console.log('📦 Carregando devoluções com storeId:', storeIdForReturns);
+        console.log('📦 Carregando devoluções com storeId:', storeIdForReturns, 'Role:', user.role);
         
         const stats = await api.getReturnsStats(storeIdForReturns);
         const returns = await api.getReturns(null, null, null, storeIdForReturns);
         
         console.log('✅ Devoluções carregadas:', returns.length, 'devoluções encontradas');
         
+        // Verificar se returns é um array válido
+        if (!Array.isArray(returns)) {
+            console.error('❌ Resposta não é um array:', typeof returns, returns);
+            returns = [];
+        } else if (returns.length > 0) {
+            console.log('✅ Primeira devolução:', {
+                id: returns[0].id,
+                return_number: returns[0].return_number,
+                product_name: returns[0].product_name,
+                product_barcode: returns[0].product_barcode,
+                customer_name: returns[0].customer_name,
+                sale_number: returns[0].sale_number,
+                store_id: returns[0].store_id
+            });
+            
+            // Verificar se product_name está faltando
+            if (!returns[0].product_name && returns[0].product_id) {
+                console.warn('⚠️ Product_name está faltando para devolução', returns[0].id);
+            }
+        }
+        
         // Atualizar card
-        document.getElementById('totalReturns').textContent = stats.total_returns || 0;
-        document.getElementById('pendingReturnsCount').textContent = `${stats.pending_returns || 0} pendentes`;
+        const totalReturnsEl = document.getElementById('totalReturns');
+        const pendingReturnsCountEl = document.getElementById('pendingReturnsCount');
+        if (totalReturnsEl) {
+            totalReturnsEl.textContent = stats?.total_returns || 0;
+        }
+        if (pendingReturnsCountEl) {
+            pendingReturnsCountEl.textContent = `${stats?.pending_returns || 0} pendentes`;
+        }
         
         // Renderizar tabela (últimas 10)
         const recentReturns = returns.slice(0, 10);
@@ -167,6 +194,17 @@ async function loadReturns() {
     } catch (error) {
         console.error('❌ Erro ao carregar devoluções:', error);
         console.error('❌ Detalhes:', error);
+        // Garantir que a tabela mostre mensagem de erro se houver
+        const tbody = document.getElementById('returnsTableBody');
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="10" style="text-align: center; padding: 2rem; color: #ef4444;">
+                        Erro ao carregar devoluções. Tente recarregar a página.
+                    </td>
+                </tr>
+            `;
+        }
     }
 }
 
@@ -221,17 +259,20 @@ function renderReturnsTable(returns) {
             actionDetails = `Reembolso de R$ ${parseFloat(returnItem.refund_amount).toFixed(2)}`;
         }
 
+        // Garantir que product_name não seja undefined
+        const productName = returnItem.product_name || returnItem.product_barcode || 'Produto não encontrado';
+        
         return `
             <tr>
-                <td>${returnItem.return_number}</td>
-                <td>${new Date(returnItem.created_at).toLocaleDateString('pt-BR')}</td>
+                <td>${returnItem.return_number || 'N/A'}</td>
+                <td>${returnItem.created_at ? new Date(returnItem.created_at).toLocaleDateString('pt-BR') : 'N/A'}</td>
                 <td>${returnItem.customer_name || 'N/A'}</td>
                 <td>${returnItem.sale_number || 'N/A'}</td>
-                <td>${returnItem.product_name}</td>
-                <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${returnItem.defect_description}">${returnItem.defect_description}</td>
+                <td>${productName}</td>
+                <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${returnItem.defect_description || ''}">${returnItem.defect_description || 'N/A'}</td>
                 <td>${actionDetails}</td>
-                <td>R$ ${parseFloat(returnItem.original_price).toFixed(2)}</td>
-                <td>${returnItem.original_payment_method}${returnItem.installments ? ` (${returnItem.installments}x)` : ''}</td>
+                <td>R$ ${parseFloat(returnItem.original_price || 0).toFixed(2).replace('.', ',')}</td>
+                <td>${returnItem.original_payment_method || 'N/A'}${returnItem.installments ? ` (${returnItem.installments}x)` : ''}</td>
                 <td>${statusBadge}</td>
             </tr>
         `;
