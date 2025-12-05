@@ -518,11 +518,14 @@ router.get('/:id', auth, async (req, res) => {
         await ensureReturnsTableExists();
         
         const { id } = req.params;
+        console.log('📥 Buscando devolução por ID:', id);
         
-        const returnData = await db.get(
+        // Tentar primeiro com JOINs
+        let returnData = await db.get(
             `SELECT r.*,
                     s.sale_number,
                     s.payment_method as original_payment_method,
+                    s.installments,
                     s.total as sale_total,
                     p.name as product_name,
                     p.barcode as product_barcode,
@@ -544,14 +547,64 @@ router.get('/:id', auth, async (req, res) => {
             [id]
         );
 
-        if (!returnData) {
-            return res.status(404).json({ error: 'Devolução não encontrada' });
+        // Se não encontrou ou dados estão incompletos, buscar sem JOINs e adicionar manualmente
+        if (!returnData || !returnData.product_name) {
+            console.log('⚠️ Devolução não encontrada ou dados incompletos com JOINs. Buscando sem JOINs...');
+            const simpleReturn = await db.get('SELECT * FROM returns WHERE id = ?', [id]);
+            
+            if (!simpleReturn) {
+                return res.status(404).json({ error: 'Devolução não encontrada' });
+            }
+            
+            // Adicionar dados básicos manualmente
+            try {
+                const sale = await db.get('SELECT sale_number, payment_method, installments, total FROM sales WHERE id = ?', [simpleReturn.sale_id]);
+                const product = await db.get('SELECT name, barcode, sale_price FROM products WHERE id = ?', [simpleReturn.product_id]);
+                const customer = simpleReturn.customer_id ? await db.get('SELECT name, document FROM customers WHERE id = ?', [simpleReturn.customer_id]) : null;
+                const store = await db.get('SELECT name FROM stores WHERE id = ?', [simpleReturn.store_id]);
+                const processedBy = simpleReturn.processed_by ? await db.get('SELECT name FROM users WHERE id = ?', [simpleReturn.processed_by]) : null;
+                const replacementProduct = simpleReturn.replacement_product_id ? await db.get('SELECT name, sale_price FROM products WHERE id = ?', [simpleReturn.replacement_product_id]) : null;
+                
+                returnData = {
+                    ...simpleReturn,
+                    sale_number: sale?.sale_number || null,
+                    original_payment_method: sale?.payment_method || simpleReturn.original_payment_method,
+                    installments: sale?.installments || null,
+                    sale_total: sale?.total || null,
+                    product_name: product?.name || null,
+                    product_barcode: product?.barcode || null,
+                    current_product_price: product?.sale_price || null,
+                    customer_name: customer?.name || null,
+                    customer_document: customer?.document || null,
+                    store_name: store?.name || null,
+                    processed_by_name: processedBy?.name || null,
+                    replacement_product_name: replacementProduct?.name || null,
+                    replacement_product_price: replacementProduct?.sale_price || null
+                };
+                
+                console.log('✅ Dados adicionados manualmente para devolução', id);
+            } catch (joinError) {
+                console.error('❌ Erro ao buscar dados adicionais:', joinError);
+                // Retornar mesmo sem dados adicionais
+                returnData = simpleReturn;
+            }
         }
 
+        // Garantir valores padrão
+        returnData = {
+            ...returnData,
+            product_name: returnData.product_name || returnData.product_barcode || 'Produto não encontrado',
+            customer_name: returnData.customer_name || null,
+            sale_number: returnData.sale_number || null,
+            original_payment_method: returnData.original_payment_method || 'Não informado'
+        };
+
+        console.log('✅ Devolução encontrada:', returnData.return_number);
         res.json(returnData);
     } catch (error) {
-        console.error('Erro ao obter devolução:', error);
-        res.status(500).json({ error: 'Erro ao obter devolução' });
+        console.error('❌ Erro ao obter devolução:', error);
+        console.error('❌ Stack:', error.stack);
+        res.status(500).json({ error: 'Erro ao obter devolução', details: error.message });
     }
 });
 

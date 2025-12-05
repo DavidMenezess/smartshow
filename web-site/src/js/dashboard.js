@@ -250,13 +250,20 @@ function renderReturnsTable(returns) {
         let actionDetails = actionDisplay;
         if (returnItem.action_type === 'different_product') {
             if (returnItem.replacement_product_name) {
-                actionDetails = `Troca: ${returnItem.product_name} → ${returnItem.replacement_product_name}`;
-                if (returnItem.price_difference !== 0) {
-                    actionDetails += ` (${returnItem.price_difference > 0 ? `Cliente paga R$ ${Math.abs(returnItem.price_difference).toFixed(2)}` : `Loja devolve R$ ${Math.abs(returnItem.price_difference).toFixed(2)}`})`;
+                actionDetails = `Troca por: ${returnItem.replacement_product_name}`;
+                const priceDiff = parseFloat(returnItem.price_difference || 0);
+                if (priceDiff !== 0) {
+                    if (priceDiff > 0) {
+                        actionDetails += ` <span style="color: #ef4444; font-weight: bold;">(+R$ ${priceDiff.toFixed(2).replace('.', ',')})</span>`;
+                    } else {
+                        actionDetails += ` <span style="color: #10b981; font-weight: bold;">(R$ ${Math.abs(priceDiff).toFixed(2).replace('.', ',')})</span>`;
+                    }
                 }
+            } else {
+                actionDetails = 'Troca por outro produto';
             }
         } else if (returnItem.action_type === 'refund' && returnItem.refund_amount) {
-            actionDetails = `Reembolso de R$ ${parseFloat(returnItem.refund_amount).toFixed(2)}`;
+            actionDetails = `Reembolso de R$ ${parseFloat(returnItem.refund_amount).toFixed(2).replace('.', ',')}`;
         }
 
         // Garantir que product_name não seja undefined

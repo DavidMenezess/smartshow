@@ -845,30 +845,47 @@
                     'cancelled': '<span style="background: #ef4444; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.875rem;">Cancelada</span>'
                 }[returnItem.status] || returnItem.status;
 
-                const actionText = {
-                    'same_product': 'Troca pelo mesmo',
-                    'different_product': returnItem.replacement_product_name ? `Troca por: ${returnItem.replacement_product_name}` : 'Troca por outro',
-                    'refund': 'Reembolso'
-                }[returnItem.action_type] || returnItem.action_type;
-
-                const priceDiff = returnItem.price_difference || 0;
-                const priceDiffText = priceDiff > 0 
-                    ? `<span style="color: #ef4444;">+R$ ${priceDiff.toFixed(2)}</span>` 
-                    : priceDiff < 0 
-                        ? `<span style="color: #10b981;">R$ ${priceDiff.toFixed(2)}</span>` 
-                        : 'Sem diferença';
+                // Garantir que product_name não seja undefined
+                const productName = returnItem.product_name || returnItem.product_barcode || 'Produto não encontrado';
+                
+                // Montar texto da ação com informações completas
+                let actionText = '';
+                if (returnItem.action_type === 'same_product') {
+                    actionText = 'Troca pelo mesmo produto';
+                } else if (returnItem.action_type === 'different_product') {
+                    if (returnItem.replacement_product_name) {
+                        actionText = `Troca por: ${returnItem.replacement_product_name}`;
+                        const priceDiff = parseFloat(returnItem.price_difference || 0);
+                        if (priceDiff !== 0) {
+                            if (priceDiff > 0) {
+                                actionText += ` <span style="color: #ef4444; font-weight: bold;">(+R$ ${priceDiff.toFixed(2).replace('.', ',')})</span>`;
+                            } else {
+                                actionText += ` <span style="color: #10b981; font-weight: bold;">(R$ ${Math.abs(priceDiff).toFixed(2).replace('.', ',')})</span>`;
+                            }
+                        }
+                    } else {
+                        actionText = 'Troca por outro produto';
+                    }
+                } else if (returnItem.action_type === 'refund') {
+                    actionText = 'Reembolso';
+                    if (returnItem.refund_amount) {
+                        actionText += ` (R$ ${parseFloat(returnItem.refund_amount).toFixed(2).replace('.', ',')})`;
+                    }
+                } else {
+                    actionText = returnItem.action_type || 'N/A';
+                }
 
                 return `
                     <tr>
-                        <td>${returnItem.return_number}</td>
-                        <td>${new Date(returnItem.created_at).toLocaleDateString('pt-BR')}</td>
+                        <td>${returnItem.return_number || 'N/A'}</td>
+                        <td>${returnItem.created_at ? new Date(returnItem.created_at).toLocaleDateString('pt-BR') : 'N/A'}</td>
                         <td>${returnItem.customer_name || 'N/A'}</td>
                         <td>${returnItem.sale_number || 'N/A'}</td>
-                        <td>${returnItem.product_name}</td>
-                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${returnItem.defect_description}">${returnItem.defect_description}</td>
+                        <td>${productName}</td>
+                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${returnItem.defect_description || ''}">${returnItem.defect_description || 'N/A'}</td>
                         <td>${actionText}</td>
-                        <td>R$ ${parseFloat(returnItem.original_price).toFixed(2)}</td>
-                        <td>${returnItem.original_payment_method}${returnItem.installments ? ` (${returnItem.installments}x)` : ''}</td>
+                        <td>R$ ${parseFloat(returnItem.original_price || 0).toFixed(2).replace('.', ',')}</td>
+                        <td>${returnItem.original_payment_method || 'N/A'}${returnItem.installments ? ` (${returnItem.installments}x)` : ''}</td>
                         <td>${statusBadge}</td>
                         <td>
                             ${returnItem.status === 'pending' ? `
@@ -1371,37 +1388,76 @@
         // Ver detalhes da devolução
         async function viewReturnDetails(returnId) {
             try {
+                console.log('📥 Buscando detalhes da devolução:', returnId);
                 const returnItem = await api.getReturn(returnId);
-                let details = `Devolução: ${returnItem.return_number}\n\n`;
+                console.log('✅ Detalhes recebidos:', returnItem);
+                
+                if (!returnItem) {
+                    alert('Devolução não encontrada');
+                    return;
+                }
+                
+                let details = `═══════════════════════════════════\n`;
+                details += `DETALHES DA DEVOLUÇÃO\n`;
+                details += `═══════════════════════════════════\n\n`;
+                details += `Nº Devolução: ${returnItem.return_number || 'N/A'}\n`;
+                details += `Nº Venda: ${returnItem.sale_number || 'N/A'}\n`;
+                details += `Data: ${returnItem.created_at ? new Date(returnItem.created_at).toLocaleDateString('pt-BR') : 'N/A'}\n\n`;
                 details += `Cliente: ${returnItem.customer_name || 'N/A'}\n`;
-                details += `Produto: ${returnItem.product_name}\n`;
-                details += `Defeito: ${returnItem.defect_description}\n`;
-                details += `Ação: ${returnItem.action_type === 'same_product' ? 'Troca pelo mesmo' : returnItem.action_type === 'different_product' ? 'Troca por outro' : 'Reembolso'}\n`;
-                details += `Valor Original: R$ ${parseFloat(returnItem.original_price).toFixed(2)}\n`;
-                details += `Forma de Pagamento: ${returnItem.original_payment_method}\n`;
+                details += `Produto: ${returnItem.product_name || returnItem.product_barcode || 'Produto não encontrado'}\n`;
+                details += `Defeito: ${returnItem.defect_description || 'N/A'}\n\n`;
                 
-                if (returnItem.replacement_product_name) {
-                    details += `Produto de Substituição: ${returnItem.replacement_product_name}\n`;
-                    details += `Valor de Substituição: R$ ${parseFloat(returnItem.replacement_price).toFixed(2)}\n`;
-                    details += `Diferença: R$ ${parseFloat(returnItem.price_difference).toFixed(2)}\n`;
+                // Ação detalhada
+                if (returnItem.action_type === 'same_product') {
+                    details += `Ação: Troca pelo mesmo produto\n`;
+                } else if (returnItem.action_type === 'different_product') {
+                    details += `Ação: Troca por outro produto\n`;
+                    if (returnItem.replacement_product_name) {
+                        details += `Produto de Substituição: ${returnItem.replacement_product_name}\n`;
+                        if (returnItem.replacement_price) {
+                            details += `Valor de Substituição: R$ ${parseFloat(returnItem.replacement_price).toFixed(2).replace('.', ',')}\n`;
+                        }
+                        if (returnItem.price_difference !== undefined && returnItem.price_difference !== null) {
+                            const priceDiff = parseFloat(returnItem.price_difference);
+                            if (priceDiff > 0) {
+                                details += `Diferença: Cliente paga R$ ${priceDiff.toFixed(2).replace('.', ',')}\n`;
+                            } else if (priceDiff < 0) {
+                                details += `Diferença: Loja devolve R$ ${Math.abs(priceDiff).toFixed(2).replace('.', ',')}\n`;
+                            } else {
+                                details += `Diferença: Sem diferença de valor\n`;
+                            }
+                        }
+                    }
+                } else if (returnItem.action_type === 'refund') {
+                    details += `Ação: Reembolso\n`;
+                    if (returnItem.refund_amount) {
+                        details += `Valor Reembolsado: R$ ${parseFloat(returnItem.refund_amount).toFixed(2).replace('.', ',')}\n`;
+                    }
                 }
                 
-                if (returnItem.refund_amount) {
-                    details += `Valor Reembolsado: R$ ${parseFloat(returnItem.refund_amount).toFixed(2)}\n`;
-                }
+                details += `\nValor Original: R$ ${parseFloat(returnItem.original_price || 0).toFixed(2).replace('.', ',')}\n`;
+                details += `Forma de Pagamento: ${returnItem.original_payment_method || 'N/A'}${returnItem.installments ? ` (${returnItem.installments}x)` : ''}\n\n`;
                 
-                details += `Status: ${returnItem.status}\n`;
+                details += `Status: ${returnItem.status === 'pending' ? 'Pendente' : returnItem.status === 'completed' ? 'Concluída' : returnItem.status === 'cancelled' ? 'Cancelada' : returnItem.status}\n`;
                 if (returnItem.processed_by_name) {
                     details += `Processado por: ${returnItem.processed_by_name}\n`;
                 }
+                if (returnItem.processed_at) {
+                    details += `Data de Processamento: ${new Date(returnItem.processed_at).toLocaleDateString('pt-BR')}\n`;
+                }
                 if (returnItem.observations) {
-                    details += `Observações: ${returnItem.observations}\n`;
+                    details += `\nObservações: ${returnItem.observations}\n`;
                 }
 
                 alert(details);
             } catch (error) {
-                console.error('Erro ao buscar detalhes:', error);
-                alert('Erro ao buscar detalhes da devolução');
+                console.error('❌ Erro ao buscar detalhes:', error);
+                console.error('❌ Detalhes do erro:', error);
+                let errorMessage = 'Erro ao buscar detalhes da devolução';
+                if (error.message) {
+                    errorMessage += ': ' + error.message;
+                }
+                alert(errorMessage);
             }
         }
 
