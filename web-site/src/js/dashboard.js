@@ -106,7 +106,9 @@ async function renderNormalDashboard(data) {
     document.getElementById('lowStock').textContent = data.stock.lowStock;
 
     // Carregar devoluções
+    console.log('📦 Chamando loadReturns() do dashboard...');
     await loadReturns();
+    console.log('✅ loadReturns() concluído');
 
     // Atualizar cards financeiros
     document.getElementById('receivable').textContent = 
