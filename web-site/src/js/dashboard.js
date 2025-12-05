@@ -210,8 +210,13 @@ async function loadReturns() {
 
 // Renderizar tabela de devoluções
 function renderReturnsTable(returns) {
+    console.log('🎨 Renderizando tabela de devoluções com', returns.length, 'itens');
     const tbody = document.getElementById('returnsTableBody');
-    if (!tbody) return;
+    if (!tbody) {
+        console.error('❌ Elemento returnsTableBody não encontrado no DOM!');
+        return;
+    }
+    console.log('✅ Elemento returnsTableBody encontrado');
 
     if (returns.length === 0) {
         tbody.innerHTML = `
