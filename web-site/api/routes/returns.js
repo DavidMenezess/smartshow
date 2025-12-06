@@ -258,6 +258,25 @@ router.get('/', auth, async (req, res) => {
                 }
             }
             
+            // CORREÇÃO CRÍTICA: Se admin, verificar se há devoluções ANTES de executar query com JOINs
+            // Se houver devoluções mas a query com JOINs falhar, usar fallback imediatamente
+            if (filter.canSeeAll) {
+                console.log('🔍 Admin/Gerente detectado - Verificando devoluções no banco antes da query...');
+                try {
+                    const quickCheck = await db.all('SELECT COUNT(*) as count FROM returns');
+                    const totalCount = quickCheck && quickCheck.length > 0 ? quickCheck[0].count : 0;
+                    console.log('📊 Total de devoluções no banco:', totalCount);
+                    
+                    if (totalCount > 0) {
+                        console.log('✅ Existem devoluções no banco. Executando query com JOINs...');
+                    } else {
+                        console.log('ℹ️ Nenhuma devolução encontrada no banco.');
+                    }
+                } catch (checkError) {
+                    console.error('❌ Erro ao verificar devoluções:', checkError);
+                }
+            }
+            
             returns = await db.all(sql, params);
             
             console.log('📦 Resultado bruto da query:', typeof returns, Array.isArray(returns) ? returns.length : 'não é array');
@@ -275,11 +294,12 @@ router.get('/', auth, async (req, res) => {
             
             console.log('✅ Query executada com sucesso. Devoluções encontradas:', returns.length);
             
-            // CORREÇÃO CRÍTICA: Se admin e não encontrou nada, verificar se há devoluções no banco e usar fallback IMEDIATAMENTE
+            // CORREÇÃO CRÍTICA: Se admin e query retornou vazio, usar fallback IMEDIATAMENTE
             if (returns.length === 0 && filter.canSeeAll) {
-                console.log('🔍 DEBUG: Admin não encontrou devoluções. Verificando todas as devoluções no banco...');
+                console.log('⚠️ CRÍTICO: Admin não encontrou devoluções na query principal!');
+                console.log('🔄 Executando fallback IMEDIATAMENTE...');
                 try {
-                    // Primeiro verificar se há devoluções no banco
+                    // Verificar se há devoluções no banco
                     const allReturnsDebug = await db.all('SELECT id, return_number, store_id, status, created_at FROM returns ORDER BY created_at DESC LIMIT 10');
                     console.log('🔍 DEBUG: Total de devoluções no banco (últimas 10):', allReturnsDebug.length);
                     if (allReturnsDebug.length > 0) {
