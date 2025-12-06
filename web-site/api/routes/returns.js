@@ -248,6 +248,8 @@ router.get('/', auth, async (req, res) => {
             returns = await db.all(sql, params);
             
             console.log('📦 Resultado bruto da query:', typeof returns, Array.isArray(returns) ? returns.length : 'não é array');
+            console.log('📦 SQL executado:', sql);
+            console.log('📦 Parâmetros usados:', JSON.stringify(params));
             
             if (!returns) {
                 console.log('⚠️ Query retornou null/undefined, usando array vazio');
@@ -259,6 +261,23 @@ router.get('/', auth, async (req, res) => {
             }
             
             console.log('✅ Query executada com sucesso. Devoluções encontradas:', returns.length);
+            
+            // DEBUG: Se admin e não encontrou nada, verificar se há devoluções no banco
+            if (returns.length === 0 && filter.canSeeAll) {
+                console.log('🔍 DEBUG: Admin não encontrou devoluções. Verificando todas as devoluções no banco...');
+                try {
+                    const allReturnsDebug = await db.all('SELECT id, return_number, store_id, status, created_at FROM returns ORDER BY created_at DESC LIMIT 10');
+                    console.log('🔍 DEBUG: Total de devoluções no banco (últimas 10):', allReturnsDebug.length);
+                    if (allReturnsDebug.length > 0) {
+                        console.log('⚠️ PROBLEMA: Existem devoluções no banco mas a query não retornou!');
+                        allReturnsDebug.forEach((ret, idx) => {
+                            console.log(`  Devolução ${idx + 1}: ID=${ret.id}, store_id=${ret.store_id} (tipo: ${typeof ret.store_id}), return_number=${ret.return_number}, status=${ret.status}`);
+                        });
+                    }
+                } catch (debugError) {
+                    console.error('❌ Erro ao fazer debug:', debugError);
+                }
+            }
             
             // Se não encontrou com JOINs mas encontrou sem JOINs, retornar as sem JOINs com dados básicos
             if (returns.length === 0 && filter.store_id !== null && filter.store_id !== undefined) {
