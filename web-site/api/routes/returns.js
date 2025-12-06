@@ -409,13 +409,66 @@ router.get('/', auth, async (req, res) => {
         }
         
         // Garantir que todos os campos obrigatórios tenham valores padrão
-        returns = returns.map(ret => {
-            // Garantir que product_name não seja null ou undefined
-            if (!ret.product_name && ret.product_id) {
-                // Tentar buscar o nome do produto se não estiver presente
-                // (isso pode acontecer se o JOIN falhou)
-                console.warn('⚠️ Product_name está faltando para devolução', ret.id, '- tentando buscar...');
+        // CORREÇÃO: Se ainda faltam dados, buscar de forma síncrona antes de mapear
+        if (returns.length > 0) {
+            console.log('🔍 Verificando se há dados faltando antes do mapeamento final...');
+            for (const ret of returns) {
+                // Se product_name está faltando, buscar
+                if (!ret.product_name && ret.product_id) {
+                    try {
+                        const product = await db.get('SELECT name, barcode FROM products WHERE id = ?', [ret.product_id]);
+                        if (product) {
+                            ret.product_name = product.name || product.barcode || null;
+                            ret.product_barcode = product.barcode || ret.product_barcode || null;
+                            console.log(`✅ Product_name adicionado para devolução ${ret.id}: ${ret.product_name}`);
+                        }
+                    } catch (err) {
+                        console.warn('⚠️ Erro ao buscar produto', ret.product_id, ':', err.message);
+                    }
+                }
+                
+                // Se customer_name está faltando, buscar
+                if (!ret.customer_name && ret.customer_id) {
+                    try {
+                        const customer = await db.get('SELECT name FROM customers WHERE id = ?', [ret.customer_id]);
+                        if (customer) {
+                            ret.customer_name = customer.name || null;
+                            console.log(`✅ Customer_name adicionado para devolução ${ret.id}: ${ret.customer_name}`);
+                        }
+                    } catch (err) {
+                        console.warn('⚠️ Erro ao buscar cliente', ret.customer_id, ':', err.message);
+                    }
+                }
+                
+                // Se sale_number está faltando, buscar
+                if (!ret.sale_number && ret.sale_id) {
+                    try {
+                        const sale = await db.get('SELECT sale_number FROM sales WHERE id = ?', [ret.sale_id]);
+                        if (sale) {
+                            ret.sale_number = sale.sale_number || null;
+                            console.log(`✅ Sale_number adicionado para devolução ${ret.id}: ${ret.sale_number}`);
+                        }
+                    } catch (err) {
+                        console.warn('⚠️ Erro ao buscar venda', ret.sale_id, ':', err.message);
+                    }
+                }
+                
+                // Se replacement_product_name está faltando, buscar
+                if (!ret.replacement_product_name && ret.replacement_product_id) {
+                    try {
+                        const replacementProduct = await db.get('SELECT name FROM products WHERE id = ?', [ret.replacement_product_id]);
+                        if (replacementProduct) {
+                            ret.replacement_product_name = replacementProduct.name || null;
+                            console.log(`✅ Replacement_product_name adicionado para devolução ${ret.id}: ${ret.replacement_product_name}`);
+                        }
+                    } catch (err) {
+                        console.warn('⚠️ Erro ao buscar produto de substituição', ret.replacement_product_id, ':', err.message);
+                    }
+                }
             }
+        }
+        
+        returns = returns.map(ret => {
             return {
                 ...ret,
                 product_name: ret.product_name || ret.product_barcode || 'Produto não encontrado',
