@@ -270,9 +270,44 @@ router.get('/', auth, async (req, res) => {
                     console.log('🔍 DEBUG: Total de devoluções no banco (últimas 10):', allReturnsDebug.length);
                     if (allReturnsDebug.length > 0) {
                         console.log('⚠️ PROBLEMA: Existem devoluções no banco mas a query não retornou!');
+                        console.log('🔄 Tentando buscar todas as devoluções sem JOINs...');
                         allReturnsDebug.forEach((ret, idx) => {
                             console.log(`  Devolução ${idx + 1}: ID=${ret.id}, store_id=${ret.store_id} (tipo: ${typeof ret.store_id}), return_number=${ret.return_number}, status=${ret.status}`);
                         });
+                        
+                        // Tentar buscar todas sem JOINs e adicionar dados manualmente
+                        const allReturnsSimple = await db.all('SELECT * FROM returns ORDER BY created_at DESC');
+                        if (allReturnsSimple.length > 0) {
+                            console.log('✅ Encontradas', allReturnsSimple.length, 'devoluções sem JOINs. Adicionando dados básicos...');
+                            // Adicionar dados básicos manualmente
+                            for (const ret of allReturnsSimple) {
+                                try {
+                                    const sale = await db.get('SELECT sale_number, payment_method, installments FROM sales WHERE id = ?', [ret.sale_id]);
+                                    const product = await db.get('SELECT name, barcode FROM products WHERE id = ?', [ret.product_id]);
+                                    const customer = ret.customer_id ? await db.get('SELECT name, document FROM customers WHERE id = ?', [ret.customer_id]) : null;
+                                    const store = await db.get('SELECT name FROM stores WHERE id = ?', [ret.store_id]);
+                                    const processedBy = ret.processed_by ? await db.get('SELECT name FROM users WHERE id = ?', [ret.processed_by]) : null;
+                                    const replacementProduct = ret.replacement_product_id ? await db.get('SELECT name FROM products WHERE id = ?', [ret.replacement_product_id]) : null;
+                                    
+                                    ret.sale_number = sale?.sale_number || null;
+                                    ret.original_payment_method = sale?.payment_method || ret.original_payment_method;
+                                    ret.installments = sale?.installments || null;
+                                    ret.product_name = product?.name || null;
+                                    ret.product_barcode = product?.barcode || null;
+                                    ret.customer_name = customer?.name || null;
+                                    ret.customer_document = customer?.document || null;
+                                    ret.store_name = store?.name || null;
+                                    ret.processed_by_name = processedBy?.name || null;
+                                    ret.replacement_product_name = replacementProduct?.name || null;
+                                    ret.replacement_price = ret.replacement_price || null;
+                                    ret.price_difference = ret.price_difference || 0;
+                                } catch (joinError) {
+                                    console.warn('⚠️ Erro ao buscar dados adicionais para devolução', ret.id, ':', joinError.message);
+                                }
+                            }
+                            returns = allReturnsSimple;
+                            console.log('✅ Retornando', returns.length, 'devoluções com dados básicos adicionados (fallback admin)');
+                        }
                     }
                 } catch (debugError) {
                     console.error('❌ Erro ao fazer debug:', debugError);
