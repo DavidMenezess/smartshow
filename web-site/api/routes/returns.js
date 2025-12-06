@@ -243,6 +243,19 @@ router.get('/', auth, async (req, res) => {
                         }
                     }
                 }
+            } else if (filter.canSeeAll) {
+                // Admin/Gerente - verificar se há devoluções no banco
+                console.log('🔍 TESTE: Admin/Gerente - Verificando devoluções no banco...');
+                const allReturnsCheck = await db.all(`SELECT id, return_number, store_id, status, created_at FROM returns ORDER BY created_at DESC LIMIT 10`);
+                console.log('🔍 TESTE: Total de devoluções no banco (últimas 10):', allReturnsCheck.length);
+                if (allReturnsCheck.length > 0) {
+                    console.log('✅ Devoluções existem no banco para admin ver!');
+                    allReturnsCheck.forEach((ret, idx) => {
+                        console.log(`  Devolução ${idx + 1}: ID=${ret.id}, store_id=${ret.store_id} (tipo: ${typeof ret.store_id}), return_number=${ret.return_number}, status=${ret.status}`);
+                    });
+                } else {
+                    console.log('ℹ️ Nenhuma devolução encontrada no banco.');
+                }
             }
             
             returns = await db.all(sql, params);
