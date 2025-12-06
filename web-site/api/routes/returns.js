@@ -305,7 +305,7 @@ router.get('/', auth, async (req, res) => {
             console.log('✅ Query executada com sucesso. Devoluções encontradas:', returns.length);
             
             // CORREÇÃO CRÍTICA: Se admin e query retornou vazio, usar fallback IMEDIATAMENTE
-            if (returns.length === 0 && filter.canSeeAll) {
+            if ((returns.length === 0 && filter.canSeeAll) || (shouldUseFallback && returns.length === 0)) {
                 console.log('⚠️ CRÍTICO: Admin não encontrou devoluções na query principal!');
                 console.log('🔄 Executando fallback IMEDIATAMENTE...');
                 try {
