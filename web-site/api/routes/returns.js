@@ -275,35 +275,36 @@ router.get('/', auth, async (req, res) => {
             
             console.log('✅ Query executada com sucesso. Devoluções encontradas:', returns.length);
             
-            // DEBUG: Se admin e não encontrou nada, verificar se há devoluções no banco
+            // CORREÇÃO CRÍTICA: Se admin e não encontrou nada, verificar se há devoluções no banco e usar fallback IMEDIATAMENTE
             if (returns.length === 0 && filter.canSeeAll) {
                 console.log('🔍 DEBUG: Admin não encontrou devoluções. Verificando todas as devoluções no banco...');
                 try {
+                    // Primeiro verificar se há devoluções no banco
                     const allReturnsDebug = await db.all('SELECT id, return_number, store_id, status, created_at FROM returns ORDER BY created_at DESC LIMIT 10');
                     console.log('🔍 DEBUG: Total de devoluções no banco (últimas 10):', allReturnsDebug.length);
                     if (allReturnsDebug.length > 0) {
-                        console.log('⚠️ PROBLEMA: Existem devoluções no banco mas a query não retornou!');
-                        console.log('🔄 Tentando buscar todas as devoluções sem JOINs...');
+                        console.log('⚠️ PROBLEMA: Existem devoluções no banco mas a query com JOINs não retornou!');
+                        console.log('🔄 Usando fallback: Buscar todas as devoluções sem JOINs e adicionar dados manualmente...');
                         allReturnsDebug.forEach((ret, idx) => {
                             console.log(`  Devolução ${idx + 1}: ID=${ret.id}, store_id=${ret.store_id} (tipo: ${typeof ret.store_id}), return_number=${ret.return_number}, status=${ret.status}`);
                         });
                         
-                        // Tentar buscar todas sem JOINs e adicionar dados manualmente
+                        // CORREÇÃO: Buscar TODAS as devoluções sem JOINs e adicionar dados manualmente
                         const allReturnsSimple = await db.all('SELECT * FROM returns ORDER BY created_at DESC');
                         if (allReturnsSimple.length > 0) {
                             console.log('✅ Encontradas', allReturnsSimple.length, 'devoluções sem JOINs. Adicionando dados básicos...');
-                            // Adicionar dados básicos manualmente
+                            // Adicionar dados básicos manualmente para TODAS as devoluções
                             for (const ret of allReturnsSimple) {
                                 try {
-                                    const sale = await db.get('SELECT sale_number, payment_method, installments FROM sales WHERE id = ?', [ret.sale_id]);
-                                    const product = await db.get('SELECT name, barcode FROM products WHERE id = ?', [ret.product_id]);
+                                    const sale = ret.sale_id ? await db.get('SELECT sale_number, payment_method, installments FROM sales WHERE id = ?', [ret.sale_id]) : null;
+                                    const product = ret.product_id ? await db.get('SELECT name, barcode FROM products WHERE id = ?', [ret.product_id]) : null;
                                     const customer = ret.customer_id ? await db.get('SELECT name, document FROM customers WHERE id = ?', [ret.customer_id]) : null;
-                                    const store = await db.get('SELECT name FROM stores WHERE id = ?', [ret.store_id]);
+                                    const store = ret.store_id ? await db.get('SELECT name FROM stores WHERE id = ?', [ret.store_id]) : null;
                                     const processedBy = ret.processed_by ? await db.get('SELECT name FROM users WHERE id = ?', [ret.processed_by]) : null;
                                     const replacementProduct = ret.replacement_product_id ? await db.get('SELECT name FROM products WHERE id = ?', [ret.replacement_product_id]) : null;
                                     
                                     ret.sale_number = sale?.sale_number || null;
-                                    ret.original_payment_method = sale?.payment_method || ret.original_payment_method;
+                                    ret.original_payment_method = sale?.payment_method || ret.original_payment_method || null;
                                     ret.installments = sale?.installments || null;
                                     ret.product_name = product?.name || null;
                                     ret.product_barcode = product?.barcode || null;
@@ -314,16 +315,24 @@ router.get('/', auth, async (req, res) => {
                                     ret.replacement_product_name = replacementProduct?.name || null;
                                     ret.replacement_price = ret.replacement_price || null;
                                     ret.price_difference = ret.price_difference || 0;
+                                    
+                                    console.log(`✅ Dados adicionados para devolução ${ret.id}: sale_number=${ret.sale_number}, customer_name=${ret.customer_name}, product_name=${ret.product_name}, replacement_product_name=${ret.replacement_product_name}`);
                                 } catch (joinError) {
-                                    console.warn('⚠️ Erro ao buscar dados adicionais para devolução', ret.id, ':', joinError.message);
+                                    console.error('❌ Erro ao buscar dados adicionais para devolução', ret.id, ':', joinError.message);
+                                    console.error('❌ Stack:', joinError.stack);
                                 }
                             }
                             returns = allReturnsSimple;
                             console.log('✅ Retornando', returns.length, 'devoluções com dados básicos adicionados (fallback admin)');
+                        } else {
+                            console.log('ℹ️ Nenhuma devolução encontrada no banco.');
                         }
+                    } else {
+                        console.log('ℹ️ Nenhuma devolução encontrada no banco.');
                     }
                 } catch (debugError) {
                     console.error('❌ Erro ao fazer debug:', debugError);
+                    console.error('❌ Stack:', debugError.stack);
                 }
             }
             
