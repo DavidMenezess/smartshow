@@ -260,15 +260,18 @@ router.get('/', auth, async (req, res) => {
             
             // CORREÇÃO CRÍTICA: Se admin, verificar se há devoluções ANTES de executar query com JOINs
             // Se houver devoluções mas a query com JOINs falhar, usar fallback imediatamente
+            let shouldUseFallback = false;
             if (filter.canSeeAll) {
                 console.log('🔍 Admin/Gerente detectado - Verificando devoluções no banco antes da query...');
                 try {
-                    const quickCheck = await db.all('SELECT COUNT(*) as count FROM returns');
-                    const totalCount = quickCheck && quickCheck.length > 0 ? quickCheck[0].count : 0;
+                    const quickCheck = await db.get('SELECT COUNT(*) as count FROM returns');
+                    const totalCount = quickCheck ? quickCheck.count : 0;
                     console.log('📊 Total de devoluções no banco:', totalCount);
                     
                     if (totalCount > 0) {
                         console.log('✅ Existem devoluções no banco. Executando query com JOINs...');
+                        // Se há devoluções, marcar para usar fallback se query retornar vazio
+                        shouldUseFallback = true;
                     } else {
                         console.log('ℹ️ Nenhuma devolução encontrada no banco.');
                     }
@@ -278,6 +281,13 @@ router.get('/', auth, async (req, res) => {
             }
             
             returns = await db.all(sql, params);
+            
+            // Se admin, há devoluções no banco, mas query retornou vazio, usar fallback IMEDIATAMENTE
+            if (shouldUseFallback && returns.length === 0) {
+                console.log('⚠️ CRÍTICO: Admin tem devoluções no banco mas query retornou vazio!');
+                console.log('🔄 Pulando para fallback IMEDIATAMENTE...');
+                // Não continuar com o código abaixo, ir direto para o fallback
+            }
             
             console.log('📦 Resultado bruto da query:', typeof returns, Array.isArray(returns) ? returns.length : 'não é array');
             console.log('📦 SQL executado:', sql);
