@@ -748,36 +748,42 @@ router.get('/:id', auth, async (req, res) => {
         console.log('📥 Buscando devolução por ID:', id);
         
         // Tentar primeiro com JOINs
-        let returnData = await db.get(
-            `SELECT r.*,
-                    s.sale_number,
-                    s.payment_method as original_payment_method,
-                    s.installments,
-                    s.total as sale_total,
-                    p.name as product_name,
-                    p.barcode as product_barcode,
-                    p.sale_price as current_product_price,
-                    c.name as customer_name,
-                    c.document as customer_document,
-                    st.name as store_name,
-                    u.name as processed_by_name,
-                    rp.name as replacement_product_name,
-                    rp.sale_price as replacement_product_price
-             FROM returns r
-             LEFT JOIN sales s ON r.sale_id = s.id
-             LEFT JOIN products p ON r.product_id = p.id
-             LEFT JOIN customers c ON r.customer_id = c.id
-             LEFT JOIN stores st ON r.store_id = st.id
-             LEFT JOIN users u ON r.processed_by = u.id
-             LEFT JOIN products rp ON r.replacement_product_id = rp.id
-             WHERE r.id = ?`,
-            [id]
-        );
-        
-        // Garantir que replacement_price e price_difference sejam incluídos
-        if (returnData) {
-            returnData.replacement_price = returnData.replacement_price || null;
-            returnData.price_difference = returnData.price_difference || 0;
+        let returnData = null;
+        try {
+            returnData = await db.get(
+                `SELECT r.*,
+                        s.sale_number,
+                        s.payment_method as original_payment_method,
+                        s.installments,
+                        s.total as sale_total,
+                        p.name as product_name,
+                        p.barcode as product_barcode,
+                        p.sale_price as current_product_price,
+                        c.name as customer_name,
+                        c.document as customer_document,
+                        st.name as store_name,
+                        u.name as processed_by_name,
+                        rp.name as replacement_product_name,
+                        rp.sale_price as replacement_product_price
+                 FROM returns r
+                 LEFT JOIN sales s ON r.sale_id = s.id
+                 LEFT JOIN products p ON r.product_id = p.id
+                 LEFT JOIN customers c ON r.customer_id = c.id
+                 LEFT JOIN stores st ON r.store_id = st.id
+                 LEFT JOIN users u ON r.processed_by = u.id
+                 LEFT JOIN products rp ON r.replacement_product_id = rp.id
+                 WHERE r.id = ?`,
+                [id]
+            );
+            
+            // Garantir que replacement_price e price_difference sejam incluídos
+            if (returnData) {
+                returnData.replacement_price = returnData.replacement_price || null;
+                returnData.price_difference = returnData.price_difference || 0;
+            }
+        } catch (joinError) {
+            console.warn('⚠️ Erro na query com JOINs, usando fallback:', joinError.message);
+            returnData = null;
         }
 
         // Se não encontrou ou dados estão incompletos, buscar sem JOINs e adicionar manualmente
