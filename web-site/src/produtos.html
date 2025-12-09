@@ -1431,12 +1431,21 @@
                         details += `  - Nome: ${returnItem.replacement_product_name}\n`;
                         // Usar replacement_price ou replacement_product_price
                         const replacementPrice = returnItem.replacement_price || returnItem.replacement_product_price;
+                        const originalPrice = parseFloat(returnItem.original_price || 0);
+                        
                         if (replacementPrice) {
                             details += `  - Valor: R$ ${parseFloat(replacementPrice).toFixed(2).replace('.', ',')}\n`;
                         } else {
                             details += `  - Valor: Não informado\n`;
                         }
-                        const priceDiff = parseFloat(returnItem.price_difference || 0);
+                        
+                        // Calcular diferença de preço
+                        let priceDiff = parseFloat(returnItem.price_difference || 0);
+                        // Se price_difference não está disponível, calcular manualmente
+                        if (priceDiff === 0 && replacementPrice && originalPrice) {
+                            priceDiff = parseFloat(replacementPrice) - originalPrice;
+                        }
+                        
                         if (priceDiff !== 0) {
                             details += `\nDiferença de Valor:\n`;
                             if (priceDiff > 0) {
@@ -1444,8 +1453,10 @@
                             } else {
                                 details += `  -R$ ${Math.abs(priceDiff).toFixed(2).replace('.', ',')} (Cliente recebe reembolso - sai dinheiro do caixa)\n`;
                             }
-                        } else {
+                        } else if (replacementPrice && originalPrice) {
                             details += `\nDiferença de Valor: Sem diferença (valores iguais)\n`;
+                        } else {
+                            details += `\nDiferença de Valor: Não calculada (valores não disponíveis)\n`;
                         }
                     } else {
                         details += `Produto de Substituição: Não informado\n`;
