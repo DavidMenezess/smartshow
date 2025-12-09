@@ -1096,6 +1096,20 @@ router.get('/:id', auth, async (req, res) => {
                 console.warn('⚠️ Erro ao buscar preço do produto de substituição:', replacementError.message);
             }
         }
+        
+        // CORREÇÃO: Calcular price_difference se não estiver disponível
+        if (returnData.action_type === 'different_product' && returnData.replacement_product_id) {
+            const originalPrice = parseFloat(returnData.original_price || 0);
+            const replacementPrice = parseFloat(returnData.replacement_price || returnData.replacement_product_price || 0);
+            
+            if (originalPrice > 0 && replacementPrice > 0) {
+                // Se price_difference não está disponível ou é 0, calcular
+                if (!returnData.price_difference || returnData.price_difference === 0) {
+                    returnData.price_difference = replacementPrice - originalPrice;
+                    console.log('✅ Price_difference calculado:', returnData.price_difference, '(original:', originalPrice, 'replacement:', replacementPrice, ')');
+                }
+            }
+        }
 
         console.log('✅ Devolução encontrada:', returnData.return_number);
         console.log('✅ Dados completos:', {
