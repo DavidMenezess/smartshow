@@ -412,20 +412,33 @@ router.get('/', auth, async (req, res) => {
             
             // CORREÇÃO CRÍTICA: Se query retornou dados mas estão incompletos, usar fallback também
             // Verificar se há dados faltando mesmo quando a query retornou resultados
+            // Verificar TODOS os retornos, não apenas o primeiro
             let hasIncompleteData = false;
             if (returns.length > 0) {
-                const firstReturn = returns[0];
-                if (!firstReturn.customer_name || !firstReturn.sale_number || !firstReturn.product_name || !firstReturn.processed_by_name) {
-                    hasIncompleteData = true;
-                    console.warn('⚠️ Query retornou dados mas estão incompletos. Usando fallback para preencher...');
+                // Verificar se pelo menos um retorno tem dados incompletos
+                for (const ret of returns) {
+                    if (!ret.customer_name || !ret.sale_number || !ret.product_name || !ret.processed_by_name || ret.product_name === 'Produto não encontrado') {
+                        hasIncompleteData = true;
+                        console.warn(`⚠️ Devolução ${ret.id} tem dados incompletos: customer=${ret.customer_name}, sale=${ret.sale_number}, product=${ret.product_name}, user=${ret.processed_by_name}`);
+                        break; // Se encontrou um incompleto, já pode usar fallback
+                    }
+                }
+                if (hasIncompleteData) {
+                    console.warn('⚠️ Query retornou dados mas estão incompletos. Usando fallback para preencher TODOS os dados...');
                 }
             }
             
-            // Se não encontrou com JOINs OU dados estão incompletos, buscar sem JOINs e preencher
-            if ((returns.length === 0 || hasIncompleteData) && filter.store_id !== null && filter.store_id !== undefined) {
+            // CORREÇÃO CRÍTICA: Para usuários não-admin, SEMPRE usar fallback se houver store_id
+            // Isso garante que todos os dados sejam preenchidos corretamente
+            const shouldUseFallbackForNonAdmin = !filter.canSeeAll && filter.store_id !== null && filter.store_id !== undefined;
+            
+            // Se não encontrou com JOINs OU dados estão incompletos OU é usuário não-admin, buscar sem JOINs e preencher
+            if ((returns.length === 0 || hasIncompleteData || shouldUseFallbackForNonAdmin) && filter.store_id !== null && filter.store_id !== undefined) {
                 const storeIdNum = parseInt(filter.store_id);
                 if (!isNaN(storeIdNum) && storeIdNum > 0) {
-                    if (returns.length === 0) {
+                    if (shouldUseFallbackForNonAdmin) {
+                        console.log('🔄 Usuário não-admin detectado - usando fallback para garantir dados completos...');
+                    } else if (returns.length === 0) {
                         console.warn('⚠️ Query com JOINs retornou 0, mas devoluções existem. Buscando sem JOINs...');
                     } else {
                         console.warn('⚠️ Query retornou dados incompletos. Buscando dados faltando sem JOINs...');
@@ -433,16 +446,17 @@ router.get('/', auth, async (req, res) => {
                     const fallbackSimple = await db.all(`SELECT * FROM returns WHERE store_id = ? ORDER BY created_at DESC`, [storeIdNum]);
                     if (fallbackSimple.length > 0) {
                         console.log('✅ Encontradas', fallbackSimple.length, 'devoluções sem JOINs. Adicionando dados básicos...');
-                        // Adicionar dados básicos manualmente
+                        // Adicionar dados básicos manualmente para TODAS as devoluções
                         for (const ret of fallbackSimple) {
                             try {
-                                const sale = await db.get('SELECT sale_number, payment_method, installments FROM sales WHERE id = ?', [ret.sale_id]);
-                                const product = await db.get('SELECT name, barcode FROM products WHERE id = ?', [ret.product_id]);
+                                const sale = ret.sale_id ? await db.get('SELECT sale_number, payment_method, installments FROM sales WHERE id = ?', [ret.sale_id]) : null;
+                                const product = ret.product_id ? await db.get('SELECT name, barcode FROM products WHERE id = ?', [ret.product_id]) : null;
                                 const customer = ret.customer_id ? await db.get('SELECT name, document FROM customers WHERE id = ?', [ret.customer_id]) : null;
-                                const store = await db.get('SELECT name FROM stores WHERE id = ?', [ret.store_id]);
+                                const store = ret.store_id ? await db.get('SELECT name FROM stores WHERE id = ?', [ret.store_id]) : null;
                                 const processedBy = ret.processed_by ? await db.get('SELECT name FROM users WHERE id = ?', [ret.processed_by]) : null;
                                 const replacementProduct = ret.replacement_product_id ? await db.get('SELECT name FROM products WHERE id = ?', [ret.replacement_product_id]) : null;
                                 
+                                // CORREÇÃO: Sempre preencher, mesmo se já existir (substituir dados incompletos)
                                 ret.sale_number = sale?.sale_number || null;
                                 ret.original_payment_method = sale?.payment_method || ret.original_payment_method || null;
                                 ret.installments = sale?.installments || null;
@@ -457,13 +471,14 @@ router.get('/', auth, async (req, res) => {
                                 ret.replacement_price = ret.replacement_price || null;
                                 ret.price_difference = ret.price_difference || 0;
                                 
-                                console.log(`✅ Dados completos para devolução ${ret.id}: customer=${ret.customer_name}, sale=${ret.sale_number}, product=${ret.product_name}, user=${ret.processed_by_name}, installments=${ret.installments}`);
+                                console.log(`✅ Dados completos para devolução ${ret.id}: customer=${ret.customer_name}, sale=${ret.sale_number}, product=${ret.product_name}, user=${ret.processed_by_name}, installments=${ret.installments}, replacement=${ret.replacement_product_name}`);
                             } catch (joinError) {
                                 console.warn('⚠️ Erro ao buscar dados adicionais para devolução', ret.id, ':', joinError.message);
                             }
                         }
+                        // CORREÇÃO CRÍTICA: Substituir completamente os dados da query principal pelos do fallback
                         returns = fallbackSimple;
-                        console.log('✅ Retornando', returns.length, 'devoluções com dados básicos adicionados');
+                        console.log('✅ Retornando', returns.length, 'devoluções com dados completos adicionados (fallback)');
                     }
                 }
             }
