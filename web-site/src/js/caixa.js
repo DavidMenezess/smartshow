@@ -39,15 +39,26 @@ class CaixaSystem {
 
     async loadCashControlFromServer() {
         try {
+            // CORREÇÃO CRÍTICA: Obter store_id atual
+            const currentStoreId = this.getCurrentStoreId();
+            console.log('🏪 Store_id atual:', currentStoreId);
+            
             // PRIMEIRO: Sempre verificar estado local ANTES de buscar do servidor
-            const localStored = localStorage.getItem('smartshow_cash_control');
+            const key = this.getCashControlKey();
+            const localStored = localStorage.getItem(key);
             let hasValidLocalState = false;
             
             if (localStored) {
                 try {
                     const localState = JSON.parse(localStored);
-                    // Verificar se o caixa foi aberto hoje
-                    if (localState.isOpen && localState.lastOpened) {
+                    
+                    // CORREÇÃO CRÍTICA: Verificar se o store_id do estado salvo corresponde ao atual
+                    if (localState.store_id && localState.store_id !== currentStoreId) {
+                        console.log('⚠️ Store_id do estado salvo não corresponde ao atual. Ignorando estado salvo.');
+                        // Limpar estado antigo e continuar para buscar do servidor
+                        localStorage.removeItem(key);
+                    } else if (localState.isOpen && localState.lastOpened) {
+                        // Verificar se o caixa foi aberto hoje
                         const lastOpenedDate = new Date(localState.lastOpened);
                         const today = new Date();
                         const lastOpenedDay = lastOpenedDate.toDateString();
@@ -56,7 +67,7 @@ class CaixaSystem {
                         if (lastOpenedDay === todayDay) {
                             // Caixa está aberto hoje localmente - USAR ESTE ESTADO
                             console.log('✅ Caixa aberto hoje localmente, usando estado local');
-                            this.cashControl = localState;
+                            this.cashControl = { ...localState, store_id: currentStoreId };
                             this.saveCashControl();
                             hasValidLocalState = true;
                             
@@ -116,10 +127,11 @@ class CaixaSystem {
                         todaySales: serverState.todaySales || 0,
                         lastOpened: serverState.openedAt || new Date().toISOString(),
                         lastClosed: null,
-                        observations: serverState.observations || ''
+                        observations: serverState.observations || '',
+                        store_id: currentStoreId
                     };
                     this.saveCashControl();
-                    console.log('✅ Caixa aberto no servidor, estado sincronizado');
+                    console.log('✅ Caixa aberto no servidor, estado sincronizado para store_id:', currentStoreId);
                 } else {
                     // Caixa está fechado
                     this.cashControl = {
@@ -129,10 +141,11 @@ class CaixaSystem {
                         todaySales: 0,
                         lastOpened: null,
                         lastClosed: null,
-                        observations: ''
+                        observations: '',
+                        store_id: currentStoreId
                     };
                     this.saveCashControl();
-                    console.log('ℹ️ Caixa fechado');
+                    console.log('ℹ️ Caixa fechado para store_id:', currentStoreId);
                 }
             }
         } catch (error) {
@@ -428,6 +441,7 @@ class CaixaSystem {
             
             // Atualizar estado local
             const now = new Date();
+            const currentStoreId = this.getCurrentStoreId();
             this.cashControl = {
                 isOpen: true,
                 initialCash: initialCash,
@@ -435,10 +449,11 @@ class CaixaSystem {
                 todaySales: 0,
                 lastOpened: now.toISOString(),
                 lastClosed: null,
-                observations: observations
+                observations: observations,
+                store_id: currentStoreId
             };
 
-            console.log('✅ Caixa aberto:', this.cashControl);
+            console.log('✅ Caixa aberto para store_id:', currentStoreId, this.cashControl);
             this.saveCashControl();
             this.hideOpenCashModal();
             
