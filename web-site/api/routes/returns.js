@@ -993,20 +993,98 @@ router.get('/:id', auth, async (req, res) => {
             processed_by_name: returnData.processed_by_name || null
         };
 
+        // CORREÇÃO CRÍTICA: Verificar e buscar TODOS os dados faltantes antes de retornar
         // Se ainda não tem processed_by_name, buscar
         if (!returnData.processed_by_name && returnData.processed_by) {
             try {
                 const user = await db.get('SELECT name FROM users WHERE id = ?', [returnData.processed_by]);
                 if (user) {
                     returnData.processed_by_name = user.name;
+                    console.log('✅ Processed_by_name adicionado:', returnData.processed_by_name);
                 }
             } catch (userError) {
                 console.warn('⚠️ Erro ao buscar nome do usuário:', userError.message);
             }
         }
+        
+        // Se ainda não tem customer_name, buscar
+        if (!returnData.customer_name && returnData.customer_id) {
+            try {
+                const customer = await db.get('SELECT name FROM customers WHERE id = ?', [returnData.customer_id]);
+                if (customer) {
+                    returnData.customer_name = customer.name;
+                    console.log('✅ Customer_name adicionado:', returnData.customer_name);
+                }
+            } catch (customerError) {
+                console.warn('⚠️ Erro ao buscar nome do cliente:', customerError.message);
+            }
+        }
+        
+        // Se ainda não tem sale_number ou installments, buscar
+        if ((!returnData.sale_number || !returnData.installments) && returnData.sale_id) {
+            try {
+                const sale = await db.get('SELECT sale_number, payment_method, installments FROM sales WHERE id = ?', [returnData.sale_id]);
+                if (sale) {
+                    if (!returnData.sale_number) {
+                        returnData.sale_number = sale.sale_number;
+                        console.log('✅ Sale_number adicionado:', returnData.sale_number);
+                    }
+                    if (!returnData.installments) {
+                        returnData.installments = sale.installments;
+                        console.log('✅ Installments adicionado:', returnData.installments);
+                    }
+                    if (!returnData.original_payment_method) {
+                        returnData.original_payment_method = sale.payment_method;
+                    }
+                }
+            } catch (saleError) {
+                console.warn('⚠️ Erro ao buscar dados da venda:', saleError.message);
+            }
+        }
+        
+        // Se ainda não tem product_name, buscar
+        if (!returnData.product_name || returnData.product_name === 'Produto não encontrado') {
+            if (returnData.product_id) {
+                try {
+                    const product = await db.get('SELECT name, barcode FROM products WHERE id = ?', [returnData.product_id]);
+                    if (product) {
+                        returnData.product_name = product.name || product.barcode || null;
+                        returnData.product_barcode = product.barcode || returnData.product_barcode || null;
+                        console.log('✅ Product_name adicionado:', returnData.product_name);
+                    }
+                } catch (productError) {
+                    console.warn('⚠️ Erro ao buscar produto:', productError.message);
+                }
+            }
+        }
+        
+        // Se ainda não tem replacement_product_name, buscar
+        if (!returnData.replacement_product_name && returnData.replacement_product_id) {
+            try {
+                const replacementProduct = await db.get('SELECT name, sale_price FROM products WHERE id = ?', [returnData.replacement_product_id]);
+                if (replacementProduct) {
+                    returnData.replacement_product_name = replacementProduct.name;
+                    if (!returnData.replacement_price && replacementProduct.sale_price) {
+                        returnData.replacement_price = replacementProduct.sale_price;
+                    }
+                    console.log('✅ Replacement_product_name adicionado:', returnData.replacement_product_name);
+                }
+            } catch (replacementError) {
+                console.warn('⚠️ Erro ao buscar produto de substituição:', replacementError.message);
+            }
+        }
 
         console.log('✅ Devolução encontrada:', returnData.return_number);
-        console.log('✅ Processed by:', returnData.processed_by_name);
+        console.log('✅ Dados completos:', {
+            customer_name: returnData.customer_name,
+            sale_number: returnData.sale_number,
+            product_name: returnData.product_name,
+            processed_by_name: returnData.processed_by_name,
+            installments: returnData.installments,
+            replacement_product_name: returnData.replacement_product_name,
+            replacement_price: returnData.replacement_price,
+            price_difference: returnData.price_difference
+        });
         res.json(returnData);
     } catch (error) {
         console.error('❌ Erro ao obter devolução:', error);

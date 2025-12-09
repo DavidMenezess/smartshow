@@ -1467,16 +1467,35 @@
                 }
                 details += `\n\n`;
                 
+                details += `═══════════════════════════════════\n`;
+                details += `STATUS E PROCESSAMENTO\n`;
+                details += `═══════════════════════════════════\n\n`;
                 details += `Status: ${returnItem.status === 'pending' ? 'Pendente' : returnItem.status === 'completed' ? 'Concluída' : returnItem.status === 'cancelled' ? 'Cancelada' : returnItem.status}\n`;
-                details += `Usuário: ${returnItem.processed_by_name || 'N/A'}\n`;
-                if (returnItem.processed_by_name && returnItem.processed_at) {
-                    details += `Processado por: ${returnItem.processed_by_name} em ${new Date(returnItem.processed_at).toLocaleDateString('pt-BR')}\n`;
-                }
+                details += `Usuário que Processou: ${returnItem.processed_by_name || 'N/A'}\n`;
                 if (returnItem.processed_at) {
                     details += `Data de Processamento: ${new Date(returnItem.processed_at).toLocaleDateString('pt-BR')}\n`;
                 }
                 if (returnItem.observations) {
                     details += `\nObservações: ${returnItem.observations}\n`;
+                }
+                
+                // Verificar se há dados faltando e avisar
+                const missingData = [];
+                if (!returnItem.customer_name || returnItem.customer_name === 'N/A') {
+                    missingData.push('Cliente');
+                }
+                if (!returnItem.sale_number || returnItem.sale_number === 'N/A') {
+                    missingData.push('Número da Venda');
+                }
+                if (!returnItem.product_name || returnItem.product_name === 'Produto não encontrado') {
+                    missingData.push('Produto');
+                }
+                if (returnItem.action_type === 'different_product' && !returnItem.replacement_product_name) {
+                    missingData.push('Produto de Substituição');
+                }
+                
+                if (missingData.length > 0) {
+                    details += `\n⚠️ ATENÇÃO: Alguns dados não foram encontrados: ${missingData.join(', ')}\n`;
                 }
 
                 alert(details);
