@@ -190,6 +190,9 @@ router.get('/', auth, async (req, res) => {
             console.log('✅ Admin/Gerente - vendo todas as devoluções (sem filtro de loja)');
             console.log('✅ Usuário role:', req.user.role, 'store_id do usuário:', req.user.store_id);
             // Não adicionar filtro - query retornará todas as devoluções
+            // CORREÇÃO CRÍTICA: Para admin sem store_id, usar fallback IMEDIATAMENTE
+            // A query com JOINs pode falhar silenciosamente, então vamos usar fallback direto
+            console.log('🔄 Admin sem store_id - usando fallback direto para garantir que funcione');
         } else {
             // Usuário sem store_id e não admin - não retornar nada
             console.warn('⚠️ Usuário sem store_id - não retornará devoluções');
@@ -258,11 +261,19 @@ router.get('/', auth, async (req, res) => {
                 }
             }
             
-            // CORREÇÃO CRÍTICA: Se admin, verificar se há devoluções ANTES de executar query com JOINs
-            // Se houver devoluções mas a query com JOINs falhar, usar fallback imediatamente
+            // CORREÇÃO CRÍTICA: Se admin sem store_id, usar fallback IMEDIATAMENTE
+            // A query com JOINs pode falhar silenciosamente, então vamos usar fallback direto
             let shouldUseFallback = false;
-            if (filter.canSeeAll) {
-                console.log('🔍 Admin/Gerente detectado - Verificando devoluções no banco antes da query...');
+            let skipMainQuery = false;
+            
+            if (filter.canSeeAll && !filter.store_id) {
+                console.log('🔍 Admin/Gerente SEM store_id detectado - Usando fallback DIRETO');
+                console.log('🔄 Pulando query com JOINs e usando fallback imediatamente para garantir que funcione');
+                skipMainQuery = true;
+                shouldUseFallback = true;
+            } else if (filter.canSeeAll && filter.store_id) {
+                // Admin com store_id específico - tentar query normal primeiro
+                console.log('🔍 Admin/Gerente COM store_id - Verificando devoluções no banco antes da query...');
                 try {
                     const quickCheck = await db.get('SELECT COUNT(*) as count FROM returns');
                     const totalCount = quickCheck ? quickCheck.count : 0;
@@ -270,7 +281,6 @@ router.get('/', auth, async (req, res) => {
                     
                     if (totalCount > 0) {
                         console.log('✅ Existem devoluções no banco. Executando query com JOINs...');
-                        // Se há devoluções, marcar para usar fallback se query retornar vazio
                         shouldUseFallback = true;
                     } else {
                         console.log('ℹ️ Nenhuma devolução encontrada no banco.');
@@ -280,7 +290,14 @@ router.get('/', auth, async (req, res) => {
                 }
             }
             
-            returns = await db.all(sql, params);
+            // Se não deve pular a query principal, executá-la
+            if (!skipMainQuery) {
+                returns = await db.all(sql, params);
+            } else {
+                // Se deve pular, definir returns como vazio para entrar no fallback
+                returns = [];
+                console.log('⏭️ Query principal pulada - usando fallback direto');
+            }
             
             // Se admin, há devoluções no banco, mas query retornou vazio, usar fallback IMEDIATAMENTE
             if (shouldUseFallback && returns.length === 0) {
@@ -289,32 +306,42 @@ router.get('/', auth, async (req, res) => {
                 // Não continuar com o código abaixo, ir direto para o fallback
             }
             
-            console.log('📦 Resultado bruto da query:', typeof returns, Array.isArray(returns) ? returns.length : 'não é array');
-            console.log('📦 SQL executado:', sql);
-            console.log('📦 Parâmetros usados:', JSON.stringify(params));
-            
-            if (!returns) {
-                console.log('⚠️ Query retornou null/undefined, usando array vazio');
-                returns = [];
-            } else if (!Array.isArray(returns)) {
-                console.log('⚠️ Query não retornou array, convertendo...');
-                console.log('⚠️ Tipo recebido:', typeof returns);
-                returns = [];
+            if (!skipMainQuery) {
+                console.log('📦 Resultado bruto da query:', typeof returns, Array.isArray(returns) ? returns.length : 'não é array');
+                console.log('📦 SQL executado:', sql);
+                console.log('📦 Parâmetros usados:', JSON.stringify(params));
+                
+                if (!returns) {
+                    console.log('⚠️ Query retornou null/undefined, usando array vazio');
+                    returns = [];
+                } else if (!Array.isArray(returns)) {
+                    console.log('⚠️ Query não retornou array, convertendo...');
+                    console.log('⚠️ Tipo recebido:', typeof returns);
+                    returns = [];
+                }
+                
+                console.log('✅ Query executada com sucesso. Devoluções encontradas:', returns.length);
             }
             
-            console.log('✅ Query executada com sucesso. Devoluções encontradas:', returns.length);
-            
-            // CORREÇÃO CRÍTICA: Se admin e query retornou vazio, usar fallback IMEDIATAMENTE
-            if ((returns.length === 0 && filter.canSeeAll) || (shouldUseFallback && returns.length === 0)) {
-                console.log('⚠️ CRÍTICO: Admin não encontrou devoluções na query principal!');
-                console.log('🔄 Executando fallback IMEDIATAMENTE...');
+            // CORREÇÃO CRÍTICA: Se admin sem store_id OU admin com store_id mas query retornou vazio, usar fallback IMEDIATAMENTE
+            if (skipMainQuery || (returns.length === 0 && filter.canSeeAll) || (shouldUseFallback && returns.length === 0)) {
+                if (skipMainQuery) {
+                    console.log('🔄 Admin sem store_id - Executando fallback DIRETO (pulando query principal)...');
+                } else {
+                    console.log('⚠️ CRÍTICO: Admin não encontrou devoluções na query principal!');
+                    console.log('🔄 Executando fallback IMEDIATAMENTE...');
+                }
                 try {
                     // Verificar se há devoluções no banco
                     const allReturnsDebug = await db.all('SELECT id, return_number, store_id, status, created_at FROM returns ORDER BY created_at DESC LIMIT 10');
                     console.log('🔍 DEBUG: Total de devoluções no banco (últimas 10):', allReturnsDebug.length);
                     if (allReturnsDebug.length > 0) {
-                        console.log('⚠️ PROBLEMA: Existem devoluções no banco mas a query com JOINs não retornou!');
-                        console.log('🔄 Usando fallback: Buscar todas as devoluções sem JOINs e adicionar dados manualmente...');
+                        if (skipMainQuery) {
+                            console.log('✅ Admin sem store_id - Buscando todas as devoluções sem JOINs e adicionando dados manualmente...');
+                        } else {
+                            console.log('⚠️ PROBLEMA: Existem devoluções no banco mas a query com JOINs não retornou!');
+                            console.log('🔄 Usando fallback: Buscar todas as devoluções sem JOINs e adicionar dados manualmente...');
+                        }
                         allReturnsDebug.forEach((ret, idx) => {
                             console.log(`  Devolução ${idx + 1}: ID=${ret.id}, store_id=${ret.store_id} (tipo: ${typeof ret.store_id}), return_number=${ret.return_number}, status=${ret.status}`);
                         });
