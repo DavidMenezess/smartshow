@@ -381,16 +381,33 @@ router.get('/', auth, async (req, res) => {
                             }
                             returns = allReturnsSimple;
                             console.log('✅ Retornando', returns.length, 'devoluções com dados básicos adicionados (fallback admin)');
+                            console.log('✅ Primeira devolução (fallback):', returns.length > 0 ? {
+                                id: returns[0].id,
+                                return_number: returns[0].return_number,
+                                product_name: returns[0].product_name,
+                                customer_name: returns[0].customer_name,
+                                sale_number: returns[0].sale_number,
+                                store_id: returns[0].store_id
+                            } : 'Nenhuma');
                         } else {
                             console.log('ℹ️ Nenhuma devolução encontrada no banco.');
+                            returns = []; // Garantir que seja array vazio
                         }
                     } else {
                         console.log('ℹ️ Nenhuma devolução encontrada no banco.');
+                        returns = []; // Garantir que seja array vazio
                     }
                 } catch (debugError) {
                     console.error('❌ Erro ao fazer debug:', debugError);
                     console.error('❌ Stack:', debugError.stack);
+                    returns = []; // Garantir que seja array vazio mesmo em caso de erro
                 }
+            }
+            
+            // GARANTIR que returns seja sempre um array válido
+            if (!Array.isArray(returns)) {
+                console.warn('⚠️ Returns não é array, convertendo para array vazio');
+                returns = [];
             }
             
             // Se não encontrou com JOINs mas encontrou sem JOINs, retornar as sem JOINs com dados básicos
