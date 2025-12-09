@@ -206,7 +206,7 @@
 
     <!-- Modal de Devoluções -->
     <div id="returnsModal" class="modal" style="display: none;">
-        <div class="modal-content" style="max-width: 1200px;">
+        <div class="modal-content" style="max-width: 95vw; width: 95vw; max-height: 95vh; height: 95vh; overflow: auto;">
             <span class="close" onclick="closeReturnsModal()">&times;</span>
             <h2>Devoluções de Produtos</h2>
             
@@ -216,8 +216,8 @@
             </div>
 
             <!-- Tabela de devoluções -->
-            <div class="table-container">
-                <table class="data-table">
+            <div class="table-container" style="overflow-x: auto; max-height: calc(95vh - 150px);">
+                <table class="data-table" style="min-width: 1400px;">
                     <thead>
                         <tr>
                             <th>Nº Devolução</th>
@@ -229,6 +229,7 @@
                             <th>Ação</th>
                             <th>Valor Original</th>
                             <th>Forma Pagamento</th>
+                            <th>Usuário</th>
                             <th>Status</th>
                             <th>Ações</th>
                         </tr>
@@ -830,7 +831,7 @@
             if (returns.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="11" style="text-align: center; padding: 2rem;">
+                        <td colspan="12" style="text-align: center; padding: 2rem;">
                             Nenhuma devolução registrada
                         </td>
                     </tr>
@@ -849,6 +850,8 @@
                 const productName = returnItem.product_name || returnItem.product_barcode || 'Produto não encontrado';
                 
                 // Montar texto da ação com informações completas
+                // CORREÇÃO: price_difference > 0 = cliente paga mais (entra dinheiro) = VERDE com +
+                // price_difference < 0 = cliente recebe reembolso (sai dinheiro) = VERMELHO com -
                 let actionText = '';
                 if (returnItem.action_type === 'same_product') {
                     actionText = 'Troca pelo mesmo produto';
@@ -858,9 +861,11 @@
                         const priceDiff = parseFloat(returnItem.price_difference || 0);
                         if (priceDiff !== 0) {
                             if (priceDiff > 0) {
-                                actionText += ` <span style="color: #ef4444; font-weight: bold;">(+R$ ${priceDiff.toFixed(2).replace('.', ',')})</span>`;
+                                // Cliente paga mais = entra dinheiro = VERDE com +
+                                actionText += ` <span style="color: #10b981; font-weight: bold;">(+R$ ${priceDiff.toFixed(2).replace('.', ',')})</span>`;
                             } else {
-                                actionText += ` <span style="color: #10b981; font-weight: bold;">(R$ ${Math.abs(priceDiff).toFixed(2).replace('.', ',')})</span>`;
+                                // Cliente recebe reembolso = sai dinheiro = VERMELHO com -
+                                actionText += ` <span style="color: #ef4444; font-weight: bold;">(-R$ ${Math.abs(priceDiff).toFixed(2).replace('.', ',')})</span>`;
                             }
                         }
                     } else {
@@ -869,7 +874,7 @@
                 } else if (returnItem.action_type === 'refund') {
                     actionText = 'Reembolso';
                     if (returnItem.refund_amount) {
-                        actionText += ` (R$ ${parseFloat(returnItem.refund_amount).toFixed(2).replace('.', ',')})`;
+                        actionText += ` <span style="color: #ef4444; font-weight: bold;">(-R$ ${parseFloat(returnItem.refund_amount).toFixed(2).replace('.', ',')})</span>`;
                     }
                 } else {
                     actionText = returnItem.action_type || 'N/A';
@@ -886,6 +891,7 @@
                         <td>${actionText}</td>
                         <td>R$ ${parseFloat(returnItem.original_price || 0).toFixed(2).replace('.', ',')}</td>
                         <td>${returnItem.original_payment_method || 'N/A'}${returnItem.installments ? ` (${returnItem.installments}x)` : ''}</td>
+                        <td>${returnItem.processed_by_name || 'N/A'}</td>
                         <td>${statusBadge}</td>
                         <td>
                             ${returnItem.status === 'pending' ? `
@@ -1405,7 +1411,8 @@
                 details += `Data: ${returnItem.created_at ? new Date(returnItem.created_at).toLocaleDateString('pt-BR') : 'N/A'}\n\n`;
                 details += `Cliente: ${returnItem.customer_name || 'N/A'}\n`;
                 details += `Produto: ${returnItem.product_name || returnItem.product_barcode || 'Produto não encontrado'}\n`;
-                details += `Defeito: ${returnItem.defect_description || 'N/A'}\n\n`;
+                details += `Defeito: ${returnItem.defect_description || 'N/A'}\n`;
+                details += `Usuário: ${returnItem.processed_by_name || 'N/A'}\n\n`;
                 
                 // Ação detalhada
                 if (returnItem.action_type === 'same_product') {
@@ -1417,14 +1424,12 @@
                         if (returnItem.replacement_price) {
                             details += `Valor de Substituição: R$ ${parseFloat(returnItem.replacement_price).toFixed(2).replace('.', ',')}\n`;
                         }
-                        if (returnItem.price_difference !== undefined && returnItem.price_difference !== null) {
-                            const priceDiff = parseFloat(returnItem.price_difference);
+                        const priceDiff = parseFloat(returnItem.price_difference || 0);
+                        if (priceDiff !== 0) {
                             if (priceDiff > 0) {
-                                details += `Diferença: Cliente paga R$ ${priceDiff.toFixed(2).replace('.', ',')}\n`;
-                            } else if (priceDiff < 0) {
-                                details += `Diferença: Loja devolve R$ ${Math.abs(priceDiff).toFixed(2).replace('.', ',')}\n`;
+                                details += `Diferença: +R$ ${priceDiff.toFixed(2).replace('.', ',')} (Cliente paga mais - entra dinheiro)\n`;
                             } else {
-                                details += `Diferença: Sem diferença de valor\n`;
+                                details += `Diferença: -R$ ${Math.abs(priceDiff).toFixed(2).replace('.', ',')} (Cliente recebe reembolso - sai dinheiro)\n`;
                             }
                         }
                     }
@@ -1439,8 +1444,9 @@
                 details += `Forma de Pagamento: ${returnItem.original_payment_method || 'N/A'}${returnItem.installments ? ` (${returnItem.installments}x)` : ''}\n\n`;
                 
                 details += `Status: ${returnItem.status === 'pending' ? 'Pendente' : returnItem.status === 'completed' ? 'Concluída' : returnItem.status === 'cancelled' ? 'Cancelada' : returnItem.status}\n`;
-                if (returnItem.processed_by_name) {
-                    details += `Processado por: ${returnItem.processed_by_name}\n`;
+                details += `Usuário: ${returnItem.processed_by_name || 'N/A'}\n`;
+                if (returnItem.processed_by_name && returnItem.processed_at) {
+                    details += `Processado por: ${returnItem.processed_by_name} em ${new Date(returnItem.processed_at).toLocaleDateString('pt-BR')}\n`;
                 }
                 if (returnItem.processed_at) {
                     details += `Data de Processamento: ${new Date(returnItem.processed_at).toLocaleDateString('pt-BR')}\n`;

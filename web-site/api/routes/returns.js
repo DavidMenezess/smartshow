@@ -834,14 +834,47 @@ router.get('/:id', auth, async (req, res) => {
             original_payment_method: returnData.original_payment_method || 'Não informado',
             replacement_product_name: returnData.replacement_product_name || null,
             replacement_price: returnData.replacement_price || null,
-            price_difference: returnData.price_difference || 0
+            price_difference: returnData.price_difference || 0,
+            processed_by_name: returnData.processed_by_name || null
         };
 
+        // Se ainda não tem processed_by_name, buscar
+        if (!returnData.processed_by_name && returnData.processed_by) {
+            try {
+                const user = await db.get('SELECT name FROM users WHERE id = ?', [returnData.processed_by]);
+                if (user) {
+                    returnData.processed_by_name = user.name;
+                }
+            } catch (userError) {
+                console.warn('⚠️ Erro ao buscar nome do usuário:', userError.message);
+            }
+        }
+
         console.log('✅ Devolução encontrada:', returnData.return_number);
+        console.log('✅ Processed by:', returnData.processed_by_name);
         res.json(returnData);
     } catch (error) {
         console.error('❌ Erro ao obter devolução:', error);
         console.error('❌ Stack:', error.stack);
+        console.error('❌ ID da devolução:', req.params.id);
+        
+        // Tentar retornar pelo menos dados básicos
+        try {
+            const basicReturn = await db.get('SELECT * FROM returns WHERE id = ?', [req.params.id]);
+            if (basicReturn) {
+                console.log('⚠️ Retornando dados básicos devido a erro nos JOINs');
+                return res.json({
+                    ...basicReturn,
+                    product_name: 'Produto não encontrado',
+                    customer_name: null,
+                    sale_number: null,
+                    processed_by_name: null
+                });
+            }
+        } catch (basicError) {
+            console.error('❌ Erro ao buscar dados básicos:', basicError);
+        }
+        
         res.status(500).json({ error: 'Erro ao obter devolução', details: error.message });
     }
 });
