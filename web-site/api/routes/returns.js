@@ -1066,13 +1066,34 @@ router.get('/:id', auth, async (req, res) => {
                 const replacementProduct = await db.get('SELECT name, sale_price FROM products WHERE id = ?', [returnData.replacement_product_id]);
                 if (replacementProduct) {
                     returnData.replacement_product_name = replacementProduct.name;
+                    // Se não tem replacement_price, usar sale_price do produto
                     if (!returnData.replacement_price && replacementProduct.sale_price) {
                         returnData.replacement_price = replacementProduct.sale_price;
+                        returnData.replacement_product_price = replacementProduct.sale_price;
+                    }
+                    // Se não tem replacement_product_price, usar replacement_price ou sale_price
+                    if (!returnData.replacement_product_price) {
+                        returnData.replacement_product_price = returnData.replacement_price || replacementProduct.sale_price || null;
                     }
                     console.log('✅ Replacement_product_name adicionado:', returnData.replacement_product_name);
+                    console.log('✅ Replacement_price:', returnData.replacement_price, 'Replacement_product_price:', returnData.replacement_product_price);
                 }
             } catch (replacementError) {
                 console.warn('⚠️ Erro ao buscar produto de substituição:', replacementError.message);
+            }
+        }
+        
+        // Se tem replacement_product_name mas não tem replacement_price, tentar buscar do produto
+        if (returnData.replacement_product_name && !returnData.replacement_price && returnData.replacement_product_id) {
+            try {
+                const replacementProduct = await db.get('SELECT sale_price FROM products WHERE id = ?', [returnData.replacement_product_id]);
+                if (replacementProduct && replacementProduct.sale_price) {
+                    returnData.replacement_price = replacementProduct.sale_price;
+                    returnData.replacement_product_price = replacementProduct.sale_price;
+                    console.log('✅ Replacement_price adicionado do produto:', returnData.replacement_price);
+                }
+            } catch (replacementError) {
+                console.warn('⚠️ Erro ao buscar preço do produto de substituição:', replacementError.message);
             }
         }
 
