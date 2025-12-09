@@ -593,6 +593,19 @@ router.get('/', auth, async (req, res) => {
                         console.warn('⚠️ Erro ao buscar produto de substituição', ret.replacement_product_id, ':', err.message);
                     }
                 }
+                
+                // Se processed_by_name ainda está faltando, buscar novamente
+                if (!ret.processed_by_name && ret.processed_by) {
+                    try {
+                        const processedBy = await db.get('SELECT name FROM users WHERE id = ?', [ret.processed_by]);
+                        if (processedBy) {
+                            ret.processed_by_name = processedBy.name || null;
+                            console.log(`✅ Processed_by_name adicionado (mapeamento final) para devolução ${ret.id}: ${ret.processed_by_name}`);
+                        }
+                    } catch (err) {
+                        console.warn('⚠️ Erro ao buscar usuário processador (mapeamento final)', ret.processed_by, ':', err.message);
+                    }
+                }
             }
         }
         
