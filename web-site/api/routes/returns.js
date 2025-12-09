@@ -373,7 +373,7 @@ router.get('/', auth, async (req, res) => {
                                     ret.replacement_price = ret.replacement_price || null;
                                     ret.price_difference = ret.price_difference || 0;
                                     
-                                    console.log(`✅ Dados adicionados para devolução ${ret.id}: sale_number=${ret.sale_number}, customer_name=${ret.customer_name}, product_name=${ret.product_name}, replacement_product_name=${ret.replacement_product_name}`);
+                                    console.log(`✅ Dados adicionados para devolução ${ret.id}: sale_number=${ret.sale_number}, customer_name=${ret.customer_name}, product_name=${ret.product_name}, replacement_product_name=${ret.replacement_product_name}, processed_by_name=${ret.processed_by_name}, installments=${ret.installments}`);
                                 } catch (joinError) {
                                     console.error('❌ Erro ao buscar dados adicionais para devolução', ret.id, ':', joinError.message);
                                     console.error('❌ Stack:', joinError.stack);
@@ -410,11 +410,26 @@ router.get('/', auth, async (req, res) => {
                 returns = [];
             }
             
-            // Se não encontrou com JOINs mas encontrou sem JOINs, retornar as sem JOINs com dados básicos
-            if (returns.length === 0 && filter.store_id !== null && filter.store_id !== undefined) {
+            // CORREÇÃO CRÍTICA: Se query retornou dados mas estão incompletos, usar fallback também
+            // Verificar se há dados faltando mesmo quando a query retornou resultados
+            let hasIncompleteData = false;
+            if (returns.length > 0) {
+                const firstReturn = returns[0];
+                if (!firstReturn.customer_name || !firstReturn.sale_number || !firstReturn.product_name || !firstReturn.processed_by_name) {
+                    hasIncompleteData = true;
+                    console.warn('⚠️ Query retornou dados mas estão incompletos. Usando fallback para preencher...');
+                }
+            }
+            
+            // Se não encontrou com JOINs OU dados estão incompletos, buscar sem JOINs e preencher
+            if ((returns.length === 0 || hasIncompleteData) && filter.store_id !== null && filter.store_id !== undefined) {
                 const storeIdNum = parseInt(filter.store_id);
                 if (!isNaN(storeIdNum) && storeIdNum > 0) {
-                    console.warn('⚠️ Query com JOINs retornou 0, mas devoluções existem. Buscando sem JOINs...');
+                    if (returns.length === 0) {
+                        console.warn('⚠️ Query com JOINs retornou 0, mas devoluções existem. Buscando sem JOINs...');
+                    } else {
+                        console.warn('⚠️ Query retornou dados incompletos. Buscando dados faltando sem JOINs...');
+                    }
                     const fallbackSimple = await db.all(`SELECT * FROM returns WHERE store_id = ? ORDER BY created_at DESC`, [storeIdNum]);
                     if (fallbackSimple.length > 0) {
                         console.log('✅ Encontradas', fallbackSimple.length, 'devoluções sem JOINs. Adicionando dados básicos...');
@@ -429,7 +444,7 @@ router.get('/', auth, async (req, res) => {
                                 const replacementProduct = ret.replacement_product_id ? await db.get('SELECT name FROM products WHERE id = ?', [ret.replacement_product_id]) : null;
                                 
                                 ret.sale_number = sale?.sale_number || null;
-                                ret.original_payment_method = sale?.payment_method || ret.original_payment_method;
+                                ret.original_payment_method = sale?.payment_method || ret.original_payment_method || null;
                                 ret.installments = sale?.installments || null;
                                 ret.product_name = product?.name || null;
                                 ret.product_barcode = product?.barcode || null;
@@ -441,6 +456,8 @@ router.get('/', auth, async (req, res) => {
                                 // Garantir que replacement_price e price_difference sejam incluídos
                                 ret.replacement_price = ret.replacement_price || null;
                                 ret.price_difference = ret.price_difference || 0;
+                                
+                                console.log(`✅ Dados completos para devolução ${ret.id}: customer=${ret.customer_name}, sale=${ret.sale_number}, product=${ret.product_name}, user=${ret.processed_by_name}, installments=${ret.installments}`);
                             } catch (joinError) {
                                 console.warn('⚠️ Erro ao buscar dados adicionais para devolução', ret.id, ':', joinError.message);
                             }
@@ -514,16 +531,38 @@ router.get('/', auth, async (req, res) => {
                     }
                 }
                 
-                // Se sale_number está faltando, buscar
-                if (!ret.sale_number && ret.sale_id) {
+                // Se sale_number ou installments está faltando, buscar
+                if ((!ret.sale_number || !ret.installments) && ret.sale_id) {
                     try {
-                        const sale = await db.get('SELECT sale_number FROM sales WHERE id = ?', [ret.sale_id]);
+                        const sale = await db.get('SELECT sale_number, payment_method, installments FROM sales WHERE id = ?', [ret.sale_id]);
                         if (sale) {
-                            ret.sale_number = sale.sale_number || null;
-                            console.log(`✅ Sale_number adicionado para devolução ${ret.id}: ${ret.sale_number}`);
+                            if (!ret.sale_number) {
+                                ret.sale_number = sale.sale_number || null;
+                                console.log(`✅ Sale_number adicionado para devolução ${ret.id}: ${ret.sale_number}`);
+                            }
+                            if (!ret.installments) {
+                                ret.installments = sale.installments || null;
+                                console.log(`✅ Installments adicionado para devolução ${ret.id}: ${ret.installments}`);
+                            }
+                            if (!ret.original_payment_method) {
+                                ret.original_payment_method = sale.payment_method || ret.original_payment_method || null;
+                            }
                         }
                     } catch (err) {
                         console.warn('⚠️ Erro ao buscar venda', ret.sale_id, ':', err.message);
+                    }
+                }
+                
+                // Se processed_by_name está faltando, buscar
+                if (!ret.processed_by_name && ret.processed_by) {
+                    try {
+                        const processedBy = await db.get('SELECT name FROM users WHERE id = ?', [ret.processed_by]);
+                        if (processedBy) {
+                            ret.processed_by_name = processedBy.name || null;
+                            console.log(`✅ Processed_by_name adicionado para devolução ${ret.id}: ${ret.processed_by_name}`);
+                        }
+                    } catch (err) {
+                        console.warn('⚠️ Erro ao buscar usuário processador', ret.processed_by, ':', err.message);
                     }
                 }
                 
@@ -549,9 +588,11 @@ router.get('/', auth, async (req, res) => {
                 customer_name: ret.customer_name || null,
                 sale_number: ret.sale_number || null,
                 original_payment_method: ret.original_payment_method || 'Não informado',
+                installments: ret.installments || null,
                 replacement_product_name: ret.replacement_product_name || null,
                 replacement_price: ret.replacement_price || null,
-                price_difference: ret.price_difference || 0
+                price_difference: ret.price_difference || 0,
+                processed_by_name: ret.processed_by_name || null
             };
         });
         
