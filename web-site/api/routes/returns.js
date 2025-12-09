@@ -261,12 +261,20 @@ router.get('/', auth, async (req, res) => {
                 }
             }
             
-            // CORREÇÃO CRÍTICA: Se admin sem store_id, usar fallback IMEDIATAMENTE
-            // A query com JOINs pode falhar silenciosamente, então vamos usar fallback direto
+            // CORREÇÃO CRÍTICA: Para usuários não-admin, SEMPRE pular query principal e usar fallback DIRETO
+            // Para admin sem store_id, também usar fallback direto
             let shouldUseFallback = false;
             let skipMainQuery = false;
             
-            if (filter.canSeeAll && !filter.store_id) {
+            // Verificar se é usuário não-admin (gerente, caixa, vendedor) com store_id
+            const isNonAdminWithStore = !filter.canSeeAll && filter.store_id !== null && filter.store_id !== undefined;
+            
+            if (isNonAdminWithStore) {
+                console.log('🔍 Usuário não-admin (gerente/caixa/vendedor) detectado - Usando fallback DIRETO');
+                console.log('🔄 Pulando query com JOINs e usando fallback imediatamente para garantir dados completos');
+                skipMainQuery = true;
+                shouldUseFallback = true;
+            } else if (filter.canSeeAll && !filter.store_id) {
                 console.log('🔍 Admin/Gerente SEM store_id detectado - Usando fallback DIRETO');
                 console.log('🔄 Pulando query com JOINs e usando fallback imediatamente para garantir que funcione');
                 skipMainQuery = true;
