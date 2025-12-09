@@ -1415,23 +1415,38 @@
                 details += `Usuário: ${returnItem.processed_by_name || 'N/A'}\n\n`;
                 
                 // Ação detalhada
+                details += `\n═══════════════════════════════════\n`;
+                details += `AÇÃO REALIZADA\n`;
+                details += `═══════════════════════════════════\n\n`;
+                
                 if (returnItem.action_type === 'same_product') {
                     details += `Ação: Troca pelo mesmo produto\n`;
                 } else if (returnItem.action_type === 'different_product') {
-                    details += `Ação: Troca por outro produto\n`;
+                    details += `Ação: Troca por outro produto\n\n`;
                     if (returnItem.replacement_product_name) {
-                        details += `Produto de Substituição: ${returnItem.replacement_product_name}\n`;
+                        details += `Produto Original (Devolvido):\n`;
+                        details += `  - Nome: ${returnItem.product_name || returnItem.product_barcode || 'Produto não encontrado'}\n`;
+                        details += `  - Valor: R$ ${parseFloat(returnItem.original_price || 0).toFixed(2).replace('.', ',')}\n\n`;
+                        details += `Produto de Substituição (Novo):\n`;
+                        details += `  - Nome: ${returnItem.replacement_product_name}\n`;
                         if (returnItem.replacement_price) {
-                            details += `Valor de Substituição: R$ ${parseFloat(returnItem.replacement_price).toFixed(2).replace('.', ',')}\n`;
+                            details += `  - Valor: R$ ${parseFloat(returnItem.replacement_price).toFixed(2).replace('.', ',')}\n`;
+                        } else if (returnItem.replacement_product_price) {
+                            details += `  - Valor: R$ ${parseFloat(returnItem.replacement_product_price).toFixed(2).replace('.', ',')}\n`;
                         }
                         const priceDiff = parseFloat(returnItem.price_difference || 0);
                         if (priceDiff !== 0) {
+                            details += `\nDiferença de Valor:\n`;
                             if (priceDiff > 0) {
-                                details += `Diferença: +R$ ${priceDiff.toFixed(2).replace('.', ',')} (Cliente paga mais - entra dinheiro)\n`;
+                                details += `  +R$ ${priceDiff.toFixed(2).replace('.', ',')} (Cliente paga mais - entra dinheiro no caixa)\n`;
                             } else {
-                                details += `Diferença: -R$ ${Math.abs(priceDiff).toFixed(2).replace('.', ',')} (Cliente recebe reembolso - sai dinheiro)\n`;
+                                details += `  -R$ ${Math.abs(priceDiff).toFixed(2).replace('.', ',')} (Cliente recebe reembolso - sai dinheiro do caixa)\n`;
                             }
+                        } else {
+                            details += `\nDiferença de Valor: Sem diferença (valores iguais)\n`;
                         }
+                    } else {
+                        details += `Produto de Substituição: Não informado\n`;
                     }
                 } else if (returnItem.action_type === 'refund') {
                     details += `Ação: Reembolso\n`;
@@ -1440,8 +1455,17 @@
                     }
                 }
                 
-                details += `\nValor Original: R$ ${parseFloat(returnItem.original_price || 0).toFixed(2).replace('.', ',')}\n`;
-                details += `Forma de Pagamento: ${returnItem.original_payment_method || 'N/A'}${returnItem.installments ? ` (${returnItem.installments}x)` : ''}\n\n`;
+                details += `\n═══════════════════════════════════\n`;
+                details += `INFORMAÇÕES DA VENDA ORIGINAL\n`;
+                details += `═══════════════════════════════════\n\n`;
+                details += `Valor Original: R$ ${parseFloat(returnItem.original_price || 0).toFixed(2).replace('.', ',')}\n`;
+                details += `Forma de Pagamento: ${returnItem.original_payment_method || 'N/A'}`;
+                if (returnItem.installments && returnItem.installments > 1) {
+                    details += ` (${returnItem.installments}x parcelas)`;
+                } else if (returnItem.installments === 1) {
+                    details += ` (À vista)`;
+                }
+                details += `\n\n`;
                 
                 details += `Status: ${returnItem.status === 'pending' ? 'Pendente' : returnItem.status === 'completed' ? 'Concluída' : returnItem.status === 'cancelled' ? 'Cancelada' : returnItem.status}\n`;
                 details += `Usuário: ${returnItem.processed_by_name || 'N/A'}\n`;

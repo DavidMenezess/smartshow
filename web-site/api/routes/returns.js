@@ -910,9 +910,24 @@ router.get('/:id', auth, async (req, res) => {
             returnData = null;
         }
 
+        // CORREÇÃO CRÍTICA: Verificar se dados estão incompletos mesmo quando a query retorna dados
+        // Verificar se pelo menos um campo importante está faltando
+        const hasIncompleteData = returnData && (
+            !returnData.customer_name || 
+            !returnData.sale_number || 
+            !returnData.product_name || 
+            !returnData.processed_by_name ||
+            returnData.product_name === 'Produto não encontrado' ||
+            !returnData.installments && returnData.sale_id
+        );
+        
         // Se não encontrou ou dados estão incompletos, buscar sem JOINs e adicionar manualmente
-        if (!returnData || !returnData.product_name) {
-            console.log('⚠️ Devolução não encontrada ou dados incompletos com JOINs. Buscando sem JOINs...');
+        if (!returnData || hasIncompleteData) {
+            if (hasIncompleteData) {
+                console.log('⚠️ Devolução encontrada mas dados estão incompletos. Buscando sem JOINs para preencher...');
+            } else {
+                console.log('⚠️ Devolução não encontrada com JOINs. Buscando sem JOINs...');
+            }
             const simpleReturn = await db.get('SELECT * FROM returns WHERE id = ?', [id]);
             
             if (!simpleReturn) {
@@ -921,17 +936,17 @@ router.get('/:id', auth, async (req, res) => {
             
             // Adicionar dados básicos manualmente
             try {
-                const sale = await db.get('SELECT sale_number, payment_method, installments, total FROM sales WHERE id = ?', [simpleReturn.sale_id]);
-                const product = await db.get('SELECT name, barcode, sale_price FROM products WHERE id = ?', [simpleReturn.product_id]);
+                const sale = simpleReturn.sale_id ? await db.get('SELECT sale_number, payment_method, installments, total FROM sales WHERE id = ?', [simpleReturn.sale_id]) : null;
+                const product = simpleReturn.product_id ? await db.get('SELECT name, barcode, sale_price FROM products WHERE id = ?', [simpleReturn.product_id]) : null;
                 const customer = simpleReturn.customer_id ? await db.get('SELECT name, document FROM customers WHERE id = ?', [simpleReturn.customer_id]) : null;
-                const store = await db.get('SELECT name FROM stores WHERE id = ?', [simpleReturn.store_id]);
+                const store = simpleReturn.store_id ? await db.get('SELECT name FROM stores WHERE id = ?', [simpleReturn.store_id]) : null;
                 const processedBy = simpleReturn.processed_by ? await db.get('SELECT name FROM users WHERE id = ?', [simpleReturn.processed_by]) : null;
                 const replacementProduct = simpleReturn.replacement_product_id ? await db.get('SELECT name, sale_price FROM products WHERE id = ?', [simpleReturn.replacement_product_id]) : null;
                 
                 returnData = {
                     ...simpleReturn,
                     sale_number: sale?.sale_number || null,
-                    original_payment_method: sale?.payment_method || simpleReturn.original_payment_method,
+                    original_payment_method: sale?.payment_method || simpleReturn.original_payment_method || null,
                     installments: sale?.installments || null,
                     sale_total: sale?.total || null,
                     product_name: product?.name || null,
@@ -948,6 +963,16 @@ router.get('/:id', auth, async (req, res) => {
                 };
                 
                 console.log('✅ Dados adicionados manualmente para devolução', id);
+                console.log('✅ Dados completos:', {
+                    customer_name: returnData.customer_name,
+                    sale_number: returnData.sale_number,
+                    product_name: returnData.product_name,
+                    processed_by_name: returnData.processed_by_name,
+                    installments: returnData.installments,
+                    replacement_product_name: returnData.replacement_product_name,
+                    replacement_price: returnData.replacement_price,
+                    price_difference: returnData.price_difference
+                });
             } catch (joinError) {
                 console.error('❌ Erro ao buscar dados adicionais:', joinError);
                 // Retornar mesmo sem dados adicionais
