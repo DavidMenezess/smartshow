@@ -1429,10 +1429,12 @@
                         details += `  - Valor: R$ ${parseFloat(returnItem.original_price || 0).toFixed(2).replace('.', ',')}\n\n`;
                         details += `Produto de Substituição (Novo):\n`;
                         details += `  - Nome: ${returnItem.replacement_product_name}\n`;
-                        if (returnItem.replacement_price) {
-                            details += `  - Valor: R$ ${parseFloat(returnItem.replacement_price).toFixed(2).replace('.', ',')}\n`;
-                        } else if (returnItem.replacement_product_price) {
-                            details += `  - Valor: R$ ${parseFloat(returnItem.replacement_product_price).toFixed(2).replace('.', ',')}\n`;
+                        // Usar replacement_price ou replacement_product_price
+                        const replacementPrice = returnItem.replacement_price || returnItem.replacement_product_price;
+                        if (replacementPrice) {
+                            details += `  - Valor: R$ ${parseFloat(replacementPrice).toFixed(2).replace('.', ',')}\n`;
+                        } else {
+                            details += `  - Valor: Não informado\n`;
                         }
                         const priceDiff = parseFloat(returnItem.price_difference || 0);
                         if (priceDiff !== 0) {
