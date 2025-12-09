@@ -428,17 +428,64 @@ router.get('/', auth, async (req, res) => {
                 }
             }
             
-            // CORREÇÃO CRÍTICA: Para usuários não-admin, SEMPRE usar fallback se houver store_id
-            // Isso garante que todos os dados sejam preenchidos corretamente
+            // CORREÇÃO CRÍTICA: Para usuários não-admin (gerente, caixa, vendedor), SEMPRE usar fallback se houver store_id
+            // Isso garante que todos os dados sejam preenchidos corretamente, independentemente do resultado da query principal
             const shouldUseFallbackForNonAdmin = !filter.canSeeAll && filter.store_id !== null && filter.store_id !== undefined;
             
-            // Se não encontrou com JOINs OU dados estão incompletos OU é usuário não-admin, buscar sem JOINs e preencher
-            if ((returns.length === 0 || hasIncompleteData || shouldUseFallbackForNonAdmin) && filter.store_id !== null && filter.store_id !== undefined) {
+            // Se é usuário não-admin, SEMPRE usar fallback (pular query principal com JOINs que pode falhar)
+            if (shouldUseFallbackForNonAdmin) {
                 const storeIdNum = parseInt(filter.store_id);
                 if (!isNaN(storeIdNum) && storeIdNum > 0) {
-                    if (shouldUseFallbackForNonAdmin) {
-                        console.log('🔄 Usuário não-admin detectado - usando fallback para garantir dados completos...');
-                    } else if (returns.length === 0) {
+                    console.log('🔄 Usuário não-admin detectado (gerente/caixa/vendedor) - usando fallback DIRETO para garantir dados completos...');
+                    console.log('🔄 Pulando query principal com JOINs e usando fallback imediatamente...');
+                    
+                    // Buscar devoluções sem JOINs
+                    const fallbackSimple = await db.all(`SELECT * FROM returns WHERE store_id = ? ORDER BY created_at DESC`, [storeIdNum]);
+                    if (fallbackSimple.length > 0) {
+                        console.log('✅ Encontradas', fallbackSimple.length, 'devoluções sem JOINs. Adicionando dados básicos...');
+                        // Adicionar dados básicos manualmente para TODAS as devoluções
+                        for (const ret of fallbackSimple) {
+                            try {
+                                const sale = ret.sale_id ? await db.get('SELECT sale_number, payment_method, installments FROM sales WHERE id = ?', [ret.sale_id]) : null;
+                                const product = ret.product_id ? await db.get('SELECT name, barcode FROM products WHERE id = ?', [ret.product_id]) : null;
+                                const customer = ret.customer_id ? await db.get('SELECT name, document FROM customers WHERE id = ?', [ret.customer_id]) : null;
+                                const store = ret.store_id ? await db.get('SELECT name FROM stores WHERE id = ?', [ret.store_id]) : null;
+                                const processedBy = ret.processed_by ? await db.get('SELECT name FROM users WHERE id = ?', [ret.processed_by]) : null;
+                                const replacementProduct = ret.replacement_product_id ? await db.get('SELECT name FROM products WHERE id = ?', [ret.replacement_product_id]) : null;
+                                
+                                // CORREÇÃO: Sempre preencher, mesmo se já existir (substituir dados incompletos)
+                                ret.sale_number = sale?.sale_number || null;
+                                ret.original_payment_method = sale?.payment_method || ret.original_payment_method || null;
+                                ret.installments = sale?.installments || null;
+                                ret.product_name = product?.name || null;
+                                ret.product_barcode = product?.barcode || null;
+                                ret.customer_name = customer?.name || null;
+                                ret.customer_document = customer?.document || null;
+                                ret.store_name = store?.name || null;
+                                ret.processed_by_name = processedBy?.name || null;
+                                ret.replacement_product_name = replacementProduct?.name || null;
+                                // Garantir que replacement_price e price_difference sejam incluídos
+                                ret.replacement_price = ret.replacement_price || null;
+                                ret.price_difference = ret.price_difference || 0;
+                                
+                                console.log(`✅ Dados completos para devolução ${ret.id}: customer=${ret.customer_name}, sale=${ret.sale_number}, product=${ret.product_name}, user=${ret.processed_by_name}, installments=${ret.installments}, replacement=${ret.replacement_product_name}`);
+                            } catch (joinError) {
+                                console.warn('⚠️ Erro ao buscar dados adicionais para devolução', ret.id, ':', joinError.message);
+                            }
+                        }
+                        // CORREÇÃO CRÍTICA: Substituir completamente os dados da query principal pelos do fallback
+                        returns = fallbackSimple;
+                        console.log('✅ Retornando', returns.length, 'devoluções com dados completos adicionados (fallback para não-admin)');
+                    } else {
+                        returns = [];
+                        console.log('ℹ️ Nenhuma devolução encontrada para store_id:', storeIdNum);
+                    }
+                }
+            } else if ((returns.length === 0 || hasIncompleteData) && filter.store_id !== null && filter.store_id !== undefined) {
+                // Para admin ou quando há dados incompletos, usar fallback como backup
+                const storeIdNum = parseInt(filter.store_id);
+                if (!isNaN(storeIdNum) && storeIdNum > 0) {
+                    if (returns.length === 0) {
                         console.warn('⚠️ Query com JOINs retornou 0, mas devoluções existem. Buscando sem JOINs...');
                     } else {
                         console.warn('⚠️ Query retornou dados incompletos. Buscando dados faltando sem JOINs...');
