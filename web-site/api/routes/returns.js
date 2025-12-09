@@ -987,8 +987,10 @@ router.get('/:id', auth, async (req, res) => {
             customer_name: returnData.customer_name || null,
             sale_number: returnData.sale_number || null,
             original_payment_method: returnData.original_payment_method || 'Não informado',
+            installments: returnData.installments || null,
             replacement_product_name: returnData.replacement_product_name || null,
             replacement_price: returnData.replacement_price || null,
+            replacement_product_price: returnData.replacement_product_price || returnData.replacement_price || null,
             price_difference: returnData.price_difference || 0,
             processed_by_name: returnData.processed_by_name || null
         };
