@@ -261,9 +261,11 @@ function renderReturnsTable(returns) {
                 const priceDiff = parseFloat(returnItem.price_difference || 0);
                 if (priceDiff !== 0) {
                     if (priceDiff > 0) {
-                        actionDetails += ` <span style="color: #ef4444; font-weight: bold;">(+R$ ${priceDiff.toFixed(2).replace('.', ',')})</span>`;
+                        // Cliente paga mais - entra dinheiro no caixa = VERDE
+                        actionDetails += ` <span style="color: #10b981; font-weight: bold;">(+R$ ${priceDiff.toFixed(2).replace('.', ',')})</span>`;
                     } else {
-                        actionDetails += ` <span style="color: #10b981; font-weight: bold;">(R$ ${Math.abs(priceDiff).toFixed(2).replace('.', ',')})</span>`;
+                        // Cliente recebe reembolso - sai dinheiro do caixa = VERMELHO
+                        actionDetails += ` <span style="color: #ef4444; font-weight: bold;">(-R$ ${Math.abs(priceDiff).toFixed(2).replace('.', ',')})</span>`;
                     }
                 }
             } else {
