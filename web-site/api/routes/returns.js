@@ -397,6 +397,11 @@ router.get('/', auth, async (req, res) => {
                                 sale_number: returns[0].sale_number,
                                 store_id: returns[0].store_id
                             } : 'Nenhuma');
+                            // CORREÇÃO: Garantir que retornamos imediatamente após o fallback
+                            if (returns.length > 0) {
+                                console.log('✅ Fallback admin concluído com sucesso. Retornando', returns.length, 'devoluções');
+                                return res.json(returns);
+                            }
                         } else {
                             console.log('ℹ️ Nenhuma devolução encontrada no banco.');
                             returns = []; // Garantir que seja array vazio
