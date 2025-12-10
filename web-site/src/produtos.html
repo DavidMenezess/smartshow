@@ -1302,18 +1302,25 @@
                 console.log('✅ Devolução criada com sucesso:', createdReturn);
                 console.log('✅ Store_id da devolução criada:', createdReturn?.store_id);
                 
-                // Se for troca por outro produto ou reembolso, imprimir cupom automaticamente
+                // Perguntar se deseja imprimir a nota de devolução
+                let shouldPrint = false;
                 if (actionType === 'different_product' || actionType === 'refund') {
-                    try {
-                        await api.printExchangeReceipt(createdReturn);
-                        console.log('Cupom de troca impresso automaticamente');
-                    } catch (printError) {
-                        console.warn('Erro ao imprimir cupom de troca:', printError);
-                        // Não bloquear o fluxo se a impressão falhar
+                    shouldPrint = confirm('Devolução registrada com sucesso!\n\nDeseja imprimir a nota de devolução?');
+                    
+                    if (shouldPrint) {
+                        try {
+                            await api.printExchangeReceipt(createdReturn);
+                            console.log('Cupom de troca impresso');
+                            alert('Nota de devolução impressa com sucesso!');
+                        } catch (printError) {
+                            console.warn('Erro ao imprimir cupom de troca:', printError);
+                            alert('Devolução registrada, mas houve erro ao imprimir a nota.\n\nErro: ' + (printError.message || 'Erro desconhecido'));
+                        }
                     }
+                } else {
+                    alert('Devolução registrada com sucesso!');
                 }
                 
-                alert('Devolução registrada com sucesso!' + (actionType === 'different_product' || actionType === 'refund' ? '\nCupom de troca impresso automaticamente.' : ''));
                 closeReturnFormModal();
                 
                 // Aguardar um pouco antes de recarregar para garantir que a devolução foi salva

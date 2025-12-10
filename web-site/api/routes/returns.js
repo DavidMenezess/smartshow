@@ -1570,6 +1570,33 @@ router.post('/', auth, async (req, res) => {
                                  VALUES (?, ?, ?, ?, ?, ?)`,
                                 [cashControl.id, movementType, amount, description, req.user.id, new Date().toISOString()]
                             );
+                            
+                            // CORREÇÃO CRÍTICA: Atualizar saldo atual do caixa
+                            if (priceDifference > 0) {
+                                // Cliente paga mais - entra dinheiro no caixa
+                                const newTodaySales = (cashControl.today_sales || 0) + amount;
+                                const newCurrentBalance = (cashControl.initial_cash || 0) + newTodaySales;
+                                await db.run(
+                                    `UPDATE cash_control 
+                                     SET today_sales = ?, 
+                                         current_balance = ?
+                                     WHERE id = ?`,
+                                    [newTodaySales, newCurrentBalance, cashControl.id]
+                                );
+                                console.log('✅ Caixa atualizado: +R$', amount, '(entra dinheiro)');
+                            } else {
+                                // Loja devolve - sai dinheiro do caixa
+                                const newTodaySales = (cashControl.today_sales || 0) - amount;
+                                const newCurrentBalance = (cashControl.initial_cash || 0) + newTodaySales;
+                                await db.run(
+                                    `UPDATE cash_control 
+                                     SET today_sales = ?, 
+                                         current_balance = ?
+                                     WHERE id = ?`,
+                                    [newTodaySales, newCurrentBalance, cashControl.id]
+                                );
+                                console.log('✅ Caixa atualizado: -R$', amount, '(sai dinheiro)');
+                            }
                         } else {
                             console.warn('Aviso: Caixa não está aberto. Movimentação de caixa não foi registrada.');
                         }
@@ -1598,6 +1625,18 @@ router.post('/', auth, async (req, res) => {
                                  VALUES (?, 'exit', ?, ?, ?, ?)`,
                                 [cashControl.id, refundAmount, `Devolução - Reembolso (${returnNumber})`, req.user.id, new Date().toISOString()]
                             );
+                            
+                            // CORREÇÃO CRÍTICA: Atualizar saldo atual do caixa (sai dinheiro)
+                            const newTodaySales = (cashControl.today_sales || 0) - refundAmount;
+                            const newCurrentBalance = (cashControl.initial_cash || 0) + newTodaySales;
+                            await db.run(
+                                `UPDATE cash_control 
+                                 SET today_sales = ?, 
+                                     current_balance = ?
+                                 WHERE id = ?`,
+                                [newTodaySales, newCurrentBalance, cashControl.id]
+                            );
+                            console.log('✅ Caixa atualizado: -R$', refundAmount, '(reembolso - sai dinheiro)');
                         } else {
                             console.warn('Aviso: Caixa não está aberto. Movimentação de caixa não foi registrada.');
                         }
