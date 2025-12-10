@@ -1236,14 +1236,22 @@
                     console.log('Diferença calculada:', { replacementPrice, originalPrice, difference });
                     
                     let message = '';
+                    let backgroundColor = '';
                     if (difference > 0) {
-                        message = `<span style="color: #ef4444; font-weight: bold;">Cliente paga: R$ ${difference.toFixed(2)} (entra no caixa)</span>`;
+                        // Cliente paga mais - entra dinheiro no caixa = VERDE
+                        message = `<span style="color: #10b981; font-weight: bold;">Cliente paga: R$ ${difference.toFixed(2)} (entra no caixa)</span>`;
+                        backgroundColor = '#d1fae5'; // Verde claro
                     } else if (difference < 0) {
-                        message = `<span style="color: #10b981; font-weight: bold;">Loja devolve: R$ ${Math.abs(difference).toFixed(2)} (sai do caixa)</span>`;
+                        // Loja devolve - sai dinheiro do caixa = VERMELHO
+                        message = `<span style="color: #ef4444; font-weight: bold;">Loja devolve: R$ ${Math.abs(difference).toFixed(2)} (sai do caixa)</span>`;
+                        backgroundColor = '#fee2e2'; // Vermelho claro
                     } else {
                         message = '<span style="color: #718096;">Sem diferença de valor</span>';
+                        backgroundColor = '#f3f4f6'; // Cinza claro
                     }
                     
+                    // Atualizar cor de fundo do container
+                    priceDiffInfo.style.backgroundColor = backgroundColor;
                     document.getElementById('priceDifferenceValue').innerHTML = message;
                     priceDiffInfo.style.display = 'block';
                 } else {
