@@ -146,13 +146,18 @@ async function loadReturns() {
         const user = JSON.parse(localStorage.getItem('user') || '{}');
         let storeIdForReturns = null;
         
-        if (selectedStoreId) {
+        // CORREÇÃO: Verificar se selectedStoreId é uma string não vazia
+        // Quando "Todas as Lojas" é selecionado, selectedStoreId é '' (string vazia)
+        if (selectedStoreId && selectedStoreId !== '') {
             storeIdForReturns = selectedStoreId;
         } else if (user.store_id && (user.role !== 'admin' && user.role !== 'gerente')) {
+            // Para usuários não-admin/não-gerente, usar store_id do usuário se não há loja selecionada
             storeIdForReturns = user.store_id;
         }
+        // Se for admin/gerente e não há loja selecionada, storeIdForReturns permanece null
+        // Isso fará a API retornar todas as devoluções
         
-        console.log('📦 Carregando devoluções com storeId:', storeIdForReturns, 'Role:', user.role);
+        console.log('📦 Carregando devoluções com storeId:', storeIdForReturns, 'Role:', user.role, 'selectedStoreId:', selectedStoreId);
         
         const stats = await api.getReturnsStats(storeIdForReturns);
         const returns = await api.getReturns(null, null, null, storeIdForReturns);
