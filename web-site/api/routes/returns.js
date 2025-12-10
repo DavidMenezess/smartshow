@@ -832,6 +832,23 @@ router.get('/', auth, async (req, res) => {
             }
         }
         
+        // CORREÇÃO: Garantir que returns seja sempre um array antes de retornar
+        if (!Array.isArray(returns)) {
+            console.warn('⚠️ Returns não é array no final, convertendo para array vazio');
+            returns = [];
+        }
+        
+        console.log('📤 Retornando', returns.length, 'devoluções para o cliente');
+        if (returns.length > 0) {
+            console.log('📤 Primeira devolução sendo retornada:', {
+                id: returns[0].id,
+                return_number: returns[0].return_number,
+                product_name: returns[0].product_name,
+                customer_name: returns[0].customer_name,
+                sale_number: returns[0].sale_number,
+                store_id: returns[0].store_id
+            });
+        }
         res.json(returns);
     } catch (error) {
         console.error('❌ Erro ao listar devoluções:', error);
