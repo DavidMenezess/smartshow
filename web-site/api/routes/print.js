@@ -201,9 +201,7 @@ async function detectPrinters() {
         if (platform === 'win32') {
             // Windows: usar PowerShell para detectar TODAS as impressoras (USB, Serial, Rede)
             try {
-                // CORREÇÃO CRÍTICA: Comando PowerShell simplificado e mais robusto
-                // Usar arquivo temporário para evitar problemas de encoding
-                const tempFile = require('path').join(require('os').tmpdir(), `printers_${Date.now()}.json`);
+                // CORREÇÃO CRÍTICA: Comando PowerShell simplificado - usar stdout diretamente
                 const psCommand = `
                     $ErrorActionPreference = 'Continue'
                     $printers = Get-Printer -ErrorAction SilentlyContinue
@@ -241,33 +239,16 @@ async function detectPrinters() {
                             Location = if ($printer.Location) { $printer.Location.ToString() } else { '' }
                         }
                     }
-                    $result | ConvertTo-Json -Depth 10 | Out-File -FilePath "${tempFile}" -Encoding UTF8
-                    Get-Content "${tempFile}" -Raw
+                    # Usar [Console]::OutputEncoding para garantir UTF-8
+                    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+                    $result | ConvertTo-Json -Depth 10 -Compress
                 `;
                 
                 console.log('🔍 Executando PowerShell para detectar impressoras...');
-                const fs = require('fs');
-                const path = require('path');
-                const os = require('os');
-                const tempFile = path.join(os.tmpdir(), `printers_${Date.now()}.json`);
-                
-                // Escapar o caminho do arquivo para PowerShell
-                const escapedTempFile = tempFile.replace(/\\/g, '\\\\');
-                const psCommandWithFile = psCommand.replace('${tempFile}', escapedTempFile);
-                
                 try {
-                    const { stdout, stderr } = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommandWithFile}"`);
+                    const { stdout, stderr } = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`);
                     
-                    // Tentar ler do arquivo temporário primeiro
-                    let cleanOutput = '';
-                    if (fs.existsSync(tempFile)) {
-                        cleanOutput = fs.readFileSync(tempFile, 'utf8').trim();
-                        // Limpar arquivo temporário
-                        try { fs.unlinkSync(tempFile); } catch (e) {}
-                    } else {
-                        // Fallback: usar stdout
-                        cleanOutput = stdout.trim();
-                    }
+                    let cleanOutput = stdout.trim();
                     
                     // Remover possíveis mensagens de erro ou warnings
                     if (cleanOutput.includes('[') || cleanOutput.includes('{')) {
