@@ -445,43 +445,193 @@ async function detectPrinters() {
                 // Não lançar erro, apenas logar e tentar método alternativo
             }
         } else if (platform === 'linux') {
-            // Linux: usar lpstat ou lsusb
+            // Linux: usar múltiplos métodos para detectar TODAS as impressoras
+            console.log('🔍 Detectando impressoras no Linux...');
+            
+            // Método 1: lpstat -p (lista todas as impressoras)
             try {
-                const { stdout } = await execAsync('lpstat -p -d 2>/dev/null || lpstat -p 2>/dev/null || echo ""');
+                console.log('🔍 Tentando método 1: lpstat -p...');
+                const { stdout } = await execAsync('lpstat -p 2>&1 || echo ""');
                 const lines = stdout.split('\n').filter(line => line.trim());
                 
+                console.log(`📋 lpstat retornou ${lines.length} linha(s)`);
+                
                 for (const line of lines) {
+                    // Padrão: "printer EPSON_TM-T20X_Receipt is idle.  enabled since ..."
                     const match = line.match(/printer\s+(\S+)/i);
                     if (match) {
                         const printerName = match[1];
-                        printers.push({
-                            name: printerName,
-                            port: 'USB',
-                            type: 'usb',
-                            isDefault: false
-                        });
-                    }
-                }
-            } catch (e) {
-                // Se lpstat falhar, tentar lsusb para impressoras USB
-                try {
-                    const { stdout } = await execAsync('lsusb | grep -i printer || echo ""');
-                    const lines = stdout.split('\n').filter(line => line.trim());
-                    lines.forEach((line, index) => {
-                        const match = line.match(/ID\s+([0-9a-fA-F]{4}):([0-9a-fA-F]{4})/);
-                        if (match) {
+                        // Obter mais informações sobre a impressora
+                        try {
+                            const { stdout: info } = await execAsync(`lpstat -p "${printerName}" -l 2>&1 || echo ""`);
+                            let port = 'USB';
+                            let type = 'usb';
+                            
+                            // Verificar se é USB, serial ou rede
+                            if (info.includes('usb://') || info.includes('USB') || printerName.toUpperCase().includes('USB')) {
+                                port = 'USB';
+                                type = 'usb';
+                            } else if (info.includes('serial://') || info.includes('COM') || printerName.toUpperCase().includes('SERIAL')) {
+                                port = 'Serial';
+                                type = 'serial';
+                            } else if (info.includes('socket://') || info.includes('ipp://') || info.includes('http://')) {
+                                port = 'Network';
+                                type = 'network';
+                            }
+                            
+                            // Verificar se é impressora fiscal por nome
+                            const nameUpper = printerName.toUpperCase();
+                            if (nameUpper.includes('EPSON') || nameUpper.includes('TM-') || nameUpper.includes('TM-T') || 
+                                nameUpper.includes('RECEIPT') || nameUpper.includes('FISCAL') || nameUpper.includes('CUPOM') ||
+                                nameUpper.includes('BEMATECH') || nameUpper.includes('DARUMA')) {
+                                type = 'usb';
+                            }
+                            
                             printers.push({
-                                name: `Impressora USB ${index + 1}`,
-                                port: `/dev/usb/lp${index}`,
+                                name: printerName,
+                                port: port,
+                                type: type,
+                                isDefault: false
+                            });
+                            console.log(`  ✓ lpstat: ${printerName} (${port}) [${type}]`);
+                        } catch (infoError) {
+                            // Se não conseguir info detalhada, adicionar mesmo assim
+                            printers.push({
+                                name: printerName,
+                                port: 'USB',
                                 type: 'usb',
                                 isDefault: false
                             });
+                            console.log(`  ✓ lpstat: ${printerName} (USB) [usb]`);
                         }
-                    });
+                    }
+                }
+            } catch (e) {
+                console.warn('⚠️ Método lpstat falhou:', e.message);
+            }
+            
+            // Método 2: lp -l (lista impressoras com detalhes)
+            if (printers.length === 0) {
+                try {
+                    console.log('🔍 Tentando método 2: lp -l...');
+                    const { stdout } = await execAsync('lp -l 2>&1 | head -20 || echo ""');
+                    const lines = stdout.split('\n').filter(line => line.trim());
+                    
+                    for (const line of lines) {
+                        // Procurar por nomes de impressoras no output
+                        const match = line.match(/([A-Za-z0-9_-]+(?:EPSON|TM|Receipt|Fiscal|Cupom)[A-Za-z0-9_-]*)/i);
+                        if (match) {
+                            const printerName = match[1];
+                            const alreadyAdded = printers.some(p => p.name === printerName);
+                            if (!alreadyAdded) {
+                                printers.push({
+                                    name: printerName,
+                                    port: 'USB',
+                                    type: 'usb',
+                                    isDefault: false
+                                });
+                                console.log(`  ✓ lp -l: ${printerName}`);
+                            }
+                        }
+                    }
                 } catch (e2) {
-                    console.error('Erro ao detectar impressoras USB:', e2);
+                    console.warn('⚠️ Método lp -l falhou:', e2.message);
                 }
             }
+            
+            // Método 3: lsusb (detectar impressoras USB conectadas)
+            try {
+                console.log('🔍 Tentando método 3: lsusb...');
+                const { stdout } = await execAsync('lsusb 2>&1 | grep -iE "(printer|epson|bematech|daruma|tm)" || echo ""');
+                const lines = stdout.split('\n').filter(line => line.trim());
+                
+                lines.forEach((line, index) => {
+                    const match = line.match(/ID\s+([0-9a-fA-F]{4}):([0-9a-fA-F]{4})\s+(.+)/i);
+                    if (match) {
+                        const vendorId = match[1];
+                        const productId = match[2];
+                        const description = match[3];
+                        
+                        // Verificar se já não foi adicionada
+                        const nameFromDesc = description.split(' ').slice(2).join(' ') || `Impressora USB ${index + 1}`;
+                        const alreadyAdded = printers.some(p => p.name === nameFromDesc || p.port.includes(vendorId));
+                        
+                        if (!alreadyAdded) {
+                            printers.push({
+                                name: nameFromDesc,
+                                port: `USB ${vendorId}:${productId}`,
+                                type: 'usb',
+                                isDefault: false
+                            });
+                            console.log(`  ✓ lsusb: ${nameFromDesc} (USB ${vendorId}:${productId})`);
+                        }
+                    }
+                });
+            } catch (e3) {
+                console.warn('⚠️ Método lsusb falhou:', e3.message);
+            }
+            
+            // Método 4: Verificar diretório /dev/usb (impressoras USB diretas)
+            try {
+                console.log('🔍 Tentando método 4: /dev/usb...');
+                const { stdout } = await execAsync('ls -1 /dev/usb/lp* 2>/dev/null || ls -1 /dev/usb/* 2>/dev/null || echo ""');
+                const lines = stdout.split('\n').filter(line => line.trim() && line.includes('lp'));
+                
+                lines.forEach((line, index) => {
+                    const port = line.trim();
+                    const alreadyAdded = printers.some(p => p.port === port);
+                    
+                    if (!alreadyAdded) {
+                        printers.push({
+                            name: `Impressora USB ${index + 1}`,
+                            port: port,
+                            type: 'usb',
+                            isDefault: false
+                        });
+                        console.log(`  ✓ /dev/usb: Impressora USB ${index + 1} (${port})`);
+                    }
+                });
+            } catch (e4) {
+                console.warn('⚠️ Método /dev/usb falhou:', e4.message);
+            }
+            
+            // Método 5: Verificar CUPS diretamente (se disponível)
+            try {
+                console.log('🔍 Tentando método 5: CUPS...');
+                const { stdout } = await execAsync('lpstat -a 2>&1 || echo ""');
+                const lines = stdout.split('\n').filter(line => line.trim());
+                
+                for (const line of lines) {
+                    // Formato: "EPSON_TM-T20X_Receipt accepting requests since..."
+                    const match = line.match(/^(\S+)\s+accepting/i);
+                    if (match) {
+                        const printerName = match[1];
+                        const alreadyAdded = printers.some(p => p.name === printerName);
+                        
+                        if (!alreadyAdded) {
+                            // Verificar tipo por nome
+                            const nameUpper = printerName.toUpperCase();
+                            let type = 'usb';
+                            if (nameUpper.includes('EPSON') || nameUpper.includes('TM-') || nameUpper.includes('RECEIPT') ||
+                                nameUpper.includes('FISCAL') || nameUpper.includes('CUPOM')) {
+                                type = 'usb';
+                            }
+                            
+                            printers.push({
+                                name: printerName,
+                                port: 'USB',
+                                type: type,
+                                isDefault: false
+                            });
+                            console.log(`  ✓ CUPS: ${printerName} (USB) [${type}]`);
+                        }
+                    }
+                }
+            } catch (e5) {
+                console.warn('⚠️ Método CUPS falhou:', e5.message);
+            }
+            
+            console.log(`✅ Total de impressoras detectadas no Linux: ${printers.length}`);
         } else if (platform === 'darwin') {
             // macOS: usar lpstat
             try {
