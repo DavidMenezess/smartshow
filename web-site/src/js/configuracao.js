@@ -217,7 +217,18 @@ async function detectPrinters() {
 // Carregar impressoras detectadas
 async function loadDetectedPrinters() {
     try {
-        const printers = await detectPrinters();
+        let printers = await detectPrinters();
+        
+        // CORREÇÃO CRÍTICA: Se servidor não detectou (Linux) e estamos no Windows, tentar detectar localmente
+        if (printers.length === 0 && navigator.platform && navigator.platform.toUpperCase().includes('WIN')) {
+            console.log('🔍 Servidor não detectou impressoras. Tentando detecção local no Windows...');
+            
+            // Tentar usar window.print() para obter lista de impressoras (não funciona diretamente)
+            // Alternativa: permitir que o usuário digite o nome manualmente ou usar uma lista conhecida
+            
+            // Adicionar opção para digitar manualmente
+            console.log('💡 Dica: Se a impressora não foi detectada automaticamente, você pode digitar o nome manualmente.');
+        }
         
         // Atualizar selects de impressoras
         const fiscalSelect = document.getElementById('fiscalPrinterPath');
@@ -255,8 +266,11 @@ async function loadDetectedPrinters() {
             console.log(`✅ ${filteredPrinters.length} impressora(s) após filtro`);
             
             if (filteredPrinters.length === 0) {
-                fiscalSelect.innerHTML += '<option value="" disabled>Nenhuma impressora detectada. Verifique se há impressoras conectadas.</option>';
+                // Adicionar opção para digitar manualmente
+                fiscalSelect.innerHTML += '<option value="" disabled>Nenhuma impressora detectada automaticamente.</option>';
+                fiscalSelect.innerHTML += '<option value="__MANUAL__">📝 Digitar nome manualmente...</option>';
                 console.warn('⚠️ Nenhuma impressora encontrada após filtro');
+                console.warn('💡 O usuário pode digitar o nome da impressora manualmente');
             } else {
                 filteredPrinters.forEach(printer => {
                     const option = document.createElement('option');
@@ -270,7 +284,33 @@ async function loadDetectedPrinters() {
                     fiscalSelect.appendChild(option);
                     console.log(`  ✓ Adicionada: ${printer.name} (${printer.port}) [${typeLabel}]`);
                 });
+                
+                // Adicionar opção para digitar manualmente no final
+                const manualOption = document.createElement('option');
+                manualOption.value = '__MANUAL__';
+                manualOption.textContent = '📝 Digitar nome manualmente...';
+                fiscalSelect.appendChild(manualOption);
             }
+            
+            // Adicionar listener para opção manual
+            fiscalSelect.addEventListener('change', function() {
+                if (this.value === '__MANUAL__') {
+                    const printerName = prompt('Digite o nome exato da impressora (como aparece no Windows):\n\nExemplo: EPSON TM-T20X Receipt');
+                    if (printerName && printerName.trim()) {
+                        // Criar nova opção com o nome digitado
+                        const newOption = document.createElement('option');
+                        newOption.value = printerName.trim();
+                        newOption.textContent = `${printerName.trim()} (Manual)`;
+                        newOption.selected = true;
+                        // Remover opção manual e adicionar a nova
+                        this.removeChild(this.options[this.selectedIndex]);
+                        this.appendChild(newOption);
+                        console.log(`✅ Impressora adicionada manualmente: ${printerName.trim()}`);
+                    } else {
+                        this.value = '';
+                    }
+                }
+            });
         }
         
         if ((a4Type === 'usb' || a4Type === 'serial') && a4Select) {
@@ -282,7 +322,8 @@ async function loadDetectedPrinters() {
                 : printers.filter(p => p.type === 'usb' || p.type === 'other');
             
             if (filteredPrinters.length === 0) {
-                a4Select.innerHTML += '<option value="" disabled>Nenhuma impressora detectada. Verifique se há impressoras conectadas.</option>';
+                a4Select.innerHTML += '<option value="" disabled>Nenhuma impressora detectada automaticamente.</option>';
+                a4Select.innerHTML += '<option value="__MANUAL__">📝 Digitar nome manualmente...</option>';
             } else {
                 filteredPrinters.forEach(printer => {
                     const option = document.createElement('option');
@@ -295,7 +336,31 @@ async function loadDetectedPrinters() {
                     }
                     a4Select.appendChild(option);
                 });
+                
+                // Adicionar opção para digitar manualmente no final
+                const manualOption = document.createElement('option');
+                manualOption.value = '__MANUAL__';
+                manualOption.textContent = '📝 Digitar nome manualmente...';
+                a4Select.appendChild(manualOption);
             }
+            
+            // Adicionar listener para opção manual
+            a4Select.addEventListener('change', function() {
+                if (this.value === '__MANUAL__') {
+                    const printerName = prompt('Digite o nome exato da impressora (como aparece no Windows):');
+                    if (printerName && printerName.trim()) {
+                        const newOption = document.createElement('option');
+                        newOption.value = printerName.trim();
+                        newOption.textContent = `${printerName.trim()} (Manual)`;
+                        newOption.selected = true;
+                        this.removeChild(this.options[this.selectedIndex]);
+                        this.appendChild(newOption);
+                        console.log(`✅ Impressora A4 adicionada manualmente: ${printerName.trim()}`);
+                    } else {
+                        this.value = '';
+                    }
+                }
+            });
         }
         
         if (printers.length > 0) {
