@@ -59,6 +59,7 @@ router.post('/fiscal/test', async (req, res) => {
 router.post('/exchange-receipt', async (req, res) => {
     try {
         const returnData = req.body;
+        const { printerName } = req.body; // Nome da impressora opcional
         
         // Gerar cupom de troca usando PDF
         const receiptData = {
@@ -82,13 +83,92 @@ router.post('/exchange-receipt', async (req, res) => {
             installments: returnData.installments
         };
         
-        await pdfGenerator.printExchangeReceipt(receiptData);
+        // Gerar PDF primeiro
+        const pdfPath = await pdfGenerator.printExchangeReceipt(receiptData);
+        
+        // Tentar imprimir diretamente na impressora USB se o nome foi fornecido
+        if (printerName && process.platform === 'win32') {
+            try {
+                await printDirectToPrinter(pdfPath, printerName);
+                console.log('✅ Impresso diretamente na impressora:', printerName);
+            } catch (printError) {
+                console.warn('⚠️ Não foi possível imprimir diretamente, usando método padrão:', printError.message);
+                // Fallback: usar método padrão do Windows
+                await pdfGenerator.printPDF(pdfPath);
+            }
+        } else {
+            // Usar método padrão
+            await pdfGenerator.printPDF(pdfPath);
+        }
+        
         res.json({ success: true, message: 'Cupom de troca impresso' });
     } catch (error) {
         console.error('Erro ao imprimir cupom de troca:', error);
         res.status(500).json({ error: error.message });
     }
 });
+
+// Função para imprimir diretamente na impressora USB (Windows)
+async function printDirectToPrinter(pdfPath, printerName) {
+    const platform = process.platform;
+    
+    if (platform === 'win32') {
+        try {
+            // Método 1: Usar SumatraPDF (se disponível) - melhor para impressoras fiscais
+            try {
+                await execAsync(`sumatrapdf.exe -print-to "${printerName}" "${pdfPath}"`);
+                return;
+            } catch (sumatraError) {
+                console.log('⚠️ SumatraPDF não disponível, tentando método alternativo...');
+            }
+            
+            // Método 2: Usar Adobe Reader (se disponível)
+            try {
+                await execAsync(`"C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe" /t "${pdfPath}" "${printerName}"`);
+                return;
+            } catch (adobeError) {
+                console.log('⚠️ Adobe Reader não disponível, tentando método alternativo...');
+            }
+            
+            // Método 3: Usar comando nativo do Windows (print)
+            try {
+                await execAsync(`print /D:"${printerName}" "${pdfPath}"`);
+                return;
+            } catch (printError) {
+                console.log('⚠️ Comando print não funcionou, tentando método alternativo...');
+            }
+            
+            // Método 4: Usar PowerShell para imprimir
+            try {
+                const psCommand = `
+                    $printer = Get-Printer -Name "${printerName}" -ErrorAction SilentlyContinue
+                    if ($printer) {
+                        Start-Process -FilePath "${pdfPath}" -Verb Print -WindowStyle Hidden
+                    } else {
+                        throw "Impressora não encontrada: ${printerName}"
+                    }
+                `;
+                await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`);
+                return;
+            } catch (psError) {
+                console.log('⚠️ PowerShell não funcionou, usando método padrão...');
+            }
+            
+            // Fallback: usar método padrão
+            throw new Error('Nenhum método de impressão direta funcionou');
+        } catch (error) {
+            console.error('❌ Erro ao imprimir diretamente:', error);
+            throw error;
+        }
+    } else {
+        // Linux/Mac: usar lp
+        try {
+            await execAsync(`lp -d "${printerName}" "${pdfPath}"`);
+        } catch (error) {
+            throw new Error(`Erro ao imprimir: ${error.message}`);
+        }
+    }
+}
 
 // Detectar impressoras USB conectadas
 router.get('/detect', async (req, res) => {
@@ -111,21 +191,30 @@ async function detectPrinters() {
             // Windows: usar PowerShell para detectar TODAS as impressoras (USB, Serial, Rede)
             try {
                 // Comando PowerShell mais robusto que detecta todas as impressoras com detalhes
+                // Incluindo detecção melhorada de impressoras USB e fiscais
                 const psCommand = `
                     $printers = Get-Printer | Select-Object Name, PortName, PrinterStatus, Default, DriverName, Shared, Location
                     $result = @()
                     foreach ($printer in $printers) {
                         $port = $printer.PortName
+                        $name = $printer.Name
                         $type = 'other'
-                        if ($port -like '*USB*' -or $port -like '*TMUSB*' -or $port -like '*usb*') {
+                        
+                        # Detecção melhorada de USB (incluindo impressoras fiscais)
+                        if ($port -like '*USB*' -or $port -like '*TMUSB*' -or $port -like '*usb*' -or 
+                            $port -like '*USB00*' -or $port -like '*USB001*' -or $port -like '*USB002*' -or
+                            $name -like '*Fiscal*' -or $name -like '*Cupom*' -or $name -like '*Receipt*' -or
+                            $name -like '*Bematech*' -or $name -like '*Daruma*' -or $name -like '*Epson*' -or
+                            $name -like '*TM*' -or $name -like '*TMT*' -or $driver -like '*USB*') {
                             $type = 'usb'
                         } elseif ($port -like 'COM*' -or $port -like '*COM*') {
                             $type = 'serial'
                         } elseif ($port -like '*.*.*.*' -or $port -like '*IP_*' -or $port -like '*TCP*') {
                             $type = 'network'
                         }
+                        
                         $result += @{
-                            Name = $printer.Name
+                            Name = $name
                             Port = $port
                             Type = $type
                             IsDefault = $printer.Default
@@ -165,6 +254,39 @@ async function detectPrinters() {
                         console.error('Erro ao parsear JSON do PowerShell:', parseError);
                         console.error('Output recebido:', cleanOutput);
                     }
+                }
+                
+                // CORREÇÃO: Também tentar detectar impressoras USB diretamente via WMI
+                try {
+                    const wmicCommand = `wmic printer where "PortName like '%USB%' or PortName like '%TMUSB%'" get Name,PortName,Default /format:csv`;
+                    const { stdout: wmicOutput } = await execAsync(wmicCommand);
+                    const lines = wmicOutput.split('\r\n').filter(line => line.trim() && !line.startsWith('Node') && !line.startsWith(','));
+                    
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        
+                        const parts = line.split(',');
+                        if (parts.length >= 3) {
+                            const name = parts[1]?.trim();
+                            const port = parts[2]?.trim();
+                            const isDefault = parts[3]?.trim() === 'TRUE';
+                            
+                            if (name && name !== 'Name' && name.length > 0) {
+                                // Verificar se já não foi adicionada
+                                const alreadyAdded = printers.some(p => p.name === name);
+                                if (!alreadyAdded) {
+                                    printers.push({
+                                        name: name,
+                                        port: port || 'N/A',
+                                        type: 'usb',
+                                        isDefault: isDefault || false
+                                    });
+                                }
+                            }
+                        }
+                    }
+                } catch (wmicError) {
+                    console.log('⚠️ Não foi possível usar WMI para detectar impressoras USB:', wmicError.message);
                 }
                 
                 // Se não encontrou impressoras, tentar método alternativo com wmic

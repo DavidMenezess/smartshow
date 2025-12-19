@@ -1309,11 +1309,29 @@
                     
                     if (shouldPrint) {
                         try {
-                            await api.printExchangeReceipt(createdReturn);
-                            console.log('Cupom de troca impresso');
+                            // Obter configuração da impressora fiscal do localStorage
+                            let printerName = null;
+                            try {
+                                const printerConfig = JSON.parse(localStorage.getItem('smartshow_printer_config') || '{}');
+                                if (printerConfig.fiscal && printerConfig.fiscal.type === 'usb' && printerConfig.fiscal.path) {
+                                    printerName = printerConfig.fiscal.path;
+                                    console.log(' printer: Usando impressora configurada:', printerName);
+                                }
+                            } catch (configError) {
+                                console.warn('⚠️ Erro ao obter configuração da impressora:', configError);
+                            }
+                            
+                            // Enviar dados da devolução com nome da impressora
+                            const printData = {
+                                ...createdReturn,
+                                printerName: printerName
+                            };
+                            
+                            await api.printExchangeReceipt(printData);
+                            console.log('✅ Cupom de troca impresso');
                             alert('Nota de devolução impressa com sucesso!');
                         } catch (printError) {
-                            console.warn('Erro ao imprimir cupom de troca:', printError);
+                            console.warn('❌ Erro ao imprimir cupom de troca:', printError);
                             alert('Devolução registrada, mas houve erro ao imprimir a nota.\n\nErro: ' + (printError.message || 'Erro desconhecido'));
                         }
                     }
