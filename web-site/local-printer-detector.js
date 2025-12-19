@@ -3,16 +3,42 @@
 // Este script roda localmente no Windows do cliente
 // ========================================
 
-// Verificar se as dependências estão instaladas
+// Tentar carregar dependências de diferentes locais
 let express, cors;
-try {
-    express = require('express');
-    cors = require('cors');
-} catch (e) {
-    console.error('❌ Erro: Dependências não encontradas!');
-    console.error('❌ Execute: npm install express cors');
-    console.error('❌ Ou copie node_modules da pasta api/ para web-site/');
-    process.exit(1);
+const paths = [
+    './api/node_modules',
+    './node_modules',
+    '../api/node_modules',
+    '../../api/node_modules'
+];
+
+let found = false;
+for (const path of paths) {
+    try {
+        const expressPath = require.resolve('express', { paths: [path] });
+        const corsPath = require.resolve('cors', { paths: [path] });
+        express = require(expressPath);
+        cors = require(corsPath);
+        found = true;
+        console.log(`✅ Dependências encontradas em: ${path}`);
+        break;
+    } catch (e) {
+        // Continuar tentando
+    }
+}
+
+if (!found) {
+    try {
+        express = require('express');
+        cors = require('cors');
+        found = true;
+        console.log('✅ Dependências encontradas globalmente');
+    } catch (e) {
+        console.error('❌ Erro: Dependências não encontradas!');
+        console.error('❌ Execute: cd api && npm install express cors');
+        console.error('❌ Ou instale globalmente: npm install -g express cors');
+        process.exit(1);
+    }
 }
 
 const { exec } = require('child_process');
