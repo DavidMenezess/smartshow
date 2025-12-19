@@ -150,47 +150,64 @@ function getAuthHeaders() {
 // Detectar impressoras
 async function detectPrinters() {
     try {
-        console.log('🔍 Iniciando detecção de impressoras no frontend...');
+        console.log('🔍 Iniciando detecção automática de impressoras...');
         
-        // MÉTODO 1: Tentar usar Web API do navegador (se disponível)
-        let clientPrinters = [];
-        if (navigator && navigator.serial) {
-            console.log('🔍 Tentando Web Serial API...');
-            // Web Serial API não lista impressoras diretamente, mas podemos tentar
+        let allPrinters = [];
+        
+        // MÉTODO 1: Tentar servidor local primeiro (se estiver rodando no Windows do cliente)
+        if (navigator.platform && navigator.platform.toUpperCase().includes('WIN')) {
+            try {
+                console.log('🔍 Tentando servidor local (Windows)...');
+                const localResponse = await fetch('http://localhost:3001/detect', {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (localResponse.ok) {
+                    const localData = await localResponse.json();
+                    if (localData.printers && localData.printers.length > 0) {
+                        console.log(`✅ ${localData.printers.length} impressora(s) detectada(s) pelo servidor local`);
+                        allPrinters = localData.printers;
+                        localData.printers.forEach((p, idx) => {
+                            console.log(`  ${idx + 1}. ${p.name} (${p.port}) [${p.type}]`);
+                        });
+                    }
+                }
+            } catch (localError) {
+                console.log('ℹ️ Servidor local não disponível (normal se não estiver rodando):', localError.message);
+            }
         }
         
-        // MÉTODO 2: Usar API do servidor (principal)
-        console.log('🔍 Tentando detecção via servidor...');
-        const response = await fetch('/api/print/detect', {
-            headers: getAuthHeaders()
-        });
-        
-        console.log('📡 Resposta recebida:', response.status, response.statusText);
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ Erro na resposta:', errorText);
-            throw new Error(`Erro ao detectar impressoras: ${response.status} ${response.statusText}`);
+        // MÉTODO 2: Se servidor local não encontrou, tentar servidor remoto
+        if (allPrinters.length === 0) {
+            console.log('🔍 Tentando detecção via servidor remoto...');
+            try {
+                const response = await fetch('/api/print/detect', {
+                    headers: getAuthHeaders()
+                });
+                
+                console.log('📡 Resposta recebida:', response.status, response.statusText);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('📦 Dados recebidos do servidor:', data);
+                    
+                    allPrinters = data.printers || [];
+                    console.log(`✅ ${allPrinters.length} impressora(s) detectada(s) pelo servidor remoto`);
+                    
+                    if (allPrinters.length > 0) {
+                        allPrinters.forEach((p, idx) => {
+                            console.log(`  ${idx + 1}. ${p.name} (${p.port}) [${p.type}]`);
+                        });
+                    }
+                } else {
+                    const errorText = await response.text();
+                    console.error('❌ Erro na resposta do servidor:', errorText);
+                }
+            } catch (serverError) {
+                console.error('❌ Erro ao conectar com servidor remoto:', serverError);
+            }
         }
-        
-        const data = await response.json();
-        console.log('📦 Dados recebidos do servidor:', data);
-        
-        let serverPrinters = data.printers || [];
-        console.log(`✅ ${serverPrinters.length} impressora(s) detectada(s) pelo servidor`);
-        
-        if (serverPrinters.length > 0) {
-            serverPrinters.forEach((p, idx) => {
-                console.log(`  ${idx + 1}. ${p.name} (${p.port}) [${p.type}]`);
-            });
-        }
-        
-        // MÉTODO 3: Se servidor não encontrou nada e estamos no Windows, tentar detectar localmente
-        // Nota: Isso requer que o servidor esteja rodando no mesmo Windows que tem a impressora
-        // Se o servidor estiver na nuvem, a detecção precisa ser feita no servidor
-        
-        // Combinar resultados
-        const allPrinters = [...clientPrinters, ...serverPrinters];
         
         // Remover duplicatas
         const uniquePrinters = [];
@@ -209,7 +226,6 @@ async function detectPrinters() {
     } catch (error) {
         console.error('❌ Erro ao detectar impressoras:', error);
         console.error('❌ Stack:', error.stack);
-        alert('Erro ao detectar impressoras: ' + (error.message || 'Erro desconhecido') + '\n\nVerifique o console para mais detalhes.');
         return [];
     }
 }
