@@ -247,10 +247,16 @@ async function detectPrinters() {
                 
                 console.log('🔍 Executando PowerShell para detectar impressoras...');
                 const fs = require('fs');
-                const tempFile = require('path').join(require('os').tmpdir(), `printers_${Date.now()}.json`);
+                const path = require('path');
+                const os = require('os');
+                const tempFile = path.join(os.tmpdir(), `printers_${Date.now()}.json`);
+                
+                // Escapar o caminho do arquivo para PowerShell
+                const escapedTempFile = tempFile.replace(/\\/g, '\\\\');
+                const psCommandWithFile = psCommand.replace('${tempFile}', escapedTempFile);
                 
                 try {
-                    const { stdout, stderr } = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`);
+                    const { stdout, stderr } = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommandWithFile}"`);
                     
                     // Tentar ler do arquivo temporário primeiro
                     let cleanOutput = '';
