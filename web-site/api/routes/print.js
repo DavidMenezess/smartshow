@@ -381,10 +381,61 @@ async function detectPrinters() {
                 } catch (wmicError) {
                     console.warn('⚠️ Erro ao usar WMI como método adicional:', wmicError.message);
                 }
+                
+                // CORREÇÃO FINAL: Se ainda não encontrou impressoras, tentar método mais simples
+                if (printers.length === 0) {
+                    console.log('🔍 Nenhuma impressora encontrada. Tentando método mais simples...');
+                    try {
+                        // Método mais simples: usar apenas Get-Printer sem filtros
+                        const simpleCommand = `Get-Printer | Select-Object -Property Name, PortName, Default | ConvertTo-Json -Compress`;
+                        const { stdout: simpleOutput } = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${simpleCommand}"`);
+                        
+                        const cleanSimple = simpleOutput.trim();
+                        if (cleanSimple) {
+                            try {
+                                const simpleList = JSON.parse(cleanSimple);
+                                const simpleArray = Array.isArray(simpleList) ? simpleList : [simpleList];
+                                
+                                simpleArray.forEach(printer => {
+                                    if (printer && printer.Name) {
+                                        const port = (printer.PortName || '').toString();
+                                        const name = (printer.Name || '').toString();
+                                        const portUpper = port.toUpperCase();
+                                        const nameUpper = name.toUpperCase();
+                                        
+                                        let type = 'other';
+                                        if (portUpper.includes('USB') || portUpper.includes('TMUSB') || 
+                                            nameUpper.includes('EPSON') || nameUpper.includes('TM-') || 
+                                            nameUpper.includes('RECEIPT') || nameUpper.includes('FISCAL')) {
+                                            type = 'usb';
+                                        } else if (portUpper.includes('COM')) {
+                                            type = 'serial';
+                                        } else if (port.match(/^\d+\.\d+\.\d+\.\d+/)) {
+                                            type = 'network';
+                                        }
+                                        
+                                        printers.push({
+                                            name: name,
+                                            port: port || 'N/A',
+                                            type: type,
+                                            isDefault: printer.Default || false
+                                        });
+                                        console.log(`  + Método simples: ${name} (${port}) [${type}]`);
+                                    }
+                                });
+                            } catch (e) {
+                                console.warn('⚠️ Erro ao parsear método simples:', e.message);
+                            }
+                        }
+                    } catch (simpleError) {
+                        console.warn('⚠️ Método simples também falhou:', simpleError.message);
+                    }
+                }
             } catch (psError) {
-                console.error('Erro ao usar PowerShell:', psError);
-                console.error('Detalhes:', psError.message);
-                // Não lançar erro, apenas logar e retornar array vazio ou tentar outro método
+                console.error('❌ Erro ao usar PowerShell:', psError);
+                console.error('❌ Detalhes:', psError.message);
+                console.error('❌ Stack:', psError.stack);
+                // Não lançar erro, apenas logar e tentar método alternativo
             }
         } else if (platform === 'linux') {
             // Linux: usar lpstat ou lsusb
