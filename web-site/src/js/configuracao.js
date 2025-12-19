@@ -141,18 +141,34 @@ function saveA4PrinterConfig() {
 // Detectar impressoras
 async function detectPrinters() {
     try {
+        console.log('🔍 Iniciando detecção de impressoras no frontend...');
         const response = await fetch('/api/print/detect', {
             headers: getAuthHeaders()
         });
         
+        console.log('📡 Resposta recebida:', response.status, response.statusText);
+        
         if (!response.ok) {
-            throw new Error('Erro ao detectar impressoras');
+            const errorText = await response.text();
+            console.error('❌ Erro na resposta:', errorText);
+            throw new Error(`Erro ao detectar impressoras: ${response.status} ${response.statusText}`);
         }
         
         const data = await response.json();
+        console.log('📦 Dados recebidos:', data);
+        console.log(`✅ ${data.printers ? data.printers.length : 0} impressora(s) detectada(s)`);
+        
+        if (data.printers && data.printers.length > 0) {
+            data.printers.forEach((p, idx) => {
+                console.log(`  ${idx + 1}. ${p.name} (${p.port}) [${p.type}]`);
+            });
+        }
+        
         return data.printers || [];
     } catch (error) {
-        console.error('Erro ao detectar impressoras:', error);
+        console.error('❌ Erro ao detectar impressoras:', error);
+        console.error('❌ Stack:', error.stack);
+        alert('Erro ao detectar impressoras: ' + (error.message || 'Erro desconhecido') + '\n\nVerifique o console para mais detalhes.');
         return [];
     }
 }
@@ -172,13 +188,34 @@ async function loadDetectedPrinters() {
             // Limpar opções existentes
             fiscalSelect.innerHTML = '<option value="">Selecione uma impressora...</option>';
             
+            console.log(`🔍 Filtrando impressoras para tipo: ${fiscalType}`);
+            console.log(`📋 Total de impressoras recebidas: ${printers.length}`);
+            
             // Filtrar impressoras por tipo se necessário
-            const filteredPrinters = fiscalType === 'serial' 
-                ? printers.filter(p => p.type === 'serial')
-                : printers.filter(p => p.type === 'usb' || p.type === 'other');
+            // CORREÇÃO: Para USB, mostrar TODAS as impressoras (USB, other) para garantir que a EPSON apareça
+            let filteredPrinters = [];
+            if (fiscalType === 'serial') {
+                filteredPrinters = printers.filter(p => p.type === 'serial');
+            } else {
+                // Para USB, mostrar USB, other e também qualquer impressora que tenha "EPSON", "TM", "Receipt" no nome
+                filteredPrinters = printers.filter(p => {
+                    const nameUpper = (p.name || '').toUpperCase();
+                    return p.type === 'usb' || 
+                           p.type === 'other' || 
+                           nameUpper.includes('EPSON') || 
+                           nameUpper.includes('TM-') || 
+                           nameUpper.includes('TM-T') || 
+                           nameUpper.includes('RECEIPT') ||
+                           nameUpper.includes('FISCAL') ||
+                           nameUpper.includes('CUPOM');
+                });
+            }
+            
+            console.log(`✅ ${filteredPrinters.length} impressora(s) após filtro`);
             
             if (filteredPrinters.length === 0) {
                 fiscalSelect.innerHTML += '<option value="" disabled>Nenhuma impressora detectada. Verifique se há impressoras conectadas.</option>';
+                console.warn('⚠️ Nenhuma impressora encontrada após filtro');
             } else {
                 filteredPrinters.forEach(printer => {
                     const option = document.createElement('option');
@@ -190,6 +227,7 @@ async function loadDetectedPrinters() {
                         option.selected = true; // Selecionar impressora padrão automaticamente
                     }
                     fiscalSelect.appendChild(option);
+                    console.log(`  ✓ Adicionada: ${printer.name} (${printer.port}) [${typeLabel}]`);
                 });
             }
         }

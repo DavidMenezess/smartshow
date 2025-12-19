@@ -173,11 +173,22 @@ async function printDirectToPrinter(pdfPath, printerName) {
 // Detectar impressoras USB conectadas
 router.get('/detect', async (req, res) => {
     try {
+        console.log('🔍 Iniciando detecção de impressoras...');
+        console.log('🔍 Plataforma:', process.platform);
+        console.log('🔍 User:', req.user ? req.user.username : 'Não autenticado');
+        
         const printers = await detectPrinters();
+        
+        console.log(`✅ Detecção concluída: ${printers.length} impressora(s) encontrada(s)`);
+        printers.forEach((p, idx) => {
+            console.log(`  ${idx + 1}. ${p.name} (${p.port}) [${p.type}] ${p.isDefault ? '[PADRÃO]' : ''}`);
+        });
+        
         res.json({ success: true, printers });
     } catch (error) {
-        console.error('Erro ao detectar impressoras:', error);
-        res.status(500).json({ error: error.message });
+        console.error('❌ Erro ao detectar impressoras:', error);
+        console.error('❌ Stack:', error.stack);
+        res.status(500).json({ error: error.message, printers: [] });
     }
 });
 
@@ -190,75 +201,80 @@ async function detectPrinters() {
         if (platform === 'win32') {
             // Windows: usar PowerShell para detectar TODAS as impressoras (USB, Serial, Rede)
             try {
-                // CORREÇÃO CRÍTICA: Comando PowerShell melhorado com tratamento de erros e logging
-                // Detectar TODAS as impressoras, não apenas USB
+                // CORREÇÃO CRÍTICA: Comando PowerShell simplificado e mais robusto
+                // Usar arquivo temporário para evitar problemas de encoding
+                const tempFile = require('path').join(require('os').tmpdir(), `printers_${Date.now()}.json`);
                 const psCommand = `
-                    $ErrorActionPreference = 'Stop'
-                    try {
-                        $printers = Get-Printer -ErrorAction Stop | Select-Object Name, PortName, PrinterStatus, Default, DriverName, Shared, Location
-                        $result = @()
-                        foreach ($printer in $printers) {
-                            $port = if ($printer.PortName) { $printer.PortName.ToString() } else { '' }
-                            $name = if ($printer.Name) { $printer.Name.ToString() } else { '' }
-                            $driver = if ($printer.DriverName) { $printer.DriverName.ToString() } else { '' }
-                            $type = 'other'
-                            
-                            # Detecção melhorada de USB (incluindo impressoras fiscais)
-                            # Verificar porta E nome E driver para garantir detecção
-                            if ($port -like '*USB*' -or $port -like '*TMUSB*' -or $port -like '*usb*' -or 
-                                $port -like '*USB00*' -or $port -like '*USB001*' -or $port -like '*USB002*' -or
-                                $name -like '*Fiscal*' -or $name -like '*Cupom*' -or $name -like '*Receipt*' -or
-                                $name -like '*Bematech*' -or $name -like '*Daruma*' -or $name -like '*Epson*' -or
-                                $name -like '*TM*' -or $name -like '*TMT*' -or $name -like '*TM-T*' -or
-                                $driver -like '*USB*' -or $driver -like '*TM*' -or $driver -like '*Epson*') {
-                                $type = 'usb'
-                            } elseif ($port -like 'COM*' -or $port -like '*COM*') {
-                                $type = 'serial'
-                            } elseif ($port -match '^\\d+\\.\\d+\\.\\d+\\.\\d+' -or $port -like '*IP_*' -or $port -like '*TCP*') {
-                                $type = 'network'
-                            }
-                            
-                            # SEMPRE adicionar TODAS as impressoras, não apenas USB
-                            $result += @{
-                                Name = $name
-                                Port = $port
-                                Type = $type
-                                IsDefault = if ($printer.Default) { $true } else { $false }
-                                Status = if ($printer.PrinterStatus) { $printer.PrinterStatus.ToString() } else { 'Unknown' }
-                                Driver = $driver
-                                Shared = if ($printer.Shared) { $true } else { $false }
-                                Location = if ($printer.Location) { $printer.Location.ToString() } else { '' }
-                            }
+                    $ErrorActionPreference = 'Continue'
+                    $printers = Get-Printer -ErrorAction SilentlyContinue
+                    $result = @()
+                    foreach ($printer in $printers) {
+                        $port = if ($printer.PortName) { $printer.PortName.ToString() } else { '' }
+                        $name = if ($printer.Name) { $printer.Name.ToString() } else { '' }
+                        $driver = if ($printer.DriverName) { $printer.DriverName.ToString() } else { '' }
+                        $portUpper = $port.ToUpper()
+                        $nameUpper = $name.ToUpper()
+                        $driverUpper = $driver.ToUpper()
+                        $type = 'other'
+                        
+                        # Detecção melhorada de USB (incluindo impressoras fiscais)
+                        if ($portUpper -like '*USB*' -or $portUpper -like '*TMUSB*' -or 
+                            $nameUpper -like '*EPSON*' -or $nameUpper -like '*TM-*' -or $nameUpper -like '*TM-T*' -or
+                            $nameUpper -like '*FISCAL*' -or $nameUpper -like '*CUPOM*' -or $nameUpper -like '*RECEIPT*' -or
+                            $nameUpper -like '*BEMATECH*' -or $nameUpper -like '*DARUMA*' -or
+                            $driverUpper -like '*USB*' -or $driverUpper -like '*TM*' -or $driverUpper -like '*EPSON*') {
+                            $type = 'usb'
+                        } elseif ($portUpper -like 'COM*') {
+                            $type = 'serial'
+                        } elseif ($port -match '^\\d+\\.\\d+\\.\\d+\\.\\d+' -or $portUpper -like '*IP_*' -or $portUpper -like '*TCP*') {
+                            $type = 'network'
                         }
-                        # Converter para JSON com encoding UTF-8 e depth suficiente
-                        $result | ConvertTo-Json -Depth 10 -Compress | Out-File -Encoding UTF8 -FilePath ([System.IO.Path]::GetTempFileName())
-                        $result | ConvertTo-Json -Depth 10 -Compress
-                    } catch {
-                        Write-Error $_.Exception.Message
-                        exit 1
+                        
+                        $result += @{
+                            Name = $name
+                            Port = $port
+                            Type = $type
+                            IsDefault = if ($printer.Default) { $true } else { $false }
+                            Status = if ($printer.PrinterStatus) { $printer.PrinterStatus.ToString() } else { 'Unknown' }
+                            Driver = $driver
+                            Shared = if ($printer.Shared) { $true } else { $false }
+                            Location = if ($printer.Location) { $printer.Location.ToString() } else { '' }
+                        }
                     }
+                    $result | ConvertTo-Json -Depth 10 | Out-File -FilePath "${tempFile}" -Encoding UTF8
+                    Get-Content "${tempFile}" -Raw
                 `;
                 
                 console.log('🔍 Executando PowerShell para detectar impressoras...');
-                const { stdout, stderr } = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`);
+                const fs = require('fs');
+                const tempFile = require('path').join(require('os').tmpdir(), `printers_${Date.now()}.json`);
                 
-                // Limpar stdout e parsear JSON
-                let cleanOutput = stdout.trim();
-                
-                // Remover possíveis mensagens de erro ou warnings do início
-                if (cleanOutput.includes('{') || cleanOutput.includes('[')) {
-                    // Encontrar o início do JSON
-                    const jsonStart = cleanOutput.indexOf('[') !== -1 ? cleanOutput.indexOf('[') : cleanOutput.indexOf('{');
-                    cleanOutput = cleanOutput.substring(jsonStart);
-                }
-                
-                // Remover possíveis mensagens do final
-                if (cleanOutput.includes('}') || cleanOutput.includes(']')) {
-                    const jsonEnd = cleanOutput.lastIndexOf(']') !== -1 ? cleanOutput.lastIndexOf(']') + 1 : cleanOutput.lastIndexOf('}') + 1;
-                    cleanOutput = cleanOutput.substring(0, jsonEnd);
-                }
-                
-                console.log('📋 Output do PowerShell (primeiros 500 chars):', cleanOutput.substring(0, 500));
+                try {
+                    const { stdout, stderr } = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`);
+                    
+                    // Tentar ler do arquivo temporário primeiro
+                    let cleanOutput = '';
+                    if (fs.existsSync(tempFile)) {
+                        cleanOutput = fs.readFileSync(tempFile, 'utf8').trim();
+                        // Limpar arquivo temporário
+                        try { fs.unlinkSync(tempFile); } catch (e) {}
+                    } else {
+                        // Fallback: usar stdout
+                        cleanOutput = stdout.trim();
+                    }
+                    
+                    // Remover possíveis mensagens de erro ou warnings
+                    if (cleanOutput.includes('[') || cleanOutput.includes('{')) {
+                        const jsonStart = cleanOutput.indexOf('[') !== -1 ? cleanOutput.indexOf('[') : cleanOutput.indexOf('{');
+                        cleanOutput = cleanOutput.substring(jsonStart);
+                    }
+                    
+                    if (cleanOutput.includes(']') || cleanOutput.includes('}')) {
+                        const jsonEnd = cleanOutput.lastIndexOf(']') !== -1 ? cleanOutput.lastIndexOf(']') + 1 : cleanOutput.lastIndexOf('}') + 1;
+                        cleanOutput = cleanOutput.substring(0, jsonEnd);
+                    }
+                    
+                    console.log('📋 Output do PowerShell (primeiros 500 chars):', cleanOutput.substring(0, 500));
                 
                 if (cleanOutput) {
                     try {
