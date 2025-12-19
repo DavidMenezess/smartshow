@@ -147,69 +147,94 @@ function getAuthHeaders() {
     };
 }
 
-// Detectar impressoras
+// Detectar impressoras - SOLUÇÃO DEFINITIVA
 async function detectPrinters() {
     try {
         console.log('🔍 Iniciando detecção automática de impressoras...');
+        console.log('🔍 Plataforma do navegador:', navigator.platform);
         
         let allPrinters = [];
+        const isWindows = navigator.platform && navigator.platform.toUpperCase().includes('WIN');
         
-        // MÉTODO 1: Tentar servidor local primeiro (se estiver rodando no Windows do cliente)
-        if (navigator.platform && navigator.platform.toUpperCase().includes('WIN')) {
+        // MÉTODO 1: Tentar servidor local (Windows) - PRIORIDADE MÁXIMA
+        if (isWindows) {
             try {
-                console.log('🔍 Tentando servidor local (Windows)...');
+                console.log('🔍 [MÉTODO 1] Tentando servidor local Windows (http://localhost:3001)...');
+                
+                // Timeout curto para não demorar se não estiver rodando
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 segundos
+                
                 const localResponse = await fetch('http://localhost:3001/detect', {
                     method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
                 
                 if (localResponse.ok) {
                     const localData = await localResponse.json();
                     if (localData.printers && localData.printers.length > 0) {
-                        console.log(`✅ ${localData.printers.length} impressora(s) detectada(s) pelo servidor local`);
+                        console.log(`✅ [MÉTODO 1] ${localData.printers.length} impressora(s) detectada(s) pelo servidor local!`);
                         allPrinters = localData.printers;
                         localData.printers.forEach((p, idx) => {
-                            console.log(`  ${idx + 1}. ${p.name} (${p.port}) [${p.type}]`);
+                            console.log(`  ✓ ${idx + 1}. ${p.name} (${p.port}) [${p.type}]`);
                         });
+                    } else {
+                        console.log('ℹ️ [MÉTODO 1] Servidor local respondeu mas não encontrou impressoras');
                     }
+                } else {
+                    console.log(`ℹ️ [MÉTODO 1] Servidor local respondeu com status ${localResponse.status}`);
                 }
             } catch (localError) {
-                console.log('ℹ️ Servidor local não disponível (normal se não estiver rodando):', localError.message);
+                if (localError.name === 'AbortError') {
+                    console.log('ℹ️ [MÉTODO 1] Servidor local não está rodando (timeout após 2s)');
+                    console.log('💡 Dica: Execute "start-detector-auto.bat" para iniciar o servidor local');
+                } else {
+                    console.log('ℹ️ [MÉTODO 1] Servidor local não disponível:', localError.message);
+                }
             }
         }
         
         // MÉTODO 2: Se servidor local não encontrou, tentar servidor remoto
         if (allPrinters.length === 0) {
-            console.log('🔍 Tentando detecção via servidor remoto...');
+            console.log('🔍 [MÉTODO 2] Tentando detecção via servidor remoto...');
             try {
                 const response = await fetch('/api/print/detect', {
                     headers: getAuthHeaders()
                 });
                 
-                console.log('📡 Resposta recebida:', response.status, response.statusText);
+                console.log('📡 [MÉTODO 2] Resposta recebida:', response.status, response.statusText);
                 
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('📦 Dados recebidos do servidor:', data);
+                    console.log('📦 [MÉTODO 2] Dados recebidos:', data);
                     
                     allPrinters = data.printers || [];
-                    console.log(`✅ ${allPrinters.length} impressora(s) detectada(s) pelo servidor remoto`);
                     
                     if (allPrinters.length > 0) {
+                        console.log(`✅ [MÉTODO 2] ${allPrinters.length} impressora(s) detectada(s) pelo servidor remoto`);
                         allPrinters.forEach((p, idx) => {
-                            console.log(`  ${idx + 1}. ${p.name} (${p.port}) [${p.type}]`);
+                            console.log(`  ✓ ${idx + 1}. ${p.name} (${p.port}) [${p.type}]`);
                         });
+                    } else {
+                        console.log('ℹ️ [MÉTODO 2] Servidor remoto não encontrou impressoras');
+                        if (isWindows && data.platform === 'linux') {
+                            console.log('⚠️ ATENÇÃO: Servidor está no Linux mas impressora está no Windows!');
+                            console.log('💡 SOLUÇÃO: Execute "start-detector-auto.bat" para iniciar detecção local');
+                        }
                     }
                 } else {
                     const errorText = await response.text();
-                    console.error('❌ Erro na resposta do servidor:', errorText);
+                    console.error('❌ [MÉTODO 2] Erro na resposta do servidor:', errorText);
                 }
             } catch (serverError) {
-                console.error('❌ Erro ao conectar com servidor remoto:', serverError);
+                console.error('❌ [MÉTODO 2] Erro ao conectar com servidor remoto:', serverError);
             }
         }
         
-        // Remover duplicatas
+        // Remover duplicatas e garantir que todas as impressoras sejam incluídas
         const uniquePrinters = [];
         const seen = new Set();
         for (const printer of allPrinters) {
@@ -221,6 +246,15 @@ async function detectPrinters() {
         }
         
         console.log(`✅ Total de ${uniquePrinters.length} impressora(s) única(s) detectada(s)`);
+        
+        // Se não encontrou nenhuma e está no Windows, mostrar mensagem útil
+        if (uniquePrinters.length === 0 && isWindows) {
+            console.warn('⚠️ Nenhuma impressora detectada automaticamente!');
+            console.warn('💡 Para detecção automática no Windows:');
+            console.warn('   1. Execute o arquivo: start-detector-auto.bat');
+            console.warn('   2. Mantenha a janela aberta');
+            console.warn('   3. Recarregue esta página e clique em "Atualizar Lista"');
+        }
         
         return uniquePrinters;
     } catch (error) {

@@ -206,5 +206,18 @@ app.get('/health', (req, res) => {
 app.listen(PORT, 'localhost', () => {
     console.log(`🚀 Servidor local de detecção de impressoras rodando em http://localhost:${PORT}`);
     console.log(`🔍 Plataforma: ${process.platform}`);
+    console.log(`✅ Pronto para detectar impressoras automaticamente!`);
+    console.log(`📋 Acesse http://localhost:${PORT}/detect para testar`);
+    console.log(`💡 Mantenha esta janela aberta enquanto usar o sistema`);
+    console.log(``);
+});
+
+// Tratamento de erros
+process.on('uncaughtException', (error) => {
+    console.error('❌ Erro não tratado:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Promise rejeitada:', reason);
 });
 
