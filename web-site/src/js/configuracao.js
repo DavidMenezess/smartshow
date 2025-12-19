@@ -138,6 +138,15 @@ function saveA4PrinterConfig() {
     alert('Configuração da impressora A4 salva com sucesso!');
 }
 
+// Função para obter headers de autenticação
+function getAuthHeaders() {
+    const token = localStorage.getItem('token');
+    return {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+    };
+}
+
 // Detectar impressoras
 async function detectPrinters() {
     try {
