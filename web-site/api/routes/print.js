@@ -176,6 +176,7 @@ router.get('/detect', async (req, res) => {
         console.log('🔍 Iniciando detecção de impressoras...');
         console.log('🔍 Plataforma:', process.platform);
         console.log('🔍 User:', req.user ? req.user.username : 'Não autenticado');
+        console.log('🔍 Hostname:', req.headers.host);
         
         const printers = await detectPrinters();
         
@@ -184,7 +185,19 @@ router.get('/detect', async (req, res) => {
             console.log(`  ${idx + 1}. ${p.name} (${p.port}) [${p.type}] ${p.isDefault ? '[PADRÃO]' : ''}`);
         });
         
-        res.json({ success: true, printers });
+        // Se não encontrou impressoras e está no Linux, adicionar mensagem informativa
+        if (printers.length === 0 && process.platform === 'linux') {
+            console.warn('⚠️ Nenhuma impressora detectada no servidor Linux.');
+            console.warn('⚠️ Se a impressora está conectada no computador Windows do cliente,');
+            console.warn('⚠️ a detecção precisa ser feita localmente ou o servidor precisa estar no Windows.');
+        }
+        
+        res.json({ 
+            success: true, 
+            printers,
+            platform: process.platform,
+            message: printers.length === 0 ? 'Nenhuma impressora detectada. Verifique se está conectada e instalada corretamente.' : null
+        });
     } catch (error) {
         console.error('❌ Erro ao detectar impressoras:', error);
         console.error('❌ Stack:', error.stack);

@@ -151,6 +151,16 @@ function getAuthHeaders() {
 async function detectPrinters() {
     try {
         console.log('🔍 Iniciando detecção de impressoras no frontend...');
+        
+        // MÉTODO 1: Tentar usar Web API do navegador (se disponível)
+        let clientPrinters = [];
+        if (navigator && navigator.serial) {
+            console.log('🔍 Tentando Web Serial API...');
+            // Web Serial API não lista impressoras diretamente, mas podemos tentar
+        }
+        
+        // MÉTODO 2: Usar API do servidor (principal)
+        console.log('🔍 Tentando detecção via servidor...');
         const response = await fetch('/api/print/detect', {
             headers: getAuthHeaders()
         });
@@ -164,16 +174,38 @@ async function detectPrinters() {
         }
         
         const data = await response.json();
-        console.log('📦 Dados recebidos:', data);
-        console.log(`✅ ${data.printers ? data.printers.length : 0} impressora(s) detectada(s)`);
+        console.log('📦 Dados recebidos do servidor:', data);
         
-        if (data.printers && data.printers.length > 0) {
-            data.printers.forEach((p, idx) => {
+        let serverPrinters = data.printers || [];
+        console.log(`✅ ${serverPrinters.length} impressora(s) detectada(s) pelo servidor`);
+        
+        if (serverPrinters.length > 0) {
+            serverPrinters.forEach((p, idx) => {
                 console.log(`  ${idx + 1}. ${p.name} (${p.port}) [${p.type}]`);
             });
         }
         
-        return data.printers || [];
+        // MÉTODO 3: Se servidor não encontrou nada e estamos no Windows, tentar detectar localmente
+        // Nota: Isso requer que o servidor esteja rodando no mesmo Windows que tem a impressora
+        // Se o servidor estiver na nuvem, a detecção precisa ser feita no servidor
+        
+        // Combinar resultados
+        const allPrinters = [...clientPrinters, ...serverPrinters];
+        
+        // Remover duplicatas
+        const uniquePrinters = [];
+        const seen = new Set();
+        for (const printer of allPrinters) {
+            const key = `${printer.name}-${printer.port}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                uniquePrinters.push(printer);
+            }
+        }
+        
+        console.log(`✅ Total de ${uniquePrinters.length} impressora(s) única(s) detectada(s)`);
+        
+        return uniquePrinters;
     } catch (error) {
         console.error('❌ Erro ao detectar impressoras:', error);
         console.error('❌ Stack:', error.stack);
