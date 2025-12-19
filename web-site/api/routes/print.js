@@ -248,54 +248,58 @@ async function detectPrinters() {
                 try {
                     const { stdout, stderr } = await execAsync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`);
                     
-                    let cleanOutput = stdout.trim();
+                    let cleanOutput = stdout ? stdout.trim() : '';
                     
                     // Remover possíveis mensagens de erro ou warnings
-                    if (cleanOutput.includes('[') || cleanOutput.includes('{')) {
+                    if (cleanOutput && (cleanOutput.includes('[') || cleanOutput.includes('{'))) {
                         const jsonStart = cleanOutput.indexOf('[') !== -1 ? cleanOutput.indexOf('[') : cleanOutput.indexOf('{');
                         cleanOutput = cleanOutput.substring(jsonStart);
                     }
                     
-                    if (cleanOutput.includes(']') || cleanOutput.includes('}')) {
+                    if (cleanOutput && (cleanOutput.includes(']') || cleanOutput.includes('}'))) {
                         const jsonEnd = cleanOutput.lastIndexOf(']') !== -1 ? cleanOutput.lastIndexOf(']') + 1 : cleanOutput.lastIndexOf('}') + 1;
                         cleanOutput = cleanOutput.substring(0, jsonEnd);
                     }
                     
-                    console.log('📋 Output do PowerShell (primeiros 500 chars):', cleanOutput.substring(0, 500));
+                    console.log('📋 Output do PowerShell (primeiros 500 chars):', cleanOutput ? cleanOutput.substring(0, 500) : '(vazio)');
                 
-                if (cleanOutput) {
-                    try {
-                        const printerList = JSON.parse(cleanOutput);
-                        const printerArray = Array.isArray(printerList) ? printerList : [printerList];
-                        
-                        console.log(`✅ Encontradas ${printerArray.length} impressora(s) via PowerShell`);
-                        
-                        printerArray.forEach(printer => {
-                            if (printer && printer.Name) {
-                                printers.push({
-                                    name: printer.Name,
-                                    port: printer.Port || 'N/A',
-                                    type: printer.Type || 'other',
-                                    isDefault: printer.IsDefault || false,
-                                    status: printer.Status || 'Unknown',
-                                    driver: printer.Driver || 'N/A',
-                                    shared: printer.Shared || false,
-                                    location: printer.Location || ''
-                                });
-                                console.log(`  - ${printer.Name} (${printer.Port}) [${printer.Type}]`);
-                            }
-                        });
-                    } catch (parseError) {
-                        console.error('❌ Erro ao parsear JSON do PowerShell:', parseError);
-                        console.error('❌ Output recebido (primeiros 1000 chars):', cleanOutput.substring(0, 1000));
-                        console.error('❌ Stack:', parseError.stack);
+                    if (cleanOutput) {
+                        try {
+                            const printerList = JSON.parse(cleanOutput);
+                            const printerArray = Array.isArray(printerList) ? printerList : [printerList];
+                            
+                            console.log(`✅ Encontradas ${printerArray.length} impressora(s) via PowerShell`);
+                            
+                            printerArray.forEach(printer => {
+                                if (printer && printer.Name) {
+                                    printers.push({
+                                        name: printer.Name,
+                                        port: printer.Port || 'N/A',
+                                        type: printer.Type || 'other',
+                                        isDefault: printer.IsDefault || false,
+                                        status: printer.Status || 'Unknown',
+                                        driver: printer.Driver || 'N/A',
+                                        shared: printer.Shared || false,
+                                        location: printer.Location || ''
+                                    });
+                                    console.log(`  - ${printer.Name} (${printer.Port}) [${printer.Type}]`);
+                                }
+                            });
+                        } catch (parseError) {
+                            console.error('❌ Erro ao parsear JSON do PowerShell:', parseError);
+                            console.error('❌ Output recebido (primeiros 1000 chars):', cleanOutput ? cleanOutput.substring(0, 1000) : '(vazio)');
+                            console.error('❌ Stack:', parseError.stack);
+                        }
+                    } else {
+                        console.warn('⚠️ PowerShell não retornou nenhum output');
                     }
-                } else {
-                    console.warn('⚠️ PowerShell não retornou nenhum output');
-                }
-                
-                if (stderr) {
-                    console.warn('⚠️ PowerShell stderr:', stderr);
+                    
+                    if (stderr) {
+                        console.warn('⚠️ PowerShell stderr:', stderr);
+                    }
+                } catch (execError) {
+                    console.warn('⚠️ Erro ao executar PowerShell:', execError.message);
+                    // Continuar para tentar outros métodos
                 }
                 
                 // CORREÇÃO: Também tentar detectar impressoras USB diretamente via WMI
